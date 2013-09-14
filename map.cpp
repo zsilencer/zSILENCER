@@ -1,0 +1,1137 @@
+#include <math.h>
+#include "map.h"
+#include "platform.h"
+#include "civilian.h"
+#include "guard.h"
+#include "robot.h"
+#include "terminal.h"
+#include "vent.h"
+#include "healmachine.h"
+#include "creditmachine.h"
+#include "secretreturn.h"
+#include "surveillancemonitor.h"
+#include "techstation.h"
+#include "inventorystation.h"
+#include "teambillboard.h"
+#include "overlay.h"
+#include "team.h"
+#include "warper.h"
+#include "walldefense.h"
+#include "pickup.h"
+
+Map::Map(){
+	for(unsigned int i = 0; i < 4; i++){
+		fg[i] = 0;
+		bg[i] = 0;
+		fgflipped[i] = 0;
+		bgflipped[i] = 0;
+		fglum[i] = 0;
+		bglum[i] = 0;
+	}
+	width = 0;
+	height = 0;
+	ambience = 0;
+	memset(description, 0, sizeof(description));
+	loaded = false;
+}
+
+Map::~Map(){
+	Unload();
+}
+
+bool Map::Load(const char * filename, World & world, Uint8 securitylevel){
+	Unload();
+	bool result = LoadFile(filename, world, 0, securitylevel);
+	if(result){
+		std::vector<Team *> teams;
+		for(std::list<Object *>::iterator it = world.objectlist.begin(); it != world.objectlist.end(); it++){
+			Object * object = *it;
+			if(object->type == ObjectTypes::TEAM){
+				teams.push_back(static_cast<Team *>(object));
+			}
+		}
+		bool result2 = false;
+		//Uint32 yoffset = height + 10;
+		for(std::vector<Team *>::iterator it = teams.begin(); it != teams.end(); it++){
+			result2 = LoadBase(*(*it), world);
+			//result2 = LoadFile("XBASE15A.SIL", world, yoffset);
+			//yoffset += 26 + 10;
+		}
+		if(result2){
+			loaded = true;
+			return true;
+		}
+	}
+	return false;
+}
+
+bool Map::LoadBase(Team & team, World & world){
+	return LoadFile("XBASE15A.SIL", world, &team);
+}
+
+bool Map::LoadFile(const char * filename, World & world, Team * team, Uint8 securitylevel){
+	SDL_RWops * file = SDL_RWFromFile(filename, "rb");
+	if(!file){
+		return false;
+	}
+	Uint8 firstbyte = 0;
+	Uint8 headerversion = 0;
+	Uint8 maxplayers = 0;
+	Uint8 maxteams = 0;
+	Uint8 padding = 0;
+	Uint8 parallax = 0;
+	Sint8 ambience = 0;
+	Uint32 flags = 0;
+	char description[0x80];
+	memset(description, 0, sizeof(description));
+	Uint32 minimapcompressedsize = 0;
+	Uint8 minimapcompressed[172 * 62];
+	Uint32 levelsize = 0;
+	Uint8 * levelcompressed = new Uint8[20000];
+	const unsigned int maxlevelsize = 200000;
+	Uint8 * level = new Uint8[maxlevelsize];
+	Uint32 numactors = 0;
+	Uint32 numplatforms = 0;
+	Uint16 width;
+	Uint16 height;
+	Sint32 x1, y1, x2, y2, type1, type2 = 0;
+
+	SDL_RWread(file, &firstbyte, 1, 1);
+	SDL_RWread(file, &headerversion, 1, 1);
+	SDL_RWread(file, &maxplayers, 1, 1);
+	SDL_RWread(file, &maxteams, 1, 1);
+	SDL_RWread(file, &width, 2, 1);
+	SDL_RWread(file, &height, 2, 1);
+	width = SDL_SwapBE16(width);
+	height = SDL_SwapBE16(height);
+	SDL_RWread(file, &padding, 1, 1);
+	SDL_RWread(file, &parallax, 1, 1);
+	SDL_RWread(file, &ambience, 1, 1);
+	//ambience -= 128;
+	SDL_RWread(file, &padding, 1, 1);
+	SDL_RWread(file, &padding, 1, 1);
+	SDL_RWread(file, &flags, 4, 1);
+	flags = SDL_SwapBE32(flags);
+	SDL_RWread(file, description, 1, 0x80);
+	description[0x80 - 1] = 0;
+	SDL_RWread(file, &minimapcompressedsize, 4, 1);
+	minimapcompressedsize = SDL_SwapLE32(minimapcompressedsize);
+	SDL_RWread(file, minimapcompressed, 1, minimapcompressedsize);
+	unsigned long minimapsizeuncompressed = sizeof(minimap.pixels);
+	SDL_RWread(file, &levelsize, 4, 1);
+	levelsize = SDL_SwapLE32(levelsize);
+	unsigned long levelsizeuncompressed = maxlevelsize;
+	SDL_RWread(file, levelcompressed, 1, levelsize);
+	SDL_RWclose(file);
+	
+	Uint32 yoffset = 0;
+	
+	if(team == 0){ // team is 0 for main map
+		expandedwidth = (width > 47 ? width : 47);
+		expandedheight = height + ((26 + 10) * 5);
+		Map::width = width;
+		Map::height = height;
+		/*if(parallax > 3){
+			parallax = 3;
+		}*/
+		Map::parallax = parallax;
+		Map::ambience = ambience;
+		uncompress(minimap.pixels, &minimapsizeuncompressed, minimapcompressed, minimapcompressedsize);
+		minimap.Recolor(16 * 4);
+		minimap.CreateSurface();
+		strcpy(Map::description, description);
+		for(unsigned int i = 0; i < 4; i++){
+			fg[i] = new Uint16[expandedwidth * expandedheight];
+			bg[i] = new Uint16[expandedwidth * expandedheight];
+			fgflipped[i] = new bool[expandedwidth * expandedheight];
+			bgflipped[i] = new bool[expandedwidth * expandedheight];
+			fglum[i] = new bool[expandedwidth * expandedheight];
+			bglum[i] = new bool[expandedwidth * expandedheight];
+			for(int j = 0; j < expandedwidth * expandedheight; j++){
+				fg[i][j] = 0;
+				bg[i][j] = 0;
+				fgflipped[i][j] = false;
+				bgflipped[i][j] = false;
+				fglum[i][j] = false;
+				bglum[i][j] = false;
+			}
+		}
+	}else{
+		baseambience = ambience;
+		yoffset = Map::height + 10 + (team->number * (26));
+	}
+	
+	uncompress(level, &levelsizeuncompressed, levelcompressed, levelsize);
+	
+	unsigned int i = 0;
+	for(unsigned int y = yoffset; y < yoffset + height; y++){
+		for(unsigned int x = 0; x < width; x++){
+			bg[0][(y * expandedwidth) + x] = ((level[i + 0]) | (level[i + 1] << 8));
+			bgflipped[0][(y * expandedwidth) + x] = level[i + 2] ? true : false;
+			bglum[0][(y * expandedwidth) + x] = level[i + 3] ? true : false ;
+			bg[1][(y * expandedwidth) + x] = ((level[i + 4]) | (level[i + 5] << 8));
+			bgflipped[1][(y * expandedwidth) + x] = level[i + 6] ? true : false;
+			bglum[1][(y * expandedwidth) + x] = level[i + 7] ? true : false;
+			bg[2][(y * expandedwidth) + x] = ((level[i + 8]) | (level[i + 9] << 8));
+			bgflipped[2][(y * expandedwidth) + x] = level[i + 10] ? true : false;
+			bglum[2][(y * expandedwidth) + x] = level[i + 11] ? true : false;
+			bg[3][(y * expandedwidth) + x] = ((level[i + 12]) | (level[i + 13] << 8));
+			bgflipped[3][(y * expandedwidth) + x] = level[i + 14] ? true : false;
+			bglum[3][(y * expandedwidth) + x] = level[i + 15] ? true : false;
+			
+			fg[0][(y * expandedwidth) + x] = ((level[i + 20]) | (level[i + 21] << 8));
+			fgflipped[0][(y * expandedwidth) + x] = level[i + 22] ? true : false;
+			fglum[0][(y * expandedwidth) + x] = level[i + 23] ? true : false;
+			fg[1][(y * expandedwidth) + x] = ((level[i + 24]) | (level[i + 25] << 8));
+			fgflipped[1][(y * expandedwidth) + x] = level[i + 26] ? true : false;
+			fglum[1][(y * expandedwidth) + x] = level[i + 27] ? true : false;
+			fg[2][(y * expandedwidth) + x] = ((level[i + 28]) | (level[i + 29] << 8));
+			fgflipped[2][(y * expandedwidth) + x] = level[i + 30] ? true : false;
+			fglum[2][(y * expandedwidth) + x] = level[i + 31] ? true : false;
+			fg[3][(y * expandedwidth) + x] = ((level[i + 32]) | (level[i + 33] << 8));
+			fgflipped[3][(y * expandedwidth) + x] = level[i + 34] ? true : false;
+			fglum[3][(y * expandedwidth) + x] = level[i + 35] ? true : false;
+			i += 36;
+		}
+	}
+	i = width * height * 36;
+	memcpy(&numactors, &level[i], sizeof(numactors));
+	numactors = SDL_SwapLE32(numactors);
+	i += sizeof(Uint32) + sizeof(Uint32);
+	for(unsigned int a = 0; a < numactors; a++){
+		Uint32 actorid;
+		Uint32 actorx;
+		Uint32 actory;
+		Uint32 actordirection;
+		Sint32 actortype;
+		Uint32 actormatchid;
+		Uint32 actorsubplane;
+		Uint32 actorunknown;
+		Uint32 actorsecurityid;
+		memcpy(&actorid, &level[i], sizeof(actorid));
+		actorid = SDL_SwapLE32(actorid);
+		i += sizeof(actorid);
+		memcpy(&actorx, &level[i], sizeof(actorx));
+		actorx = SDL_SwapLE32(actorx);
+		i += sizeof(actorx);
+		memcpy(&actory, &level[i], sizeof(actory));
+		actory = SDL_SwapLE32(actory);
+		i += sizeof(actory);
+		memcpy(&actordirection, &level[i], sizeof(actordirection));
+		actordirection = SDL_SwapLE32(actordirection);
+		i += sizeof(actordirection);
+		memcpy(&actortype, &level[i], sizeof(actortype));
+		actortype = SDL_SwapLE32(actortype);
+		i += sizeof(actortype);
+		memcpy(&actormatchid, &level[i], sizeof(actormatchid));
+		actormatchid = SDL_SwapLE32(actormatchid);
+		i += sizeof(actormatchid);
+		memcpy(&actorsubplane, &level[i], sizeof(actorsubplane));
+		actorsubplane = SDL_SwapLE32(actorsubplane);
+		i += sizeof(actorsubplane);
+		memcpy(&actorunknown, &level[i], sizeof(actorunknown));
+		actorunknown = SDL_SwapLE32(actorunknown);
+		i += sizeof(actorunknown);
+		memcpy(&actorsecurityid, &level[i], sizeof(actorsecurityid));
+		actorsecurityid = SDL_SwapLE32(actorsecurityid);
+		i += sizeof(actorsecurityid);
+		actory += yoffset * 64;
+		//printf("(%u, %u) %d id:%u type:%d match:%u subp:%u unk:%x secid:%d\n", actorx, actory, actordirection, actorid, actortype, actormatchid, actorsubplane, actorunknown, actorsecurityid);
+		// security levels:
+		// 0: all
+		// 1: low
+		// 2: medium
+		// 3: low medium
+		// 4: high
+		// 5: low high
+		// 6: medium high
+		
+		switch(actorid){
+			case 0:{
+				// agent guard (has blaster)
+				// 0: patrol
+				// 1: guard
+				if(securitylevel == 3){
+					Guard * guard = (Guard *)world.CreateObject(ObjectTypes::GUARD);
+					if(guard){
+						guard->x = actorx;
+						guard->y = actory;
+						guard->weapon = 0;
+					}
+				}
+			}break;
+			case 1:{
+				Civilian * civilian = (Civilian *)world.CreateObject(ObjectTypes::CIVILIAN);
+				if(civilian){
+					civilian->x = actorx;
+					civilian->y = actory;
+				}
+			}break;
+			case 2:{
+				// captain guard (has laser)
+				// 0: patrol
+				// 1: guard
+				if(securitylevel == 3){
+					if(actortype == 0 || actortype == 1){
+						Guard * guard = (Guard *)world.CreateObject(ObjectTypes::GUARD);
+						if(guard){
+							guard->x = actorx;
+							guard->y = actory;
+							guard->weapon = 1;
+						}
+					}
+				}
+			}break;
+			case 3:{
+				// trooper guard (has rocket)
+				// 0: patrol
+				// 1: guard
+				// 2: magistrate's laser soldier
+				// 3: magistrate's rocket soldier
+				if(securitylevel == 3){
+					Guard * guard = (Guard *)world.CreateObject(ObjectTypes::GUARD);
+					if(guard){
+						guard->x = actorx;
+						guard->y = actory;
+						guard->weapon = 2;
+					}
+				}
+			}break;
+			case 6:{
+				// robot
+				// 0: patrol
+				// 1: guard
+				if(securitylevel == 3){
+					Robot * robot = (Robot *)world.CreateObject(ObjectTypes::ROBOT);
+					if(robot){
+						robot->x = actorx;
+						robot->y = actory;
+					}
+				}
+			}break;
+			case 36:{
+				// Player start location
+				xy xy;
+				xy.x = actorx;
+				xy.y = actory;
+				playerstartlocations.push_back(xy);
+			}break;
+			case 37:{
+				// surveillance camera
+				xy xy;
+				xy.x = actorx;
+				xy.y = actory;
+				surveillancecameras.push_back(xy);
+			}break;
+			case 47:{
+				// 49:0 is small candle doodad
+				// 50:0 is large candle doodad
+				// 51:0 is small canister doodad
+				// 52:0 is large canister doodad
+				// 53:0 is downward arrow poster doodad
+				// 54:0-9 is man in tank doodad
+				Overlay * overlay = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
+				if(overlay){
+					switch(actortype){
+						case 0:
+							overlay->res_bank = 49;
+						break;
+						case 1:
+							overlay->res_bank = 50;
+						break;
+						case 2:
+							overlay->res_bank = 51;
+						break;
+						case 3:
+							overlay->res_bank = 52;
+						break;
+						case 4:
+							overlay->res_bank = 53;
+						break;
+						case 5:
+							overlay->res_bank = 54;
+						break;
+						case 6:
+							overlay->res_bank = 55;
+						break;
+						case 7:
+							overlay->res_bank = 56;
+						break;
+						case 8:
+							overlay->res_bank = 57;
+						break;
+						case 9:
+							overlay->res_bank = 58;
+						break;
+						default:
+							//overlay->res_bank = 53;
+						break;
+					}
+					overlay->res_index = 0;
+					overlay->x = actorx;
+					overlay->y = actory;
+				}
+			}break;
+			case 50:{
+				// surveillance monitor
+				SurveillanceMonitor * surveillancemonitor = (SurveillanceMonitor *)world.CreateObject(ObjectTypes::SURVEILLANCEMONITOR);
+				if(surveillancemonitor){
+					// 4:1   5:1   6:2,4   7:0
+					switch(actortype){
+						case 4:
+						case 5:
+							surveillancemonitor->SetSize(0);
+						break;
+						case 6:
+							surveillancemonitor->SetSize(1);
+						break;
+						case 7:
+							surveillancemonitor->SetSize(2);
+						break;
+					}
+					surveillancemonitor->x = actorx;
+					surveillancemonitor->y = actory;
+					if(team){
+						surveillancemonitor->teamid = team->id;
+					}
+				}
+			}break;
+			case 54:{
+				Terminal * terminal = (Terminal *)world.CreateObject(ObjectTypes::TERMINAL);
+				if(terminal){
+					terminal->x = actorx;
+					terminal->y = actory;
+					if(actortype == 0){
+						terminal->SetSize(0);
+					}else{
+						terminal->SetSize(1);
+					}
+				}
+				/*if(actortype != 0){
+					BigTerminal * bigterminal = (BigTerminal *)world.CreateObject(ObjectTypes::BIGTERMINAL);
+					if(bigterminal){
+						bigterminal->x = actorx;
+						bigterminal->y = actory;
+					}
+				}else{
+					SmallTerminal * smallterminal = (SmallTerminal *)world.CreateObject(ObjectTypes::SMALLTERMINAL);
+					if(smallterminal){
+						smallterminal->x = actorx;
+						smallterminal->y = actory;
+					}
+				}*/
+			}break;
+			case 56:{
+				// inventory station
+				InventoryStation * inventorystation = (InventoryStation *)world.CreateObject(ObjectTypes::INVENTORYSTATION);
+				if(inventorystation){
+					inventorystation->x = actorx;
+					inventorystation->y = actory;
+					if(team){
+						inventorystation->teamid = team->id;
+					}
+				}
+			}break;
+			case 57:{
+				HealMachine * healmachine = (HealMachine *)world.CreateObject(ObjectTypes::HEALMACHINE);
+				if(healmachine){
+					healmachine->x = actorx;
+					healmachine->y = actory;
+				}
+			}break;
+			case 58:{
+				// secret return
+				SecretReturn * secretreturn = (SecretReturn *)world.CreateObject(ObjectTypes::SECRETRETURN);
+				if(secretreturn){
+					secretreturn->x = actorx;
+					secretreturn->y = actory;
+					if(team){
+						secretreturn->teamid = team->id;
+					}
+				}
+			}break;
+			/*case 60:{
+				if(securitylevel == 3){
+					Robot * robot = (Robot *)world.CreateObject(ObjectTypes::ROBOT);
+					if(robot){
+						robot->x = actorx;
+						robot->y = actory;
+					}
+				}
+			}break;*/
+			case 61:{
+				Warper * warper = (Warper *)world.CreateObject(ObjectTypes::WARPER);
+				if(warper){
+					warper->actormatch = actormatchid;
+					warper->x = actorx;
+					warper->y = actory;
+					warper->FindMatch(world);
+				}
+			}break;
+			case 63:{
+				// powerup
+				// 0: super shield
+				// 1: neutron bomb
+				// 2: jet pack
+				// 3: invisible
+				// 4: hacking bonus
+				// 5: see enemies
+				// 6: neutron depositor
+				PickUp * pickup = (PickUp *)world.CreateObject(ObjectTypes::PICKUP);
+				if(pickup){
+					pickup->powerup = true;
+					switch(actortype){
+						case 0:
+							pickup->type = PickUp::SUPERSHIELD;
+						break;
+						case 1:
+							pickup->type = PickUp::NEUTRONBOMB;
+						break;
+						case 2:
+							pickup->type = PickUp::JETPACK;
+						break;
+						case 4:
+							pickup->type = PickUp::HACKING;
+						break;
+						case 5:
+							pickup->type = PickUp::RADAR;
+						break;
+						default:
+							world.MarkDestroyObject(pickup->id);
+						break;
+					}
+					pickup->x = actorx;
+					pickup->y = actory;
+					pickup->draw = false;
+					pickup->poweruprespawntime = 60;
+					pickup->quantity = pickup->poweruprespawntime;
+				}
+			}break;
+			case 64:{
+				Vent * vent = (Vent *)world.CreateObject(ObjectTypes::VENT);
+				if(vent){
+					vent->x = actorx;
+					vent->y = actory;
+				}
+			}break;
+			case 65:{
+				// base exit?
+			}break;
+			case 66:{
+				TechStation * techstation = (TechStation *)world.CreateObject(ObjectTypes::TECHSTATION);
+				if(techstation){
+					techstation->x = actorx;
+					techstation->y = actory;
+					techstation->type = actortype;
+				}
+			}break;
+			case 67:{
+				// 0: base defense
+				// 1: guard defense
+				WallDefense * walldefense = (WallDefense *)world.CreateObject(ObjectTypes::WALLDEFENSE);
+				if(walldefense){
+					walldefense->x = actorx;
+					walldefense->y = actory;
+					if(team){
+						walldefense->teamid = team->id;
+					}else{
+						walldefense->AddDefense();
+					}
+				}
+			}break;
+			case 68:{
+				// team billboard
+				TeamBillboard * teambillboard = (TeamBillboard *)world.CreateObject(ObjectTypes::TEAMBILLBOARD);
+				if(teambillboard){
+					teambillboard->x = actorx;
+					teambillboard->y = actory;
+					if(team){
+						teambillboard->agency = team->agency;
+					}else{
+						teambillboard->agency = 0;
+					}
+				}
+			}break;
+			case 69:{
+				// computer doodad thing
+				Overlay * overlay = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
+				if(overlay){
+					overlay->res_bank = 171;
+					overlay->res_index = 0;
+					overlay->x = actorx;
+					overlay->y = actory;
+				}
+			}break;
+			case 70:{
+				CreditMachine * creditmachine = (CreditMachine *)world.CreateObject(ObjectTypes::CREDITMACHINE);
+				if(creditmachine){
+					creditmachine->x = actorx;
+					creditmachine->y = actory;
+				}
+			}break;
+		}
+	}
+	memcpy(&numplatforms, &level[i], sizeof(numplatforms));
+	numplatforms = SDL_SwapLE32(numplatforms);
+	i += sizeof(Uint32) + sizeof(Uint32);
+	
+	//FILE * fileo = fopen("platforms.txt", "w");
+	for(unsigned int j = 0; j < numplatforms; j++){
+		memcpy(&x1, &level[i], sizeof(x1));
+		x1 = SDL_SwapLE32(x1);
+		i += sizeof(Uint32);
+		memcpy(&y1, &level[i], sizeof(y1));
+		y1 = SDL_SwapLE32(y1);
+		y1 += (yoffset * 64);
+		i += sizeof(Uint32);
+		memcpy(&x2, &level[i], sizeof(x2));
+		x2 = SDL_SwapLE32(x2);
+		i += sizeof(Uint32);
+		memcpy(&y2, &level[i], sizeof(y2));
+		y2 = SDL_SwapLE32(y2);
+		y2 += (yoffset * 64);
+		i += sizeof(Uint32);
+		memcpy(&type1, &level[i], sizeof(type1));
+		type1 = SDL_SwapLE32(type1);
+		i += sizeof(Uint32);
+		memcpy(&type2, &level[i], sizeof(type2));
+		type2 = SDL_SwapLE32(type2);
+		i += sizeof(Uint32);
+		
+		Uint8 type = 255;
+		bool valid = false;
+		if(type1 == 0 && type2 == 0){
+			type = Platform::RECTANGLE;
+			valid = true;
+		}else
+		if(type1 == 1 && type2 == 0){
+			type = Platform::LADDER;
+			valid = true;
+		}else
+		if(type1 == 0 && type2 == 1){
+			type = Platform::STAIRSUP;
+			valid = true;
+		}else
+		if(type1 == 0 && type2 == 2){
+			type = Platform::STAIRSDOWN;
+			valid = true;
+		}else
+		if(type1 == 2 && type2 == 0){
+			type = Platform::TRACK;
+			valid = true;
+		}else
+		if(type1 == 3 && type2 == 0){
+			type = Platform::OUTSIDEROOM;
+			valid = true;
+		}else
+		if(type1 == 3 && type2 == 1){
+			type = Platform::SPECIFICROOM;
+			valid = true;
+		}else{
+			//char temp[1234];
+			//sprintf(temp, "TRACK: (%d, %d) (%d, %d)", x1, y1, x2, y2);
+			//OutputDebugStringA(temp);
+		}
+		//printf("%d (%d, %d) (%d, %d)\n", type, x1, y1, x2, y2);
+		
+		if(valid){
+			Platform * newplatform = new Platform(type, currentid, x1, y1, x2, y2);
+			platformids[currentid] = newplatform;
+			platforms.push_back(newplatform);
+			currentid++;
+		}
+	}
+	//fclose(fileo);
+	
+	CalculateAdjacentPlatforms();
+	
+	delete[] levelcompressed;
+	delete[] level;
+	
+	return true;
+}
+
+void Map::Unload(void){
+	loaded = false;
+	currentid = 1;
+	platformids.clear();
+	playerstartlocations.clear();
+	surveillancecameras.clear();
+	for(unsigned int i = 0; i < 4; i++){
+		if(fg[i]){
+			delete[] fg[i];
+			fg[i] = 0;
+		}
+		if(bg[i]){
+			delete[] bg[i];
+			bg[i] = 0;
+		}
+		if(fgflipped[i]){
+			delete[] fgflipped[i];
+			fgflipped[i] = 0;
+		}
+		if(bgflipped[i]){
+			delete[] bgflipped[i];
+			bgflipped[i] = 0;
+		}
+		if(fglum[i]){
+			delete[] fglum[i];
+			fglum[i] = 0;
+		}
+		if(bglum[i]){
+			delete[] bglum[i];
+			bglum[i] = 0;
+		}
+	}
+	for(std::vector<Platform *>::iterator i = platforms.begin(); i != platforms.end(); i++){
+		delete (*i);
+	}
+	platforms.clear();
+}
+
+void Map::MiniMapCoords(int * x, int * y){
+	*x = (*x / float(width * 64)) * 172;
+	*y = (*y / float(height * 64)) * 62;
+}
+
+void Map::RandomPlayerStartLocation(Sint16 * x, Sint16 * y){
+	if(playerstartlocations.size() == 0){
+		return;
+	}
+	int index = rand() % playerstartlocations.size();
+	int i = 0;
+	for(std::vector<xy>::iterator it = playerstartlocations.begin(); it != playerstartlocations.end(); it++){
+		if(i == index){
+			xy xy = (*it);
+			*x = xy.x;
+			*y = xy.y;
+			return;
+		}
+		i++;
+	}
+}
+
+void Map::CalculateAdjacentPlatforms(void){
+	for(unsigned int i = 0 ; i < platforms.size(); i++){
+		switch(platforms[i]->type){
+			case Platform::RECTANGLE:
+				for(unsigned int j = 0; j < platforms.size(); j++){
+					switch(platforms[j]->type){
+						case Platform::RECTANGLE:
+							if(!platforms[i]->adjacentl){
+								if(platforms[j]->x2 == platforms[i]->x1 && platforms[j]->y1 == platforms[i]->y1){
+									platforms[i]->adjacentl = platforms[j];
+								}
+							}
+							if(!platforms[i]->adjacentr){
+								if(platforms[j]->x1 == platforms[i]->x2 && platforms[j]->y1 == platforms[i]->y1){
+									platforms[i]->adjacentr = platforms[j];
+								}
+							}
+						break;
+						case Platform::STAIRSUP:
+							if(platforms[j]->x2 == platforms[i]->x1 && platforms[j]->y1 == platforms[i]->y1){
+								platforms[i]->adjacentl = platforms[j];
+							}
+							if(platforms[j]->x1 == platforms[i]->x2 && platforms[j]->y2 == platforms[i]->y1){
+								platforms[i]->adjacentr = platforms[j];
+							}
+						break;
+						case Platform::STAIRSDOWN:
+							if(platforms[j]->x2 == platforms[i]->x1 && platforms[j]->y2 == platforms[i]->y1){
+								platforms[i]->adjacentl = platforms[j];
+							}
+							if(platforms[j]->x1 == platforms[i]->x2 && platforms[j]->y1 == platforms[i]->y1){
+								platforms[i]->adjacentr = platforms[j];
+							}
+						break;
+					}
+				}
+			break;
+			case Platform::STAIRSUP:
+				for(unsigned int j = 0; j < platforms.size(); j++){
+					switch(platforms[j]->type){
+						case Platform::RECTANGLE:
+							if(!platforms[i]->adjacentl){
+								if(platforms[j]->x2 == platforms[i]->x1 && platforms[j]->y1 == platforms[i]->y2){
+									platforms[i]->adjacentl = platforms[j];
+								}
+							}
+							if(!platforms[i]->adjacentr){
+								if(platforms[j]->x1 == platforms[i]->x2 && platforms[j]->y1 == platforms[i]->y1){
+									platforms[i]->adjacentr = platforms[j];
+								}
+							}
+						break;
+						case Platform::STAIRSUP:
+							if(platforms[j]->x2 == platforms[i]->x1 && platforms[j]->y1 == platforms[i]->y2){
+								platforms[i]->adjacentl = platforms[j];
+							}
+							if(platforms[j]->x1 == platforms[i]->x2 && platforms[j]->y2 == platforms[i]->y1){
+								platforms[i]->adjacentr = platforms[j];
+							}
+						break;
+						case Platform::STAIRSDOWN:
+							if(platforms[j]->x2 == platforms[i]->x1 && platforms[j]->y2 == platforms[i]->y2){
+								platforms[i]->adjacentl = platforms[j];
+							}
+							if(platforms[j]->x1 == platforms[i]->x2 && platforms[j]->y1 == platforms[i]->y1){
+								platforms[i]->adjacentr = platforms[j];
+							}
+						break;
+					}
+				}
+			break;
+			case Platform::STAIRSDOWN:
+				for(unsigned int j = 0; j < platforms.size(); j++){
+					switch(platforms[j]->type){
+						case Platform::RECTANGLE:
+							if(!platforms[i]->adjacentl){
+								if(platforms[j]->x2 == platforms[i]->x1 && platforms[j]->y1 == platforms[i]->y1){
+									platforms[i]->adjacentl = platforms[j];
+								}
+							}
+							if(!platforms[i]->adjacentr){
+								if(platforms[j]->x1 == platforms[i]->x2 && platforms[j]->y1 == platforms[i]->y2){
+									platforms[i]->adjacentr = platforms[j];
+								}
+							}
+						break;
+						case Platform::STAIRSUP:
+							if(platforms[j]->x2 == platforms[i]->x1 && platforms[j]->y1 == platforms[i]->y1){
+								platforms[i]->adjacentl = platforms[j];
+							}
+							if(platforms[j]->x1 == platforms[i]->x2 && platforms[j]->y2 == platforms[i]->y2){
+								platforms[i]->adjacentr = platforms[j];
+							}
+						break;
+						case Platform::STAIRSDOWN:
+							if(platforms[j]->x2 == platforms[i]->x1 && platforms[j]->y2 == platforms[i]->y1){
+								platforms[i]->adjacentl = platforms[j];
+							}
+							if(platforms[j]->x1 == platforms[i]->x2 && platforms[j]->y1 == platforms[i]->y2){
+								platforms[i]->adjacentr = platforms[j];
+							}
+						break;
+					}
+				}
+			break;
+		}
+	}
+}
+
+Platform * Map::TestAABB(int x1, int y1, int x2, int y2, Uint8 type, Platform * except, bool ignorethin){
+	for(std::vector<Platform *>::iterator i = platforms.begin(); i != platforms.end(); i++){
+		Platform * platform = (*i);
+		if(platform != except){
+			if(TestAABB(x1, y1, x2, y2, platform, type, ignorethin)){
+				return platform;
+			}
+		}
+	}
+	return 0;
+}
+
+bool Map::TestAABB(int x1, int y1, int x2, int y2, Platform * platform, Uint8 type, bool ignorethin){
+	if(platform->type & type){
+		switch(platform->type){
+			case Platform::OUTSIDEROOM:
+			case Platform::SPECIFICROOM:
+			case Platform::LADDER:
+			case Platform::RECTANGLE:{
+				if(((x1 <= platform->x1 && x2 >= platform->x1) || (x1 <= platform->x2 && x2 >= platform->x2) || (x1 >= platform->x1 && x2 <= platform->x2)) &&
+				   ((y1 <= platform->y1 && y2 >= platform->y1) || (y1 <= platform->y2 && y2 >= platform->y2) || (y1 >= platform->y1 && y2 <= platform->y2))){
+					if(ignorethin && (platform->y1 == platform->y2)){
+						return false;
+					}
+					return true;
+				}
+			}break;
+			case Platform::STAIRSUP:{
+				int edgex = platform->x1 - platform->x2;
+				int edgey = platform->y2 - platform->y1;
+				int normalx = edgey;
+				int normaly = -edgex;
+				int min1 = (x1 * normalx) + (y1 * normaly);
+				int max1 = (x2 * normalx) + (y2 * normaly);
+				int min2 = (platform->x2 * normalx) + (platform->y1 * normaly);
+				int max2 = (platform->x2 * normalx) + (platform->y2 * normaly);
+				if(((x1 <= platform->x1 && x2 >= platform->x1) || (x1 <= platform->x2 && x2 >= platform->x2) || (x1 >= platform->x1 && x2 <= platform->x2)) &&
+				   ((y1 <= platform->y1 && y2 >= platform->y1) || (y1 <= platform->y2 && y2 >= platform->y2) || (y1 >= platform->y1 && y2 <= platform->y2)) &&
+				   (max1 >= min2 && min1 <= max2)){
+					return true;
+				}
+			}break;
+			case Platform::STAIRSDOWN:{
+				int edgex = platform->x2 - platform->x1;
+				int edgey = platform->y2 - platform->y1;
+				int normalx = edgey;
+				int normaly = -edgex;
+				int min1 = (x1 * normalx) + (y2 * normaly);
+				int max1 = (x2 * normalx) + (y1 * normaly);
+				int min2 = (platform->x1 * normalx) + (platform->y2 * normaly);
+				int max2 = (platform->x1 * normalx) + (platform->y1 * normaly);
+				if(((x1 <= platform->x1 && x2 >= platform->x1) || (x1 <= platform->x2 && x2 >= platform->x2) || (x1 >= platform->x1 && x2 <= platform->x2)) &&
+				   ((y1 <= platform->y1 && y2 >= platform->y1) || (y1 <= platform->y2 && y2 >= platform->y2) || (y1 >= platform->y1 && y2 <= platform->y2)) &&
+				   (max1 >= min2 && min1 <= max2)){
+					return true;
+				}
+			}break;
+		}
+	}
+	return false;
+}
+
+Platform * Map::TestLine(int x1, int y1, int x2, int y2, int * xe, int * ye, Uint8 type){
+	// This function is unstable when the tested line segment starts at a line segment comprising a
+	// platform and must only be used for finding collision/distance when they are not touching.
+	Platform * hit = 0;
+	int xe1 = 0, ye1 = 0;
+	for(std::vector<Platform *>::iterator i = platforms.begin(); i != platforms.end(); i++){
+		Platform * platform = (*i);
+		if(TestAABB(x1, y1, x2, y2, platform, type)){ // broadphase
+			float x[4], y[4], xed = x2, yed = y2;
+			int segments = 0;
+			switch(platform->type){
+				case Platform::LADDER:
+				case Platform::RECTANGLE:{
+					segments = 4;
+					x[0] = (float)platform->x1; y[0] = (float)platform->y1;
+					x[1] = (float)platform->x2; y[1] = (float)platform->y1;
+					x[2] = (float)platform->x2; y[2] = (float)platform->y2;
+					x[3] = (float)platform->x1; y[3] = (float)platform->y2;
+				}break;
+				case Platform::STAIRSUP:{
+					segments = 2;
+					x[0] = (float)platform->x1; y[0] = (float)platform->y2;
+					x[1] = (float)platform->x2; y[1] = (float)platform->y1;
+					x[2] = (float)platform->x2; y[2] = (float)platform->y2;
+				}break;
+				case Platform::STAIRSDOWN:{
+					segments = 2;
+					x[0] = (float)platform->x1; y[0] = (float)platform->y1;
+					x[1] = (float)platform->x2; y[1] = (float)platform->y2;
+					x[2] = (float)platform->x1; y[2] = (float)platform->y2;
+				}break;
+			}
+			for(int i = 0; i < segments; i++){
+				if(LineSegmentIntersection((float)x1, (float)y1, (float)x2, (float)y2, x[i], y[i], x[(i + 1) % segments], y[(i + 1) % segments], &xed, &yed)){
+					if(abs(x1 - xed) <= abs((float)x1 - xe1) || abs(y1 - yed) <= abs((float)y1 - ye1)){
+						xe1 = xed;
+						ye1 = yed;
+						if(xe){
+							*xe = xe1;
+						}
+						if(ye){
+							*ye = ye1;
+						}
+						hit = platform;
+					}
+				}
+			}
+		}
+	}
+	return hit;
+}
+
+Platform * Map::TestIncr(int x1, int y1, int x2, int y2, int * xv, int * yv, Uint8 type, Platform * except, bool ignorethin){
+	// broadphase
+	std::vector<Platform *> test;
+	for(std::vector<Platform *>::iterator i = platforms.begin(); i != platforms.end(); i++){
+		Platform * platform = (*i);
+		if(platform == except){
+			continue;
+		}
+		int xb1 = x1 + (*xv < 0 ? *xv : 0);
+		int yb1 = y1 + (*yv < 0 ? *yv : 0);
+		int xb2 = x2 + (*xv > 0 ? *xv : 0);
+		int yb2 = y2 + (*yv > 0 ? *yv : 0);
+		/*int xb1 = x1 + *xv;
+		int yb1 = y1 + *yv;
+		int xb2 = x2 + *xv;
+		int yb2 = y2 + *yv;*/
+		if(TestAABB(xb1, yb1, xb2, yb2, platform, type, ignorethin)){
+			test.push_back(platform);
+		}
+	}
+	if(test.size() == 0){
+		return 0;
+	}
+	int dx = *xv;
+	int dy = *yv;
+	int step;
+	int error;
+	int oldxv = *xv;
+	int oldyv = *yv;
+	int yv0 = 0;
+	int xv0 = 0;
+	*xv = 0;
+	*yv = 0;
+	float slope = 0;
+	if(dx){
+		slope = (float)dy / dx;
+	}else{
+		if(oldyv > 0){
+			while(*yv < oldyv){
+				for(std::vector<Platform *>::iterator i = test.begin(); i != test.end(); i++){
+					if(TestAABB(x1 + *xv, y1 + *yv, x2 + *xv, y2 + *yv, *i, type)){
+						*yv = yv0;
+						return *i;
+					}
+				}
+				yv0 = *yv;
+				(*yv)++;
+			}
+		}else{
+			while(*yv > oldyv){
+				for(std::vector<Platform *>::iterator i = test.begin(); i != test.end(); i++){
+					if(TestAABB(x1 + *xv, y1 + *yv, x2 + *xv, y2 + *yv, *i, type)){
+						*yv = yv0;
+						return *i;
+					}
+				}
+				yv0 = *yv;
+				(*yv)--;
+			}
+		}
+	}
+	if(slope > -1 && slope < 1){
+		error = -dx / 2;
+		oldyv > 0 ? step = 1 : step = -1;
+		if(oldxv > 0){
+			while(*xv < oldxv){
+				for(std::vector<Platform *>::iterator i = test.begin(); i != test.end(); i++){
+					if(TestAABB(x1 + *xv, y1 + *yv, x2 + *xv, y2 + *yv, *i, type)){
+						*yv = yv0;
+						*xv = xv0;
+						return *i;
+					}
+				}
+				error += dy * step;
+				if(error >= 0){
+					yv0 = *yv;
+					*yv += step;
+					error -= dx;
+				}
+				xv0 = *xv;
+				(*xv)++;
+			}
+		}else{
+			while(*xv > oldxv){
+				for(std::vector<Platform *>::iterator i = test.begin(); i != test.end(); i++){
+					if(TestAABB(x1 + *xv, y1 + *yv, x2 + *xv, y2 + *yv, *i, type)){
+						*yv = yv0;
+						*xv = xv0;
+						return *i;
+					}
+				}
+				error += dy * -step;
+				if(error <= 0){
+					yv0 = *yv;
+					*yv += step;
+					error -= dx;
+				}
+				xv0 = *xv;
+				(*xv)--;
+			}
+		}
+	}else{
+		error = -dy / 2;
+		oldxv > 0 ? step = 1 : step = -1;
+		if(oldyv > 0){
+			while(*yv < oldyv){
+				for(std::vector<Platform *>::iterator i = test.begin(); i != test.end(); i++){
+					if(TestAABB(x1 + *xv, y1 + *yv, x2 + *xv, y2 + *yv, *i, type)){
+						*xv = xv0;
+						*yv = yv0;
+						return *i;
+					}
+				}
+				error += dx * step;
+				if(error >= 0){
+					xv0 = *xv;
+					*xv += step;
+					error -= dy;
+				}
+				yv0 = *yv;
+				(*yv)++;
+			}
+		}else{
+			while(*yv > oldyv){
+				for(std::vector<Platform *>::iterator i = test.begin(); i != test.end(); i++){
+					if(TestAABB(x1 + *xv, y1 + *yv, x2 + *xv, y2 + *yv, *i, type)){
+						*xv = xv0;
+						*yv = yv0;
+						return *i;
+					}
+				}
+				error += dx * -step;
+				if(error <= 0){
+					xv0 = *xv;
+					*xv += step;
+					error -= dy;
+				}
+				yv0 = *yv;
+				(*yv)--;
+			}
+		}
+	}
+	for(std::vector<Platform *>::iterator i = test.begin(); i != test.end(); i++){
+		if(TestAABB(x1 + *xv, y1 + *yv, x2 + *xv, y2 + *yv, *i, type)){
+			*xv = xv0;
+			*yv = yv0;
+			return *i;
+		}
+	}
+	return 0;
+}
+
+bool Map::LineSegmentIntersection(float Ax, float Ay, float Bx, float By, float Cx, float Cy, float Dx, float Dy, float * X, float * Y){
+	float distAB, theCos, theSin, newX, ABpos;
+
+	// Fail if either line segment is zero-length.
+	if((Ax == Bx && Ay == By) || (Cx == Dx && Cy == Dy)){
+		return false;
+	}
+
+	// Fail if the segments share an end-point.
+	if((Ax == Cx && Ay == Cy) || (Bx == Cx && By == Cy) || (Ax == Dx && Ay == Dy) || (Bx == Dx && By == Dy)){
+		return false;
+	}
+
+	// (1) Translate the system so that point A is on the origin.
+	Bx -= Ax; By -= Ay;
+	Cx -= Ax; Cy -= Ay;
+	Dx -= Ax; Dy -= Ay;
+
+	// Discover the length of segment A-B.
+	distAB = sqrt(Bx * Bx + By * By);
+
+	// (2) Rotate the system so that point B is on the positive X axis.
+	theCos = Bx / distAB;
+	theSin = By / distAB;
+	newX = Cx * theCos + Cy * theSin;
+	Cy = Cy * theCos - Cx * theSin; Cx = newX;
+	newX = Dx * theCos + Dy * theSin;
+	Dy = Dy * theCos - Dx * theSin; Dx = newX;
+
+	// Fail if segment C-D doesn't cross line A-B.
+	if((Cy < 0.0 && Dy < 0.0) || (Cy >= 0.0 && Dy >= 0.0)){
+		return false;
+	}
+
+	// (3) Discover the position of the intersection point along line A-B.
+	ABpos = Dx + (Cx - Dx) * Dy / (Dy - Cy);
+
+	// Fail if segment C-D crosses line A-B outside of segment A-B.
+	if(ABpos < 0.0 || ABpos > distAB){
+		return false;
+	}
+
+	// (4) Apply the discovered position to line A-B in the original coordinate system.
+	*X = Ax + ABpos * theCos;
+	*Y = Ay + ABpos * theSin;
+
+	// Success.
+	return true;
+}
