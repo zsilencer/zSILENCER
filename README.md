@@ -1,12 +1,18 @@
 zSILENCER
 =========
 
-Compiling
----------
+Compiling on Linux
+------------------
 SDL2 and SDL2_mixer development libraries will need to be installed.
 Run autoconf and automake and then:
 ./configure
 make
+
+Compiling on Windows
+--------------------
+SDL2 and SDL2_mixer development libraries will have to be installed into the Visual Studio include and lib directories
+Open zSILENCER.sln Visual Studio Project
+Compile project using Visual Studio
 
 Supported platforms
 -------------------
