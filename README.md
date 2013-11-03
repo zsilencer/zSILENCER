@@ -4,7 +4,7 @@ zSILENCER
 Compiling on Linux
 ------------------
 SDL2 and SDL2_mixer development libraries will need to be installed.  
-Run autoconf and automake and then:  
+Run aclocal, autoconf and automake and then:  
 ./configure  
 make  
 
