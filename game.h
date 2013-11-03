@@ -73,6 +73,8 @@ private:
 	void IndexToConfigKey(int index, SDL_Scancode ** key1, SDL_Scancode ** key2, bool ** keyop);
 	const char * GetKeyName(SDL_Scancode sym);
 	void GetGameChannelName(LobbyGame & lobbygame, char * name);
+	void CreateAmbienceChannels(void);
+	void UpdateAmbienceChannels(void);
 	static const int numkeys = 19;
 	const char * keynames[numkeys];
 	enum {NONE, FADEOUT, MAINMENU, LOBBYCONNECT, LOBBY, INGAME, MISSIONSUMMARY, SINGLEPLAYERGAME, OPTIONS, OPTIONSCONTROLS, HOSTGAME, JOINGAME};
@@ -95,7 +97,8 @@ private:
 	Uint32 chatlinesprinted;
 	char localusername[16 + 1];
 	State * sharedstate;
-	int ambientbgchannel;
+	int bgchannel[4];
+	enum {BG_AMBIENT = 0, BG_BASE, BG_TERMINAL, BG_OUTSIDE};
 	int oldselecteditem;
 	Uint8 singleplayermessage;
 	bool updatetitle;
@@ -105,6 +108,7 @@ private:
 	bool agencychanged;
 	bool gamesummaryinfoloaded;
 	bool minimized;
+	bool creategameclicked;
 };
 
 #endif

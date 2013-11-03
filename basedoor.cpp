@@ -17,7 +17,6 @@ BaseDoor::BaseDoor() : Object(ObjectTypes::BASEDOOR){
 
 void BaseDoor::Serialize(bool write, Serializer & data, Serializer * old){
 	Object::Serialize(write, data, old);
-	Sprite::Serialize(write, data, old);
 	data.Serialize(write, state_i, old);
 	data.Serialize(write, color, old);
 	data.Serialize(write, teamid, old);

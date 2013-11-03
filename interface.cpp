@@ -227,6 +227,16 @@ void Interface::ActiveChanged(World & world, Interface * callinginterface, bool 
 						}
 					}
 				}break;
+				case ObjectTypes::OVERLAY:{
+					Overlay * overlay = static_cast<Overlay *>(object);
+					if(overlay){
+						if(mouse && mousedown){
+							if(overlay->MouseInside(world, mousex, mousey)){
+								overlay->clicked = true;
+							}
+						}
+					}
+				}break;
 				case ObjectTypes::BUTTON:{
 					Button * button = static_cast<Button *>(object);
 					if(button){

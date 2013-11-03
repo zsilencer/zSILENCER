@@ -23,6 +23,7 @@ bool Audio::Init(void){
 	}else{
 		Mix_AllocateChannels(maxchannels);
 		Mix_ChannelFinished(ChannelFinished);
+		//Mix_SetPostMix(MixingFunction, 0);
 		return true;
 	}
 }
@@ -37,31 +38,11 @@ void Audio::Close(void){
 	}
 }
 
-int Audio::Play(Mix_Chunk * chunk, Uint8 volume, bool loop, int startms, int endms){
+int Audio::Play(Mix_Chunk * chunk, Uint8 volume, bool loop){
 	if(enabled && chunk){
 		int loops = 0;
 		if(loop){
 			loops = -1;
-		}
-		if(startms != 0 || endms != -1){
-			char chunkuniqstr[256];
-			sprintf(chunkuniqstr, "0x%X:%d:%d", (unsigned int)chunk, startms, endms);
-			if(!chunkcopies[chunkuniqstr]){
-				int start = (startms * ((22050 * 2) / 1000.0));
-				if(start > chunk->alen){
-					start = chunk->alen;
-				}
-				int length = (endms * ((22050 * 2) / 1000.0)) - start;
-				if(length > chunk->alen - start){
-					length = chunk->alen - start;
-				}
-				if(length < 0){
-					length = 0;
-				}
-				Mix_Chunk * newchunk = Mix_QuickLoad_RAW(&chunk->abuf[start], length);
-				chunkcopies[chunkuniqstr] = newchunk;
-			}
-			chunk = chunkcopies[chunkuniqstr];
 		}
 		int channel = Mix_PlayChannel(-1, chunk, loops);
 		if(channel >= 0){
@@ -87,8 +68,20 @@ void Audio::StopAll(int fadeoutms){
 	Stop(-1, fadeoutms);
 }
 
-int Audio::EmitSound(Uint16 objectid, Mix_Chunk * chunk, Uint8 volume, bool loop, int startms, int endms){
-	int channel = Play(chunk, volume * effectvolume, loop, startms, endms);
+void Audio::Pause(int channel){
+	Mix_Pause(channel);
+}
+
+void Audio::Resume(int channel){
+	Mix_Resume(channel);
+}
+
+bool Audio::Paused(int channel){
+	return Mix_Paused(channel);
+}
+
+int Audio::EmitSound(Uint16 objectid, Mix_Chunk * chunk, Uint8 volume, bool loop){
+	int channel = Play(chunk, volume * effectvolume, loop);
 	if(channel != -1){
 		Mix_Volume(channel, 0);
 		channelobject[channel] = objectid;
@@ -96,7 +89,7 @@ int Audio::EmitSound(Uint16 objectid, Mix_Chunk * chunk, Uint8 volume, bool loop
 	return channel;
 }
 
-void Audio::UpdateVolume(World & world, int channel, Uint32 x, Uint32 y, Uint32 radius){
+void Audio::UpdateVolume(World & world, int channel, Sint16 x, Sint16 y, int radius){
 	Uint16 objectid = channelobject[channel];
 	if(objectid){
 		Object * object = world.GetObjectFromId(objectid);
@@ -117,11 +110,15 @@ void Audio::UpdateVolume(World & world, int channel, Uint32 x, Uint32 y, Uint32 
 	}
 }
 
-void Audio::UpdateAllVolumes(World & world, Uint32 x, Uint32 y, Uint32 radius){
+void Audio::UpdateAllVolumes(World & world, Sint16 x, Sint16 y, int radius){
 	for(int i = 0; i < maxchannels; i++){
 		int channel = i;
 		UpdateVolume(world, channel, x, y, radius);
 	}
+}
+
+void Audio::SetVolume(int channel, Uint8 volume){
+	Mix_Volume(channel, volume * effectvolume);
 }
 
 void Audio::Mute(Uint8 volume){
@@ -161,4 +158,8 @@ void Audio::StopMusic(void){
 
 void Audio::ChannelFinished(int channel){
 	Audio::GetInstance().channelobject[channel] = 0;
+}
+
+void Audio::MixingFunction(void * udata, Uint8 * stream, int len){
+	
 }

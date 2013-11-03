@@ -13,7 +13,7 @@ public:
 	bool WasThrown(void);
 	bool UpdatePosition(World & world, Player & player);
 	void SetType(Uint8 type);
-	enum {EMP, SHAPED, PLASMA, NEUTRON, FLARE};
+	enum {EMP, SHAPED, PLASMA, NEUTRON, FLARE, POISONFLARE};
 	Uint8 type;
 	Uint16 ownerid;
 	Uint8 color;

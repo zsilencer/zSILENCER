@@ -20,7 +20,6 @@ LaserProjectile::LaserProjectile() : Object(ObjectTypes::LASERPROJECTILE){
 
 void LaserProjectile::Serialize(bool write, Serializer & data, Serializer * old){
 	Object::Serialize(write, data, old);
-	//Projectile::Serialize(write, data, old);
 	data.Serialize(write, state_i, old);
 }
 

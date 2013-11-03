@@ -21,7 +21,11 @@ void Config::Save(void){
 		WriteString(file, "fullscreen", fullscreen ? "1" : "0");
 		sprintf(temp, "%d", defaultagency); WriteString(file, "defaultagency", temp);
 		WriteString(file, "defaultgamename", defaultgamename);
-		sprintf(temp, "%d", defaulttechchoices); WriteString(file, "defaulttechchoices", temp);
+		sprintf(temp, "%d", defaulttechchoices[0]); WriteString(file, "defaulttechchoices0", temp);
+		sprintf(temp, "%d", defaulttechchoices[1]); WriteString(file, "defaulttechchoices1", temp);
+		sprintf(temp, "%d", defaulttechchoices[2]); WriteString(file, "defaulttechchoices2", temp);
+		sprintf(temp, "%d", defaulttechchoices[3]); WriteString(file, "defaulttechchoices3", temp);
+		sprintf(temp, "%d", defaulttechchoices[4]); WriteString(file, "defaulttechchoices4", temp);
 		WriteKey(file, "keymoveup", keymoveupbinding, keymoveupoperator);
 		WriteKey(file, "keymovedown", keymovedownbinding, keymovedownoperator);
 		WriteKey(file, "keymoveleft", keymoveleftbinding, keymoveleftoperator);
@@ -56,7 +60,11 @@ bool Config::Load(void){
 				if(CompareString(variable, "fullscreen")){ if(atoi(data) == 0){ fullscreen = false; }else{ fullscreen = true; } }
 				if(CompareString(variable, "defaultagency")){ defaultagency = atoi(data); }
 				if(CompareString(variable, "defaultgamename")){ ReadString(data, defaultgamename); }
-				if(CompareString(variable, "defaulttechchoices")){ defaulttechchoices = atoi(data); }
+				if(CompareString(variable, "defaulttechchoices0")){ defaulttechchoices[0] = atoi(data); }
+				if(CompareString(variable, "defaulttechchoices1")){ defaulttechchoices[1] = atoi(data); }
+				if(CompareString(variable, "defaulttechchoices2")){ defaulttechchoices[2] = atoi(data); }
+				if(CompareString(variable, "defaulttechchoices3")){ defaulttechchoices[3] = atoi(data); }
+				if(CompareString(variable, "defaulttechchoices4")){ defaulttechchoices[4] = atoi(data); }
 				if(CompareString(variable, "keymoveup")){ ReadKey(data, &keymoveupbinding, &keymoveupoperator); }
 				if(CompareString(variable, "keymovedown")){ ReadKey(data, &keymovedownbinding, &keymovedownoperator); }
 				if(CompareString(variable, "keymoveleft")){ ReadKey(data, &keymoveleftbinding, &keymoveleftoperator); }
@@ -88,7 +96,11 @@ void Config::LoadDefaults(void){
 	fullscreen = false;
 	defaultagency = Team::NOXIS;
 	strcpy(defaultgamename, "New Game");
-	defaulttechchoices = 4355;
+	defaulttechchoices[0] = World::BUY_LASER | World::BUY_ROCKET;
+	defaulttechchoices[1] = World::BUY_LASER | World::BUY_ROCKET;
+	defaulttechchoices[2] = World::BUY_LASER | World::BUY_ROCKET;
+	defaulttechchoices[3] = World::BUY_LASER | World::BUY_ROCKET;
+	defaulttechchoices[4] = World::BUY_LASER | World::BUY_ROCKET;
 	keymoveupbinding[0] = SDL_SCANCODE_UP; keymoveupbinding[1] = SDL_SCANCODE_UNKNOWN; keymoveupoperator = OR;
 	keymovedownbinding[0] = SDL_SCANCODE_DOWN; keymovedownbinding[1] = SDL_SCANCODE_UNKNOWN; keymovedownoperator = OR;
 	keymoveleftbinding[0] = SDL_SCANCODE_LEFT; keymoveleftbinding[1] = SDL_SCANCODE_UNKNOWN; keymoveleftoperator = OR;

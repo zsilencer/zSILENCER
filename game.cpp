@@ -16,7 +16,7 @@
 #include "cocoawrapper.h"
 
 Game::Game() : renderer(world){
-	world.SetVersion("00019");
+	world.SetVersion("00020");
 	frames = 0;
 	fps = 0;
 	state = MAINMENU;
@@ -28,7 +28,6 @@ Game::Game() : renderer(world){
 	gameselectinterface = 0;
 	modalinterface = 0;
 	sharedstate = 0;
-	ambientbgchannel = -1;
 	keynames[0] = "Move Up";
 	keynames[1] = "Move Down";
 	keynames[2] = "Move Left";
@@ -292,22 +291,12 @@ bool Game::Tick(void){
 		}
 	}
 	if(world.gameplaystate == World::INGAME && (state == INGAME || state == SINGLEPLAYERGAME)){
-		Player * localplayer = world.GetPeerPlayer(world.localpeerid);
-		if(localplayer && localplayer->InBase(world)){
-			if(ambientbgchannel != -1){
-				Audio::GetInstance().Stop(ambientbgchannel);
-				ambientbgchannel = -1;
-			}
-		}else{
-			if(ambientbgchannel == -1){
-				ambientbgchannel = Audio::GetInstance().Play(world.resources.soundbank["wndloopd.wav"], 32, true);
-			}
-		}
+		UpdateAmbienceChannels();
 	}else{
-		if(ambientbgchannel != -1){
+		/*if(ambientbgchannel != -1){
 			Audio::GetInstance().Stop(ambientbgchannel, 500);
 			ambientbgchannel = -1;
-		}
+		}*/
 	}
 	switch(state){
 		case FADEOUT:{
@@ -448,8 +437,6 @@ bool Game::Tick(void){
 							/*Team * team = (Team *)world.CreateObject(ObjectTypes::TEAM);
 							team->AddPeer(world.GetAuthorityPeer()->id);
 							team->agency = GetSelectedAgency();*/
-							//world.RequestPublicPort(world.lobby.serverip, 517);
-							//world.NATHolePunch(world.lobby.serverip, 517);
 						}else
 						if(world.lobby.creategamestatus == 2){
 							world.lobby.creategamestatus = 0;
@@ -478,7 +465,10 @@ bool Game::Tick(void){
 								gamecreateinterface = 0;
 							}
 							gamejoininterface = CreateGameJoinInterface();
-							world.SetTech(Config::GetInstance().defaulttechchoices);
+							Peer * peer = world.peerlist[world.localpeerid];
+							if(peer){
+								world.SetTech(Config::GetInstance().defaulttechchoices[GetSelectedAgency()]);
+							}
 							LobbyGame * lobbygame = world.lobby.GetGameByAccountId(currentlobbygameid);
 							if(lobbygame){
 								char temp[256];
@@ -630,22 +620,23 @@ bool Game::Tick(void){
 				world.intutorialmode = true;
 				currentinterface = 0;
 				Audio::GetInstance().StopMusic();
-				world.GetAuthorityPeer()->techchoices = 0xFFFFFFFF;
+				world.GetAuthorityPeer()->techchoices = World::BUY_LASER | World::BUY_ROCKET;
 				//world.Listen(23456);
 				Team * team = (Team *)world.CreateObject(ObjectTypes::TEAM);
 				team->AddPeer(world.GetAuthorityPeer()->id);
-				team->agency = Team::LAZARUS;
+				team->agency = Team::NOXIS;
 				team->color = ((8 << 4) + 13);
 				Player * player = (Player *)world.CreateObject(ObjectTypes::PLAYER);
 				player->suitcolor = team->color;
 				player->laserammo = 0;
-				player->credits = 20000;
+				player->credits = 500;
 				player->RemoveInventoryItem(Player::INV_BASEDOOR);
 				ShowDeployMessage();
 				world.GetAuthorityPeer()->controlledlist.push_back(player->id);
 				LoadMap("level/ALLY10c.sil", 0);
 				//LoadMap("level/THET06e.SIL", 3);
 				//LoadMap("level/STAR72.SIL", 3);
+				//LoadMap("level/EASY05c.SIL", 3);
 				world.map.RandomPlayerStartLocation(&player->x, &player->y);
 				player->oldx = player->x;
 				player->oldy = player->y;
@@ -745,7 +736,7 @@ bool Game::Tick(void){
 							sprintf(text, "The %s key fires your current weapon,\nthe Blaster.", GetKeyName(Config::GetInstance().keyfirebinding[0]));
 							world.ShowMessage(text, 128);
 						}
-						if(player->state == Player::STANDINGSHOOT || player->state == Player::CROUCHEDSHOOT || player->state == Player::FALLINGSHOOT || player->state == Player::JETPACKSHOOT){
+						if(player->state == Player::STANDINGSHOOT || player->state == Player::CROUCHEDSHOOT || player->state == Player::FALLINGSHOOT || player->state == Player::JETPACKSHOOT || player->state == Player::LADDERSHOOT){
 							singleplayermessage++;
 							world.message_i = 0;
 						}
@@ -820,6 +811,9 @@ bool Game::Tick(void){
 						if(!player->InBase(world)){
 							singleplayermessage = 11;
 							world.message_i = 0;
+						}
+						if(player->credits < 250){
+							player->credits = 250;
 						}
 						if(player->rocketammo > 0){
 							singleplayermessage++;
@@ -1206,7 +1200,7 @@ bool Game::Tick(void){
 			/*if(world.tickcount % 48 == 0){
 				world.SendPeerList();
 			}*/
-			if(!world.map.loaded && world.peercount >= 1){
+			if(!world.map.loaded && world.peercount >= 2){
 				char mapname[256];
 				sprintf(mapname, "level/%s", world.gameinfo.mapname);
 				LoadMap(mapname);
@@ -1233,8 +1227,11 @@ bool Game::Tick(void){
 										player->oldx = player->x;
 										player->oldy = player->y;
 										player->teamid = team->id;
+										player->AddInventoryItem(Player::INV_VIRUS);
+										player->credits = 2000;
 										Uint8 teamcolor = team->GetColor();
 										player->suitcolor = (((teamcolor >> 4) - i) << 4) + (teamcolor & 0xF);
+										world.peerlist[team->peers[i]]->techchoices = 0xFFFFFFFF;
 										world.peerlist[team->peers[i]]->controlledlist.clear();
 										world.peerlist[team->peers[i]]->controlledlist.push_back(player->id);
 									}
@@ -1331,7 +1328,7 @@ void Game::UpdateInputState(Input & input){
 			Input zeroinput;
 			input = zeroinput;
 		}
-		if(localplayer->buyinterfaceid){
+		if(localplayer->buyinterfaceid || localplayer->techinterfaceid){
 			Input zeroinput;
 			zeroinput.keyactivate = input.keyactivate;
 			zeroinput.keymoveleft = input.keymoveleft;
@@ -1345,6 +1342,7 @@ bool Game::LoadMap(const char * name, Uint8 securitylevel){
 	if(!world.map.Load(name, world, securitylevel)){
 		return false;
 	}
+	CreateAmbienceChannels();
 	renderer.palette.SetParallaxColors(world.map.parallax);
 	return true;
 }
@@ -1352,6 +1350,9 @@ bool Game::LoadMap(const char * name, Uint8 securitylevel){
 void Game::UnloadGame(void){
 	//world.GetAuthorityPeer()->controlledlist.clear();
 	Audio::GetInstance().StopAll(200);
+	for(int i = 0; i < sizeof(bgchannel) / sizeof(int); i++){
+		bgchannel[i] = -1;
+	}
 	world.SwitchToLocalAuthorityMode();
 	world.map.Unload();
 	world.message_i = 0;
@@ -1435,15 +1436,18 @@ bool Game::CheckForConnectionLost(void){
 void Game::ProcessInGameInterfaces(void){
 	Player * localplayer = world.GetPeerPlayer(world.localpeerid);
 	if(localplayer){
-		if(localplayer->buyinterfaceid){
+		if(localplayer->buyinterfaceid || localplayer->techinterfaceid){
 			currentinterface = localplayer->buyinterfaceid;
+			if(!currentinterface){
+				currentinterface = localplayer->techinterfaceid;
+			}
 		}else{
 			oldselecteditem = 0;
 		}
 		if(localplayer->chatinterfaceid){
 			currentinterface = localplayer->chatinterfaceid;
 		}
-		if(!localplayer->chatinterfaceid && !localplayer->buyinterfaceid){
+		if(!localplayer->chatinterfaceid && !localplayer->buyinterfaceid && !localplayer->techinterfaceid){
 			currentinterface = 0;
 		}
 		Interface * iface = (Interface *)world.GetObjectFromId(currentinterface);
@@ -1464,13 +1468,19 @@ void Game::ProcessInGameInterfaces(void){
 					}
 				}
 			}else
-			if(iface->id == localplayer->buyinterfaceid){
+			if(iface->id == localplayer->buyinterfaceid || iface->id == localplayer->techinterfaceid){
+				bool buying = false;
+				if(iface->id == localplayer->buyinterfaceid){
+					buying = true;
+				}
 				SelectBox * selectbox = (SelectBox *)iface->GetObjectWithUid(world, 1);
 				if(selectbox){
 					if(selectbox->selecteditem != oldselecteditem){
 						Audio::GetInstance().Play(world.resources.soundbank["grndown.wav"], 64);
 						oldselecteditem = selectbox->selecteditem;
-						localplayer->buyifacelastitem = selectbox->selecteditem;
+						if(buying){
+							localplayer->buyifacelastitem = selectbox->selecteditem;
+						}
 					}
 					if(selectbox->selecteditem >= selectbox->scrolled + 5){
 						selectbox->scrolled = selectbox->selecteditem - 4;
@@ -1478,7 +1488,9 @@ void Game::ProcessInGameInterfaces(void){
 					if(selectbox->selecteditem < selectbox->scrolled){
 						selectbox->scrolled = selectbox->selecteditem;
 					}
-					localplayer->buyifacelastscrolled = selectbox->scrolled;
+					if(buying){
+						localplayer->buyifacelastscrolled = selectbox->scrolled;
+					}
 					if(selectbox->enterpressed){
 						BuyableItem * buyableitem = 0;
 						for(std::vector<BuyableItem *>::iterator it = world.buyableitems.begin(); it != world.buyableitems.end(); it++){
@@ -1488,7 +1500,15 @@ void Game::ProcessInGameInterfaces(void){
 							}
 						}
 						if(buyableitem){
-							localplayer->BuyItem(world, buyableitem->id);
+							if(buying){
+								localplayer->BuyItem(world, buyableitem->id);
+							}else{
+								if(localplayer->InOwnBase(world)){
+									localplayer->RepairItem(world, buyableitem->id);
+								}else{
+									localplayer->VirusItem(world, buyableitem->id);
+								}
+							}
 						}
 						selectbox->enterpressed = false;
 					}
@@ -2090,6 +2110,7 @@ Interface * Game::CreateChatInterface(void){
 }
 
 Interface * Game::CreateGameCreateInterface(void){
+	creategameclicked = false;
 	Interface * gamecreateinterface = (Interface *)world.CreateObject(ObjectTypes::INTERFACE);
 	gamecreateinterface->x = 403;
 	gamecreateinterface->y = 87;
@@ -2241,7 +2262,6 @@ Interface * Game::CreateGameTechInterface(void){
 		if(techoverlay){
 			techoverlay->text = new char[64];
 			sprintf(techoverlay->text, "Player %d", i + 1);
-			techoverlay->textlength = strlen(techoverlay->text);
 			techoverlay->textbank = 133;
 			techoverlay->textwidth = 6;
 			techoverlay->uid = 80 + i;
@@ -2261,38 +2281,72 @@ Interface * Game::CreateGameTechInterface(void){
 			gametechinterface->AddObject(techlineoverlay->id);
 		}
 	}
-	for(int x = 0; x < 4; x++){
-		int i = 0;
-		for(std::vector<BuyableItem *>::iterator it = world.buyableitems.begin(); it != world.buyableitems.end(); it++){
-			BuyableItem * buyableitem = *it;
-			if(buyableitem->techslots){
-				Button * button = (Button *)world.CreateObject(ObjectTypes::BUTTON);
-				if(button){
-					button->x = 410 + (x * 14);
-					button->y = 125 + (i * 13);
-					button->uid = 110 + (30 * x) + i;
-					button->SetType(Button::BCHECKBOX);
-					if(x < 3){
-						button->effectbrightness = 64;
-						button->draw = false;
-					}
-					gametechinterface->AddObject(button->id);
-					if(x == 3){
-						Overlay * technameoverlay = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-						if(technameoverlay){
-							technameoverlay->text = new char[64];
-							sprintf(technameoverlay->text, "%s (%d)", buyableitem->name, buyableitem->techslots);
-							technameoverlay->x = 425 + (x * 14);
-							technameoverlay->y = 127 + (i * 13);
-							technameoverlay->textbank = 133;
-							technameoverlay->textwidth = 6;
-							technameoverlay->uid = 230 + i;
-							gametechinterface->AddObject(technameoverlay->id);
+	Team * team = world.GetPeerTeam(world.localpeerid);
+	if(team){
+		for(int x = 0; x < 4; x++){
+			int i = 0;
+			int ipos = 0;
+			for(std::vector<BuyableItem *>::iterator it = world.buyableitems.begin(); it != world.buyableitems.end(); it++){
+				BuyableItem * buyableitem = *it;
+				if(buyableitem->techslots){
+					if(buyableitem->agencyspecific == -1 || (buyableitem->agencyspecific == team->agency)){
+						Button * button = (Button *)world.CreateObject(ObjectTypes::BUTTON);
+						if(button){
+							button->x = 410 + (x * 14);
+							button->y = 125 + (ipos * 13);
+							button->uid = 110 + (30 * x) + i;
+							button->SetType(Button::BCHECKBOX);
+							if(x < 3){
+								button->effectbrightness = 64;
+								button->draw = false;
+							}
+							gametechinterface->AddObject(button->id);
+							if(x == 3){
+								Overlay * technameoverlay = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
+								if(technameoverlay){
+									technameoverlay->text = new char[64];
+									sprintf(technameoverlay->text, "%s (%d)", buyableitem->name, buyableitem->techslots);
+									technameoverlay->x = 425 + (x * 14);
+									technameoverlay->y = 127 + (ipos * 13);
+									technameoverlay->textbank = 133;
+									technameoverlay->textwidth = 6;
+									technameoverlay->uid = 230 + i;
+									gametechinterface->AddObject(technameoverlay->id);
+								}
+							}
 						}
+						ipos++;
 					}
+					i++;
 				}
-				i++;
 			}
+		}
+	}
+	Overlay * techname = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
+	if(techname){
+		techname->text = new char[64];
+		strcpy(techname->text, "");
+		techname->textbank = 134;
+		techname->textwidth = 8;
+		techname->uid = 60;
+		techname->x = 401 + (116 - ((strlen(techname->text) * techname->textwidth) / 2));
+		techname->y = 350;
+		gametechinterface->AddObject(techname->id);
+	}
+	for(int i = 0; i < 8; i++){
+		Overlay * techdesc = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
+		if(techdesc){
+			techdesc->text = new char[64];
+			strcpy(techdesc->text, "");
+			techdesc->textbank = 133;
+			techdesc->textwidth = 6;
+			techdesc->effectcolor = 129;
+			techdesc->effectbrightness = 128 + 16;
+			techdesc->textcolorramp = true;
+			techdesc->uid = 61 + i;
+			techdesc->x = 405;
+			techdesc->y = 370 + (i * 10);
+			gametechinterface->AddObject(techdesc->id);
 		}
 	}
 	gametechinterface->AddObject(teamsbutton->id);
@@ -2326,6 +2380,7 @@ Interface * Game::CreateGameSummaryInterface(Stats & stats, Uint8 agency){
 	
 	AddSummaryLine(*textbox, "Kills:", stats.kills);
 	AddSummaryLine(*textbox, "Deaths:", stats.deaths);
+	AddSummaryLine(*textbox, "Suicides", stats.suicides);
 	textbox->AddLine("");
 	textbox->AddLine("Secrets");
 	AddSummaryLine(*textbox, "  Returned:", stats.secretsreturned);
@@ -2345,14 +2400,19 @@ Interface * Game::CreateGameSummaryInterface(Stats & stats, Uint8 agency){
 	textbox->AddLine("");
 	AddSummaryLine(*textbox, "Powerups picked up:", stats.powerupspickedup);
 	AddSummaryLine(*textbox, "Health packs used:", stats.healthpacksused);
+	AddSummaryLine(*textbox, "Cameras placed:", stats.camerasplanted);
 	AddSummaryLine(*textbox, "Detonators planted:", stats.detsplanted);
 	AddSummaryLine(*textbox, "Fixed Cannons placed:", stats.fixedcannonsplaced);
+	AddSummaryLine(*textbox, "Viruses used:", stats.virusesused);
+	AddSummaryLine(*textbox, "Poisons:", stats.poisons);
+	AddSummaryLine(*textbox, "Lazarus Tracts planted:", stats.tractsplanted);
 	textbox->AddLine("");
 	textbox->AddLine("Grenades thrown");
 	AddSummaryLine(*textbox, "  E.M.P:", stats.empsthrown);
 	AddSummaryLine(*textbox, "  Plasma:", stats.plasmasthrown);
 	AddSummaryLine(*textbox, "  Shaped:", stats.shapedthrown);
 	AddSummaryLine(*textbox, "  Flare:", stats.flaresthrown);
+	AddSummaryLine(*textbox, "  Poison Flare:", stats.poisonflaresthrown);
 	AddSummaryLine(*textbox, "  Neutron:", stats.neutronsthrown);
 	for(int i = 0; i < 4; i++){
 		textbox->AddLine("");
@@ -2576,8 +2636,8 @@ bool Game::ProcessMainMenuInterface(Interface * iface){
 						return false;
 					break;
 					case 4:
-						//nextstate = HOSTGAME;
-						nextstate = MISSIONSUMMARY;
+						nextstate = HOSTGAME;
+						//nextstate = MISSIONSUMMARY;
 						state = FADEOUT;
 						fade_i = 0;
 						stateisnew = true;
@@ -2646,7 +2706,9 @@ void Game::ProcessLobbyConnectInterface(Interface * iface){
 								textbox->AddLine("Software version is current");
 								world.lobby.state = Lobby::AUTHENTICATING;
 							}else{
-								textbox->AddLine("Software is out of date, cannot continue");
+								textbox->AddLine("Software is out of date!");
+								textbox->AddLine("Get latest version at:");
+								textbox->AddLine("http://zsilencer.com");
 								world.lobby.Disconnect();
 								world.lobby.state = Lobby::IDLE;
 							}
@@ -2951,26 +3013,6 @@ bool Game::ProcessLobbyInterface(Interface * iface){
 				}break;
 				case ObjectTypes::BUTTON:{
 					Button * button = static_cast<Button *>(object);
-					if(button && button->type == Button::BCHECKBOX){
-						if(button->clicked){
-							/*if(button->state == Button::INACTIVE){
-								button->state = Button::ACTIVE;
-							}else{
-								button->state = Button::INACTIVE;
-							}*/
-							if(button->uid >= 200 && button->effectbrightness == 128){
-								Uint32 techchoice = 1 << (button->uid - 200);
-								Peer * peer = world.peerlist[world.localpeerid];
-								//printf("tech slots used: %d, %d\n", world.TechSlotsUsed(*peer), peer->techchoices);
-								if(peer){
-									world.SetTech(peer->techchoices ^ techchoice);
-									Config::GetInstance().defaulttechchoices = peer->techchoices ^ techchoice;
-									Config::GetInstance().Save();
-								}
-							}
-							button->clicked = false;
-						}
-					}
 					if(button && button->clicked && button->type != Button::BCHECKBOX){
 						button->clicked = false;
 						switch(button->uid){
@@ -3145,34 +3187,37 @@ bool Game::ProcessLobbyInterface(Interface * iface){
 								//world.GetAuthorityPeer()->controlledlist.push_back(object->id);
 							}break;
 							case 35:{ // create game create
-								const char * gamename = "";
-								const char * mapname = "";
-								const char * password = 0;
-								Object * tobject = gamecreateinterface->GetObjectWithUid(world, 5);
-								if(tobject){
-									TextInput * textinput = static_cast<TextInput *>(tobject);
-									gamename = textinput->text;
-								}
-								tobject = gamecreateinterface->GetObjectWithUid(world, 6);
-								if(tobject){
-									TextInput * textinput = static_cast<TextInput *>(tobject);
-									if(strlen(textinput->text) > 0){
-										password = textinput->text;
-									}
-								}
-								if(strlen(gamename) == 0){
-									CreateModalDialog("No game name");
-								}else{
-									tobject = gamecreateinterface->GetObjectWithUid(world, 4);
+								if(!creategameclicked){
+									const char * gamename = "";
+									const char * mapname = "";
+									const char * password = 0;
+									Object * tobject = gamecreateinterface->GetObjectWithUid(world, 5);
 									if(tobject){
-										SelectBox * selectbox = static_cast<SelectBox *>(tobject);
-										if(selectbox->selecteditem >= 0){
-											mapname = selectbox->GetItemName(selectbox->selecteditem);
-											world.lobby.CreateGame(gamename, mapname, password);
-											strcpy(Config::GetInstance().defaultgamename, gamename);
-											Config::GetInstance().Save();
-										}else{
-											CreateModalDialog("No map selected");
+										TextInput * textinput = static_cast<TextInput *>(tobject);
+										gamename = textinput->text;
+									}
+									tobject = gamecreateinterface->GetObjectWithUid(world, 6);
+									if(tobject){
+										TextInput * textinput = static_cast<TextInput *>(tobject);
+										if(strlen(textinput->text) > 0){
+											password = textinput->text;
+										}
+									}
+									if(strlen(gamename) == 0){
+										CreateModalDialog("No game name");
+									}else{
+										tobject = gamecreateinterface->GetObjectWithUid(world, 4);
+										if(tobject){
+											SelectBox * selectbox = static_cast<SelectBox *>(tobject);
+											if(selectbox->selecteditem >= 0){
+												mapname = selectbox->GetItemName(selectbox->selecteditem);
+												world.lobby.CreateGame(gamename, mapname, password);
+												creategameclicked = true;
+												strcpy(Config::GetInstance().defaultgamename, gamename);
+												Config::GetInstance().Save();
+											}else{
+												CreateModalDialog("No map selected");
+											}
 										}
 									}
 								}
@@ -3190,6 +3235,7 @@ bool Game::ProcessLobbyInterface(Interface * iface){
 									modalinterface->DestroyInterface(world, iface);
 									currentinterface = aftermodalinterface;
 									modalinterface = 0;
+									creategameclicked = false;
 								}
 							break;
 						}
@@ -3295,42 +3341,90 @@ void Game::UpdateTechInterface(void){
 					draw = false;
 				}
 				int b = 0;
+				int bpos = 0;
 				for(std::vector<BuyableItem *>::iterator it = world.buyableitems.begin(); it != world.buyableitems.end(); it++){
 					BuyableItem * buyableitem = *it;
 					if(buyableitem->techslots){
-						bool usable = true;
-						Uint8 uid = 110 + (30 * peerindex) + b;
-						if(team->peers[i] == world.localpeerid){
-							uid = 110 + (30 * 3) + b;
-							if(buyableitem->techslots <= techslotsleft || (peer && peer->techchoices & buyableitem->techchoice)){
-								usable = false;
-							}
-						}
-						Button * button = static_cast<Button *>(gametechinterface->GetObjectWithUid(world, uid));
-						if(button){
-							if(peer && peer->techchoices & buyableitem->techchoice){
-								button->res_index = 18;
-							}else{
-								button->res_index = 19;
-							}
+						if(buyableitem->agencyspecific == -1 || buyableitem->agencyspecific == team->agency){
+							bool usable = true;
+							Uint8 uid = 110 + (30 * peerindex) + b;
 							if(team->peers[i] == world.localpeerid){
-								if(!usable){
-									button->effectbrightness = 128;
-								}else{
-									button->effectbrightness = 64;
+								uid = 110 + (30 * 3) + b;
+								if(buyableitem->techslots <= techslotsleft || (peer && peer->techchoices & buyableitem->techchoice)){
+									usable = false;
 								}
 							}
-							button->draw = draw;
-						}
-						Overlay * overlay = static_cast<Overlay *>(gametechinterface->GetObjectWithUid(world, 230 + b));
-						if(overlay){
-							if(team->peers[i] == world.localpeerid){
-								if(!usable){
-									overlay->effectbrightness = 128;
+							Button * button = static_cast<Button *>(gametechinterface->GetObjectWithUid(world, uid));
+							if(button){
+								if(peer && peer->techchoices & buyableitem->techchoice){
+									button->res_index = 18;
 								}else{
-									overlay->effectbrightness = 64;
+									button->res_index = 19;
+								}
+								if(team->peers[i] == world.localpeerid){
+									if(!usable){
+										button->effectbrightness = 128;
+									}else{
+										button->effectbrightness = 64;
+									}
+								}
+								if(button && button->type == Button::BCHECKBOX){
+									if(button->clicked){
+										if(button->uid >= 200 && button->effectbrightness == 128){
+											//Uint32 techchoice = 1 << (button->uid - 200);
+											Peer * peer = world.peerlist[world.localpeerid];
+											//printf("tech slots used: %d, %d\n", world.TechSlotsUsed(*peer), peer->techchoices);
+											if(peer){
+												world.SetTech(peer->techchoices ^ buyableitem->techchoice);
+												Team * team = world.GetPeerTeam(world.localpeerid);
+												if(team){
+													Config::GetInstance().defaulttechchoices[team->agency] = peer->techchoices ^ buyableitem->techchoice;
+													Config::GetInstance().Save();
+												}
+											}
+										}
+										button->clicked = false;
+									}
+								}
+								button->draw = draw;
+							}
+							Overlay * overlay = static_cast<Overlay *>(gametechinterface->GetObjectWithUid(world, 230 + b));
+							if(overlay){
+								if(overlay->clicked){
+									overlay->clicked = false;
+									Overlay * nameoverlay = static_cast<Overlay *>(gametechinterface->GetObjectWithUid(world, 60));
+									if(nameoverlay){
+										sprintf(nameoverlay->text, "-%s-", buyableitem->name);
+										nameoverlay->x = 401 + (116 - ((strlen(nameoverlay->text) * nameoverlay->textwidth) / 2));
+									}
+									char desc[1024];
+									strcpy(desc, buyableitem->description);
+									int linenum = 0;
+									char * descline = strtok(desc, "\n");
+									while(descline){
+										Overlay * descoverlay = static_cast<Overlay *>(gametechinterface->GetObjectWithUid(world, 61 + linenum));
+										if(descoverlay){
+											strcpy(descoverlay->text, descline);
+										}
+										linenum++;
+										descline = strtok(NULL, "\n");
+									}
+									for(int i = linenum; i < 9; i++){
+										Overlay * descoverlay = static_cast<Overlay *>(gametechinterface->GetObjectWithUid(world, 61 + i));
+										if(descoverlay){
+											strcpy(descoverlay->text, "");
+										}
+									}
+								}
+								if(team->peers[i] == world.localpeerid){
+									if(!usable){
+										overlay->effectbrightness = 128;
+									}else{
+										overlay->effectbrightness = 64;
+									}
 								}
 							}
+							bpos++;
 						}
 						b++;
 					}
@@ -3708,6 +3802,51 @@ const char * Game::GetKeyName(SDL_Scancode sym){
 
 void Game::GetGameChannelName(LobbyGame & lobbygame, char * name){
 	sprintf(name, "#%s-%d", lobbygame.name, lobbygame.accountid);
+}
+
+void Game::CreateAmbienceChannels(void){
+	const char * bgchannelbanks[4] = {"wndloopb.wav", "cphum11.wav", "ambloop4.wav", "wndloop1.wav"};
+	for(int i = 0; i < sizeof(bgchannel) / sizeof(int); i++){
+		if(bgchannel[i] == -1){
+			bgchannel[i] = Audio::GetInstance().Play(world.resources.soundbank[bgchannelbanks[i]], 0, true);
+		}
+	}
+}
+
+void Game::UpdateAmbienceChannels(void){
+	Player * localplayer = world.GetPeerPlayer(world.localpeerid);
+	if(localplayer){
+		int columns = 5;
+		int rows = 5;
+		int w = 640;
+		int h = 480;
+		int outsideamount = 0;
+		int maxamount = columns * rows;
+		for(int x = 0; x < columns; x++){
+			for(int y = 0; y < rows; y++){
+				int x1 = (w * (x / float(columns))) - (w / 2);
+				x1 += - renderer.camera.GetXOffset();
+				int x2 = (w * ((x + 1) / float(columns))) - (w / 2);
+				x2 += - renderer.camera.GetXOffset();
+				int y1 = (h * (y / float(rows))) - (h / 2);
+				y1 += - renderer.camera.GetYOffset();
+				int y2 = (h * ((y + 1) / float(rows))) - (h / 2);
+				y2 += - renderer.camera.GetYOffset();
+				if(world.map.TestAABB(x1, y1, x2, y2, Platform::OUTSIDEROOM)){
+					outsideamount++;
+				}
+			}
+		}
+		if(localplayer->InBase(world)){
+			Audio::GetInstance().SetVolume(bgchannel[BG_BASE], 32);
+			Audio::GetInstance().SetVolume(bgchannel[BG_AMBIENT], 0);
+			Audio::GetInstance().SetVolume(bgchannel[BG_OUTSIDE], 0);
+		}else{
+			Audio::GetInstance().SetVolume(bgchannel[BG_BASE], 0);
+			Audio::GetInstance().SetVolume(bgchannel[BG_AMBIENT], 32 * (1 - (outsideamount / float(maxamount))));
+			Audio::GetInstance().SetVolume(bgchannel[BG_OUTSIDE], 32 * (outsideamount / float(maxamount)));
+		}
+	}
 }
 
 bool Game::HandleSDLEvents(void){

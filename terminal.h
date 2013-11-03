@@ -31,8 +31,9 @@ protected:
 	Uint8 beamingframes;
 	Uint8 readyframes;
 	Uint8 beamingcount;
+	bool secretreadynotified;
 	bool sizeset;
-	bool readysoundplayed;
+	int soundchannel;
 };
 
 #endif

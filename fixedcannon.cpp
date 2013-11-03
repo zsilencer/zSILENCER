@@ -12,6 +12,7 @@ FixedCannon::FixedCannon() : Object(ObjectTypes::FIXEDCANNON){
 	state = UP;
 	state_i = 0;
 	ownerid = 0;
+	teamid = 0;
 	renderpass = 3;
 	state = NEW;
 	suitcolor = 0;
@@ -24,20 +25,15 @@ FixedCannon::FixedCannon() : Object(ObjectTypes::FIXEDCANNON){
 
 void FixedCannon::Serialize(bool write, Serializer & data, Serializer * old){
 	Object::Serialize(write, data, old);
-	//Bipedal::Serialize(write, data, old);
 	data.Serialize(write, state, old);
 	data.Serialize(write, state_i, old);
 	data.Serialize(write, ownerid, old);
+	data.Serialize(write, teamid, old);
+	data.Serialize(write, suitcolor, old);
 }
 
 void FixedCannon::Tick(World & world){
 	Hittable::Tick(*this, world);
-	if(!suitcolor){
-		Player * owner = (Player *)world.GetObjectFromId(ownerid);
-		if(owner){
-			suitcolor = owner->suitcolor;
-		}
-	}
 	switch(state){
 		case NEW:{
 			Audio::GetInstance().EmitSound(id, world.resources.soundbank["shield2.wav"], 96);
@@ -96,11 +92,11 @@ void FixedCannon::Tick(World & world){
 		}break;
 		case SHOOTING_UP:{
 			if(state_i == 0){
-				Audio::GetInstance().EmitSound(id, world.resources.soundbank["!laserew.wav"], 128);
+				Audio::GetInstance().EmitSound(id, world.resources.soundbank["!laserew.wav"], 64);
 				LaserProjectile * laserprojectile = (LaserProjectile *)world.CreateObject(ObjectTypes::LASERPROJECTILE);
 				if(laserprojectile){
-					laserprojectile->x = x + ((mirrored ? -1 : 1) * (30 + laserprojectile->emitoffset));
-					laserprojectile->y = y - 46;
+					laserprojectile->x = x + ((mirrored ? -1 : 1) * (45 + laserprojectile->emitoffset));
+					laserprojectile->y = y - 47;
 					laserprojectile->ownerid = id;
 					laserprojectile->xv = laserprojectile->velocity * (mirrored ? -1 : 1);
 					laserprojectile->mirrored = mirrored;
@@ -116,11 +112,11 @@ void FixedCannon::Tick(World & world){
 		}break;
 		case SHOOTING_DOWN:{
 			if(state_i == 0){
-				Audio::GetInstance().EmitSound(id, world.resources.soundbank["!laserew.wav"], 96);
+				Audio::GetInstance().EmitSound(id, world.resources.soundbank["!laserew.wav"], 64);
 				LaserProjectile * laserprojectile = (LaserProjectile *)world.CreateObject(ObjectTypes::LASERPROJECTILE);
 				if(laserprojectile){
-					laserprojectile->x = x + ((mirrored ? -1 : 1) * (30 + laserprojectile->emitoffset));
-					laserprojectile->y = y - 27;
+					laserprojectile->x = x + ((mirrored ? -1 : 1) * (45 + laserprojectile->emitoffset));
+					laserprojectile->y = y - 28;
 					laserprojectile->ownerid = id;
 					laserprojectile->xv = laserprojectile->velocity * (mirrored ? -1 : 1);
 					laserprojectile->mirrored = mirrored;
@@ -175,14 +171,30 @@ void FixedCannon::HandleHit(World & world, Uint8 x, Uint8 y, Object & projectile
 	}
 }
 
-void FixedCannon::SetOwner(Uint16 id){
+void FixedCannon::SetOwner(World & world, Uint16 id){
 	ownerid = id;
+	Player * player = static_cast<Player *>(world.GetObjectFromId(id));
+	if(player){
+		suitcolor = player->suitcolor;
+		Team * team = player->GetTeam(world);
+		if(team){
+			teamid = team->id;
+		}
+	}
+}
+
+bool FixedCannon::ImplantVirus(World & world, Uint16 playerid){
+	if(playerid != ownerid){
+		SetOwner(world, playerid);
+		return true;
+	}
+	return false;
 }
 
 bool FixedCannon::Look(World & world, bool up){
 	std::vector<Uint8> types;
 	types.push_back(ObjectTypes::PLAYER);
-	Sint8 y2 = up ? -46 : -27;
+	Sint8 y2 = up ? -47 : -28;
 	std::vector<Object *> objects = world.TestAABB(x + (mirrored ? -70 : 70), y + y2, x + (mirrored ? -300 : 300), y + y2, types);
 	for(std::vector<Object *>::iterator it = objects.begin(); it != objects.end(); it++){
 		Player * player = static_cast<Player *>(*it);

@@ -15,7 +15,7 @@ public:
 	void Draw(SDL_Surface * surface, float frametime = 0);
 	void DrawWorld(SDL_Surface * surface, Camera & camera, Uint8 * lightmap, bool drawminimap = true, int recursion = 2, float frametime = 0);
 	void DrawMiniMap(Object * object);
-	void DrawWorldScaled(SDL_Surface * surface, Camera & camera, int recursion, float frametime = 0);
+	void DrawWorldScaled(SDL_Surface * surface, Camera & camera, int recursion, float frametime = 0, int factor = 2);
 	void BlitSurface(SDL_Surface * src, SDL_Rect * srcrect, SDL_Surface * dst, SDL_Rect * dstrect);
 	bool BlitSurfaceUpper(SDL_Surface * src, SDL_Rect * srcrect, SDL_Surface * dst, SDL_Rect * dstrect);
 	void BlitSurfaceSlow(SDL_Surface * src, SDL_Rect * srcrect, SDL_Surface * dst, SDL_Rect * dstrect);
@@ -25,12 +25,13 @@ public:
 	void DrawTinyText(SDL_Surface * surface, Uint16 x, Uint16 y, const char * text, Uint8 tint = 0, Uint8 brightness = 128);
 	void DrawShadow(SDL_Surface * surface, Object * object);
 	void DrawRain(SDL_Surface * surface, Camera & camera, float frametime = 0);
+	void DrawRainPuddles(SDL_Surface * surface, Camera & camera);
 	inline void SetPixel(SDL_Surface * surface, unsigned int x, unsigned int y, Uint8 color);
 	inline Uint8 GetPixel(SDL_Surface * surface, unsigned int x, unsigned int y);
 	void DrawDebug(SDL_Surface * surface);
 	void DrawMessage(SDL_Surface * surface);
 	void DrawStatus(SDL_Surface * surface);
-	void DrawScaled(SDL_Surface * src, SDL_Rect * srcrect, SDL_Surface *dst, SDL_Rect * dstrect);
+	void DrawScaled(SDL_Surface * src, SDL_Rect * srcrect, SDL_Surface *dst, SDL_Rect * dstrect, int factor = 2);
 	void DrawCheckered(SDL_Surface * src, SDL_Rect * srcrect, SDL_Surface * dst, SDL_Rect * dstrect);
 	void DrawColored(SDL_Surface * src, SDL_Rect * srcrect, SDL_Surface * dst, SDL_Rect * dstrect);
 	void DrawRampColored(SDL_Surface * src, SDL_Rect * srcrect, SDL_Surface * dst, SDL_Rect * dstrect);
@@ -46,6 +47,7 @@ public:
 	void EffectColor(SDL_Surface * dst, SDL_Rect * dstrect, Uint8 color);
 	void EffectRampColor(SDL_Surface * dst, SDL_Rect * dstrect, Uint8 color);
 	void EffectHit(SDL_Surface * dst, SDL_Rect * dstrect, Uint8 hitx, Uint8 hity, Uint8 state_hit);
+	void EffectShieldDamage(SDL_Surface * dst, SDL_Rect * dstrect, Uint8 color);
 	void EffectWarp(SDL_Surface * dst, SDL_Rect * dstrect, Uint8 state_warp);
 	void MiniMapBlit(Uint8 res_bank, Uint8 res_index, int x, int y, bool alpha = false, Uint8 teamcolor = 0);
 	void MiniMapCircle(int x, int y, Uint8 color);
@@ -66,11 +68,11 @@ public:
 	class World & world;
 	Palette palette;
 	Player * localplayer;
-	bool playerinbaseold;
 	Uint8 lightmap[640 * 480];
 	Sint8 ambience_r;
 	Uint8 state_i;
 	Uint8 ex, ey;
+	bool playerinbaseold;
 	static const int raindropscount = 100;
 	int raindropsx[raindropscount];
 	int raindropsy[raindropscount];

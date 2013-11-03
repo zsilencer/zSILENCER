@@ -17,8 +17,6 @@ PickUp::PickUp() : Object(ObjectTypes::PICKUP){
 
 void PickUp::Serialize(bool write, Serializer & data, Serializer * old){
 	Object::Serialize(write, data, old);
-	//Sprite::Serialize(write, data, old);
-	//Physical::Serialize(write, data, old);
 	data.Serialize(write, type, old);
 	data.Serialize(write, quantity, old);
 	data.Serialize(write, state_i, old);
@@ -59,33 +57,19 @@ void PickUp::Tick(World & world){
 				res_bank = 42;
 				res_index = 0;
 			}break;
-			case EMPBOMB:{
-				res_bank = 42;
-				res_index = 3;
-			}break;
-			case SHAPEDBOMB:{
-				res_bank = 42;
-				res_index = 3;
-			}break;
-			case PLASMABOMB:{
+			case EMPBOMB:
+			case SHAPEDBOMB:
+			case PLASMABOMB:
+			case FIXEDCANNON:
+			case FLARE:
+			case CAMERA:
+			case PLASMADET:{
 				res_bank = 42;
 				res_index = 3;
 			}break;
 			case NEUTRONBOMB:{
 				res_bank = 204;
 				res_index = 0;
-			}break;
-			case FIXEDCANNON:{
-				res_bank = 42;
-				res_index = 3;
-			}break;
-			case FLARE:{
-				res_bank = 42;
-				res_index = 3;
-			}break;
-			case PLASMADET:{
-				res_bank = 42;
-				res_index = 3;
 			}break;
 		}
 		yv += world.gravity;

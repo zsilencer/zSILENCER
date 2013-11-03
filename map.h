@@ -19,7 +19,11 @@ public:
 	void Unload(void);
 	void MiniMapCoords(int * x, int * y);
 	void RandomPlayerStartLocation(Sint16 * x, Sint16 * y);
+	void CalculateRainPuddleLocations(void);
 	void CalculateAdjacentPlatforms(void);
+	int AdjacentPlatformsLength(Platform & platform);
+	Platform & GetLeftmostPlatform(Platform & platform);
+	Platform & GetRightmostPlatform(Platform & platform);
 	Platform * TestAABB(int x1, int y1, int x2, int y2, Uint8 type, Platform * except = 0, bool ignorethin = false);
 	bool TestAABB(int x1, int y1, int x2, int y2, Platform * platform, Uint8 type, bool ignorethin = false);
 	Platform * TestLine(int x1, int y1, int x2, int y2, int * xe, int * ye, Uint8 type);
@@ -44,6 +48,7 @@ public:
 	struct xy { Sint16 x, y; };
 	std::vector<xy> playerstartlocations;
 	std::vector<xy> surveillancecameras;
+	std::vector<xy> rainpuddlelocations;
 	Uint16 currentid;
 	MiniMap minimap;
 	

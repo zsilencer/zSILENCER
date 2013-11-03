@@ -16,6 +16,7 @@ public:
 	void DestroyOverlays(World & world);
 	Uint8 GetColor(void);
 	const char * GetAgencyName(void);
+	Uint32 GetAvailableTech(World & world);
 	void ShowOverlays(World & world, bool show);
 	enum {NOXIS, LAZARUS, CALIBER, STATIC, BLACKROSE};
 	Uint8 agency;
@@ -34,6 +35,8 @@ public:
 	Uint16 basedoorid;
 	Uint16 beamingterminalid;
 	int peerschecksum;
+	Uint16 playerwithsecret;
+	Uint32 disabledtech;
 };
 
 #endif

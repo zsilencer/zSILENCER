@@ -15,6 +15,7 @@ public:
 	bool HasDetonated(void);
 	Uint16 ownerid;
 	Uint16 originaly;
+	bool iscamera;
 	
 private:
 	Uint8 state_i;

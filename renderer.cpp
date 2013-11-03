@@ -34,21 +34,15 @@
 #include <math.h>
 #include "sdl_internal.h"
 
-// 186:0-9 is rain puddle
 // 187:2 is background above bigterminal
 // 187:3-15 is animated planet on background above bigterminal
-// 176:0-4 cold breath
 // 194:0-7 is weird lamp looking doodad animation
 // 205:0-6 pickup default
-// 204:0-6 pickup neutron bomb
 // 203:0-5 pickup ?
 // 202:0-6 pickup invisible
-// 201:0-14 pickup jet pack
-// 200:0-6 pickup super shield
 // 41:3 button 52x21 highlighted
 // 41:4 button 52x21 not highlighted
 // 110:0-7 shield dmg shrapnel
-// 199:0-27 lazarus resurrection
 
 Renderer::Renderer(World & world) : world(world), camera(640, 480){
 	ambience_r = 0;
@@ -99,6 +93,10 @@ void Renderer::Draw(SDL_Surface * surface, float frametime){
 			localplayer->oldy = localplayer->y;
 			camera.SetPosition(localplayer->x, localplayer->y - localplayer->height);
 			playerinbaseold = false;
+		}
+		if(localplayer->state == Player::RESPAWNING){
+			localplayer->oldx = localplayer->x;
+			localplayer->oldy = localplayer->y;
 		}
 		if(localplayer->state_warp == 12){
 			localplayer->oldx = localplayer->x;
@@ -188,6 +186,7 @@ void Renderer::DrawWorld(SDL_Surface * surface, Camera & camera, Uint8 * lightma
 		}
 		DrawBackground(surface, camera, lightmap);
 		DrawRain(surface, camera, frametime);
+		DrawRainPuddles(surface, camera);
 	}
 	for(unsigned int renderpass = 0; renderpass < 4; renderpass++){
 		for(std::list<Object *>::iterator i = world.objectlist.begin(); i != world.objectlist.end(); i++){
@@ -263,6 +262,9 @@ void Renderer::DrawWorld(SDL_Surface * surface, Camera & camera, Uint8 * lightma
 								if(civilian->state_hit){
 									EffectHit(effectsurface, 0, civilian->hitx, civilian->hity, civilian->state_hit);
 								}
+								if(civilian->tractteamid){
+									EffectHacking(effectsurface, 0, 124);
+								}
 								if(civilian->state_warp){
 									EffectWarp(effectsurface, 0, civilian->state_warp);
 								}else{
@@ -317,6 +319,9 @@ void Renderer::DrawWorld(SDL_Surface * surface, Camera & camera, Uint8 * lightma
 								if(robot->state_hit){
 									EffectHit(effectsurface, 0, robot->hitx, robot->hity, robot->state_hit);
 								}
+								if(robot->damaging){
+									EffectShieldDamage(effectsurface, 0, 120);
+								}
 								if(robot->state_warp){
 									EffectWarp(effectsurface, 0, robot->state_warp);
 								}else{
@@ -340,6 +345,9 @@ void Renderer::DrawWorld(SDL_Surface * surface, Camera & camera, Uint8 * lightma
 							case ObjectTypes::SHRAPNEL:{
 								Shrapnel * shrapnel = static_cast<Shrapnel *>(object);
 								effectsurface = CreateSurfaceCopy(src);
+								if(shrapnel->res_bank == 110){
+									EffectRampColor(effectsurface, 0, 202);
+								}
 								EffectBrightness(effectsurface, 0, shrapnel->GetBrightness());
 							}break;
 							case ObjectTypes::SCROLLBAR:{
@@ -369,35 +377,38 @@ void Renderer::DrawWorld(SDL_Surface * surface, Camera & camera, Uint8 * lightma
 								// 151:2-6 is team billboard team names noxis to blackrose
 								// 151:7-13 is team billboard animation 1
 								// 151:14-20 is team billboard animation 2
-								SDL_Rect dstrect;
-								dstrect.x = object->x - world.resources.spriteoffsetx[151][1] + camera.GetXOffset();
-								dstrect.y = object->y - world.resources.spriteoffsety[151][1] + camera.GetYOffset();
-								dstrect.w = world.resources.spritewidth[151][1];
-								dstrect.h = world.resources.spriteheight[151][1];
-								BlitSurface(world.resources.spritebank[151][1], 0, surface, &dstrect);
-								dstrect.x = object->x - world.resources.spriteoffsetx[151][object->res_index] + camera.GetXOffset();
-								dstrect.y = object->y - world.resources.spriteoffsety[151][object->res_index] + camera.GetYOffset();
-								dstrect.w = world.resources.spritewidth[151][object->res_index];
-								dstrect.h = world.resources.spriteheight[151][object->res_index];
-								BlitSurface(world.resources.spritebank[151][object->res_index], 0, surface, &dstrect);
-								Uint8 index = ((state_i / 4) % 6) + 7;
-								dstrect.x = object->x - world.resources.spriteoffsetx[151][index] + camera.GetXOffset();
-								dstrect.y = object->y - world.resources.spriteoffsety[151][index] + camera.GetYOffset();
-								dstrect.w = world.resources.spritewidth[151][index];
-								dstrect.h = world.resources.spriteheight[151][index];
-								BlitSurface(world.resources.spritebank[151][index], 0, surface, &dstrect);
-								index = ((state_i / 4) % 6) + 14;
-								dstrect.x = object->x - world.resources.spriteoffsetx[151][index] + camera.GetXOffset();
-								dstrect.y = object->y - world.resources.spriteoffsety[151][index] + camera.GetYOffset();
-								dstrect.w = world.resources.spritewidth[151][index];
-								dstrect.h = world.resources.spriteheight[151][index];
-								BlitSurface(world.resources.spritebank[151][index], 0, surface, &dstrect);
-								index = teambillboard->agency + 2;
-								dstrect.x = object->x - world.resources.spriteoffsetx[151][index] + camera.GetXOffset();
-								dstrect.y = object->y - world.resources.spriteoffsety[151][index] + camera.GetYOffset();
-								dstrect.w = world.resources.spritewidth[151][index];
-								dstrect.h = world.resources.spriteheight[151][index];
-								BlitSurface(world.resources.spritebank[151][index], 0, surface, &dstrect);
+								Team * team = static_cast<Team *>(world.GetObjectFromId(teambillboard->teamid));
+								if(!team || (team && !team->playerwithsecret)){
+									SDL_Rect dstrect;
+									dstrect.x = object->x - world.resources.spriteoffsetx[151][1] + camera.GetXOffset();
+									dstrect.y = object->y - world.resources.spriteoffsety[151][1] + camera.GetYOffset();
+									dstrect.w = world.resources.spritewidth[151][1];
+									dstrect.h = world.resources.spriteheight[151][1];
+									BlitSurface(world.resources.spritebank[151][1], 0, surface, &dstrect);
+									/*dstrect.x = object->x - world.resources.spriteoffsetx[151][object->res_index] + camera.GetXOffset();
+									dstrect.y = object->y - world.resources.spriteoffsety[151][object->res_index] + camera.GetYOffset();
+									dstrect.w = world.resources.spritewidth[151][object->res_index];
+									dstrect.h = world.resources.spriteheight[151][object->res_index];
+									BlitSurface(world.resources.spritebank[151][object->res_index], 0, surface, &dstrect);*/
+									Uint8 index = ((state_i / 4) % 6) + 7;
+									dstrect.x = object->x - world.resources.spriteoffsetx[151][index] + camera.GetXOffset();
+									dstrect.y = object->y - world.resources.spriteoffsety[151][index] + camera.GetYOffset();
+									dstrect.w = world.resources.spritewidth[151][index];
+									dstrect.h = world.resources.spriteheight[151][index];
+									BlitSurface(world.resources.spritebank[151][index], 0, surface, &dstrect);
+									index = ((state_i / 4) % 6) + 14;
+									dstrect.x = object->x - world.resources.spriteoffsetx[151][index] + camera.GetXOffset();
+									dstrect.y = object->y - world.resources.spriteoffsety[151][index] + camera.GetYOffset();
+									dstrect.w = world.resources.spritewidth[151][index];
+									dstrect.h = world.resources.spriteheight[151][index];
+									BlitSurface(world.resources.spritebank[151][index], 0, surface, &dstrect);
+									index = teambillboard->agency + 2;
+									dstrect.x = object->x - world.resources.spriteoffsetx[151][index] + camera.GetXOffset();
+									dstrect.y = object->y - world.resources.spriteoffsety[151][index] + camera.GetYOffset();
+									dstrect.w = world.resources.spritewidth[151][index];
+									dstrect.h = world.resources.spriteheight[151][index];
+									BlitSurface(world.resources.spritebank[151][index], 0, surface, &dstrect);
+								}
 							}break;
 							case ObjectTypes::TERMINAL:{
 								Terminal * terminal = static_cast<Terminal *>(object);
@@ -424,18 +435,20 @@ void Renderer::DrawWorld(SDL_Surface * surface, Camera & camera, Uint8 * lightma
 							}break;
 							case ObjectTypes::SURVEILLANCEMONITOR:{
 								SurveillanceMonitor * surveillancemonitor = static_cast<SurveillanceMonitor *>(object);
-								SDL_Rect dstrect;
-								dstrect.w = surveillancemonitor->camera.w / 2;
-								dstrect.h = surveillancemonitor->camera.h / 2;
-								dstrect.x = surveillancemonitor->renderxoffset + object->x - world.resources.spriteoffsetx[object->res_bank][object->res_index] + camera.GetXOffset();
-								dstrect.y = surveillancemonitor->renderyoffset + object->y - world.resources.spriteoffsety[object->res_bank][object->res_index] + camera.GetYOffset();
-								SDL_Surface * newsurface = CreateSurface(dstrect.w, dstrect.h);
-								//memset(newsurface->pixels, 1, newsurface->w * newsurface->h);
-								DrawWorldScaled(newsurface, surveillancemonitor->camera, recursion, frametime);
-								EffectRampColor(newsurface, 0, 198);
-								BlitSurface(newsurface, 0, surface, &dstrect);
-								//SDL_FillSDL_Rect(surface, &dstrect, 212);
-								SDL_FreeSurface(newsurface);
+								if(surveillancemonitor->drawscreen){
+									SDL_Rect dstrect;
+									dstrect.w = surveillancemonitor->camera.w / 2;
+									dstrect.h = surveillancemonitor->camera.h / 2;
+									dstrect.x = surveillancemonitor->renderxoffset + object->x - world.resources.spriteoffsetx[object->res_bank][object->res_index] + camera.GetXOffset();
+									dstrect.y = surveillancemonitor->renderyoffset + object->y - world.resources.spriteoffsety[object->res_bank][object->res_index] + camera.GetYOffset();
+									SDL_Surface * newsurface = CreateSurface(dstrect.w, dstrect.h);
+									//memset(newsurface->pixels, 1, newsurface->w * newsurface->h);
+									DrawWorldScaled(newsurface, surveillancemonitor->camera, recursion, frametime, surveillancemonitor->scalefactor);
+									EffectRampColor(newsurface, 0, 198);
+									BlitSurface(newsurface, 0, surface, &dstrect);
+									//SDL_FillSDL_Rect(surface, &dstrect, 212);
+									SDL_FreeSurface(newsurface);
+								}
 							}break;
 							case ObjectTypes::OVERLAY:{
 								Overlay * overlay = static_cast<Overlay *>(object);
@@ -507,7 +520,7 @@ void Renderer::DrawWorld(SDL_Surface * surface, Camera & camera, Uint8 * lightma
 							// 214:0-6 decal inair?
 							////// 215:0-4 decal crouching
 							////// 216:0-16 decal throwing
-							// 217:0-16 decal throwing crouched
+							////// 217:0-16 decal throwing crouched
 							Uint8 decalres_bank = 0;
 							Uint8 decalres_index = 0;
 							switch(object->res_bank){
@@ -537,6 +550,10 @@ void Renderer::DrawWorld(SDL_Surface * surface, Camera & camera, Uint8 * lightma
 								break;
 								case 113:
 									decalres_bank = 216;
+									decalres_index = object->res_index;
+								break;
+								case 114:
+									decalres_bank = 217;
 									decalres_index = object->res_index;
 								break;
 							}
@@ -679,7 +696,7 @@ void Renderer::DrawWorld(SDL_Surface * surface, Camera & camera, Uint8 * lightma
 								numsecrets = team->secrets;
 							}
 							for(int i = 0; i < 3; i++){
-								Uint8 index = (((state_i / 4)) % 5) + 9;
+								Uint8 index = secretreturn->frame[i];
 								if(numsecrets > i){
 									index = (((state_i / 4)) % 8) + 1;
 								}
@@ -783,14 +800,20 @@ void Renderer::DrawWorld(SDL_Surface * surface, Camera & camera, Uint8 * lightma
 				BlitSurface(world.resources.spritebank[85][1], 0, surface, &dstrect);
 				char text[16];
 				sprintf(text, "%d", warper->GetCountdown());
-				DrawText(surface, object->x + camera.GetXOffset() - 4, object->y + camera.GetYOffset(), text, 134, 8);
+				DrawText(surface, object->x + camera.GetXOffset() - 3, object->y + camera.GetYOffset(), text, 133, 6);
 			}
 			if(object->type == ObjectTypes::WALLPROJECTILE && renderpass == object->renderpass){
 				WallProjectile * wallprojectile = static_cast<WallProjectile *>(object);
 				if(wallprojectile->state_i > 8){
 					object->x += nudgex;
 					object->y += nudgey;
-					DrawLine(surface, object->x - object->xv + camera.GetXOffset(), object->y - object->yv + camera.GetYOffset(), object->x + camera.GetXOffset(), object->y + camera.GetYOffset(), 203, 3);
+					for(int i = 1; i <= 3; i++){
+						int x1 = (object->x - (object->xv * (i / float(3))));
+						int y1 = (object->y - (object->yv * (i / float(3))));
+						int x2 = object->x;
+						int y2 = object->y;
+						DrawLine(surface, x1 + camera.GetXOffset(), y1 + camera.GetYOffset(), x2 + camera.GetXOffset(), y2 + camera.GetYOffset(), 203, 4 - i);
+					}
 					object->x -= nudgex;
 					object->y -= nudgey;
 				}
@@ -968,7 +991,7 @@ void Renderer::DrawMiniMap(Object * object){
 	}
 }
 
-void Renderer::DrawWorldScaled(SDL_Surface * surface, Camera & camera, int recursion, float frametime){
+void Renderer::DrawWorldScaled(SDL_Surface * surface, Camera & camera, int recursion, float frametime, int factor){
 	SDL_Surface * systemscreen = CreateSurface(surface->w * 2, surface->h * 2);
 	DrawWorld(systemscreen, camera, 0, false, recursion, frametime);
 	SDL_Rect dstrect;
@@ -976,7 +999,7 @@ void Renderer::DrawWorldScaled(SDL_Surface * surface, Camera & camera, int recur
 	dstrect.y = 0;
 	dstrect.w = surface->w;
 	dstrect.h = surface->h;
-	DrawScaled(systemscreen, 0, surface, &dstrect);
+	DrawScaled(systemscreen, 0, surface, &dstrect, factor);
 	SDL_FreeSurface(systemscreen);
 }
 
@@ -1234,6 +1257,21 @@ void Renderer::DrawRain(SDL_Surface * surface, Camera & camera, float frametime)
 	}
 }
 
+void Renderer::DrawRainPuddles(SDL_Surface * surface, Camera & camera){
+	// 186:0-9 is rain puddle
+	SDL_Rect dstrect;
+	int j = 0;
+	for(std::vector<Map::xy>::iterator it = world.map.rainpuddlelocations.begin(); it != world.map.rainpuddlelocations.end(); it++){
+		Sint16 x = (*it).x;
+		Sint16 y = (*it).y;
+		dstrect.x = x + camera.GetXOffset();
+		dstrect.y = y + camera.GetYOffset();
+		int div = j % 2 ? 4 : 3;
+		BlitSurface(world.resources.spritebank[186][(((state_i) / div) + (j)) % 10], 0, surface, &dstrect);
+		j++;
+	}
+}
+
 inline void Renderer::SetPixel(SDL_Surface * surface, unsigned int x, unsigned int y, Uint8 color){
 	unsigned int surfacew = surface->w;
     if(x >= surfacew){
@@ -1260,7 +1298,7 @@ void Renderer::DrawDebug(SDL_Surface * surface){
 	char temp[1234];
 	sprintf(temp, "%d %d %d %d %d %d", world.localinput.keymovedown, world.localinput.keymoveup, world.localinput.keymoveleft, world.localinput.keymoveright, world.localinput.keyjump, world.localinput.keyjetpack);
 	DrawText(surface, 10, 30, temp, 133, 7, false, -16);
-	sprintf(temp, "mode: %s(%d), total snapshots: %d, total input packets: %d, parallax: %d objects: %d", world.mode ? "REPLICA" : "AUTHORITY", world.localpeerid, world.totalsnapshots, world.totalinputpackets, world.map.parallax, int(world.objectlist.size()));
+	sprintf(temp, "mode: %s(%d), total snapshots: %d, total input packets: %d, ambience: %d objects: %d", world.mode ? "REPLICA" : "AUTHORITY", world.localpeerid, world.totalsnapshots, world.totalinputpackets, world.map.ambience, int(world.objectlist.size()));
 	DrawText(surface, 10, 40, temp, 133, 7, false, -64);
 	for(int i = 0; i < world.maxpeers; i++){
 		if(world.peerlist[i]){
@@ -1396,9 +1434,9 @@ void Renderer::DrawStatus(SDL_Surface * surface){
 	}
 }
 
-void Renderer::DrawScaled(SDL_Surface * src, SDL_Rect * srcrect, SDL_Surface *dst, SDL_Rect * dstrect){
-	for(int y = 0, y2 = 0; y < src->h; y += 2, y2++){
-		for(int x = 0, x2 = 0; x < src->w; x += 2, x2++){
+void Renderer::DrawScaled(SDL_Surface * src, SDL_Rect * srcrect, SDL_Surface *dst, SDL_Rect * dstrect, int factor){
+	for(int y = 0, y2 = 0; y < src->h; y += factor, y2++){
+		for(int x = 0, x2 = 0; x < src->w; x += factor, x2++){
 			Uint8 color = GetPixel(src, x, y);
 			if(color){
 				SetPixel(dst, dstrect->x + x2, dstrect->y + y2, color);
@@ -1631,14 +1669,18 @@ void Renderer::EffectHit(SDL_Surface * dst, SDL_Rect * dstrect, Uint8 hitx, Uint
 		}
 	}
 	if(hit_type == 1){
-		// 177:0-7 is shield damage stencil
-		for(int y = 0; y < dst->h; y++){
-			for(int x = 0; x < dst->w; x++){
-				Uint8 overlay = GetPixel(world.resources.spritebank[177][index], x, y);
-				Uint8 pixel = GetPixel(dst, x, y);
-				if(overlay && pixel){
-					SetPixel(dst, x, y, 205);//palette.Mix(205, pixel));
-				}
+		EffectShieldDamage(dst, 0, 205);
+	}
+}
+
+void Renderer::EffectShieldDamage(SDL_Surface * dst, SDL_Rect * dstrect, Uint8 color){
+	// 177:0-7 is shield damage stencil
+	for(int y = 0; y < dst->h; y++){
+		for(int x = 0; x < dst->w; x++){
+			Uint8 overlay = GetPixel(world.resources.spritebank[177][state_i % 8], x, y);
+			Uint8 pixel = GetPixel(dst, x, y);
+			if(overlay && pixel){
+				SetPixel(dst, x, y, color);//palette.Mix(205, pixel));
 			}
 		}
 	}
@@ -1944,7 +1986,7 @@ void Renderer::DrawHUD(SDL_Surface * surface, float frametime){
 			DrawWorldScaled(systemscreen, camera, 3, frametime);
 			EffectRampColor(systemscreen, 0, 190);
 			dstrect.x = 500;
-			dstrect.y = 349;
+			dstrect.y = 348;
 			BlitSurface(systemscreen, 0, surface, &dstrect);
 			SDL_FreeSurface(systemscreen);
 		}
@@ -2287,8 +2329,11 @@ void Renderer::DrawHUD(SDL_Surface * surface, float frametime){
 			// 102:2 buy up arrow
 			// 102:3 buy down array
 			
-			if(player->buyinterfaceid){
+			if(player->buyinterfaceid || player->techinterfaceid){
 				Interface * iface = (Interface *)world.GetObjectFromId(player->buyinterfaceid);
+				if(!iface){
+					iface = (Interface *)world.GetObjectFromId(player->techinterfaceid);
+				}
 				if(iface){
 					dstrect.x = -world.resources.spriteoffsetx[102][0];
 					dstrect.y = -world.resources.spriteoffsety[102][0];
@@ -2380,9 +2425,33 @@ void Renderer::DrawHUD(SDL_Surface * surface, float frametime){
 								itemname = temp;
 							}
 						}
-						DrawText(surface, 222, 145 + yoffset, itemname, 134, 9, false, 0, brightness);
 						char price[10];
-						sprintf(price, "%d", buyableitem->price);
+						if(player->buyinterfaceid){
+							if(team && (team->disabledtech & buyableitem->techchoice)){
+								strcpy(price, "DOWN");
+							}else{
+								sprintf(price, "%d", buyableitem->price);
+							}
+						}else{
+							if(!player->InOwnBase(world)){
+								BaseDoor * basedoor = static_cast<BaseDoor *>(world.GetObjectFromId(player->basedoorentering));
+								if(basedoor){
+									Team * otherteam = static_cast<Team *>(world.GetObjectFromId(basedoor->teamid));
+									if(otherteam && otherteam->disabledtech & buyableitem->techchoice){
+										strcpy(price, "DOWN");
+									}else{
+										sprintf(price, "%d", buyableitem->repairprice);
+									}
+								}
+							}else{
+								if(team && team->disabledtech & buyableitem->techchoice){
+									sprintf(price, "%d", buyableitem->repairprice);
+								}else{
+									strcpy(price, "UP");
+								}
+							}
+						}
+						DrawText(surface, 222, 145 + yoffset, itemname, 134, 9, false, 0, brightness);
 						DrawText(surface, 440 - ((strlen(price) * 9) / 2), 145 + yoffset, price, 134, 9, false, 0, brightness);
 						yoffset += 25;
 						
@@ -2390,7 +2459,11 @@ void Renderer::DrawHUD(SDL_Surface * surface, float frametime){
 					}
 					
 					char text[256];
-					sprintf(text, "Available Credits: %d", player->credits);
+					if(player->buyinterfaceid || player->InOwnBase(world)){
+						sprintf(text, "Available Credits: %d", player->credits);
+					}else{
+						sprintf(text, "Viruses Available: %d", player->InventoryItemCount(Player::INV_VIRUS));
+					}
 					DrawText(surface, 320 - ((strlen(text) * 9) / 2), 275, text, 134, 9);
 				}
 			}
@@ -2622,6 +2695,18 @@ Uint8 Renderer::InvIdToResIndex(Uint8 id){
 		case Player::INV_HEALTHPACK:
 			return 1;
 		break;
+		case Player::INV_LAZARUSTRACT:
+			return 2;
+		break;
+		case Player::INV_SECURITYPASS:
+			return 3;
+		break;
+		case Player::INV_VIRUS:
+			return 14;
+		break;
+		case Player::INV_POISON:
+			return 5;
+		break;
 		case Player::INV_EMPBOMB:
 			return 6;
 		break;
@@ -2642,6 +2727,12 @@ Uint8 Renderer::InvIdToResIndex(Uint8 id){
 		break;
 		case Player::INV_FLARE:
 			return 10;
+		break;
+		case Player::INV_POISONFLARE:
+			return 13;
+		break;
+		case Player::INV_CAMERA:
+			return 4;
 		break;
 		case Player::INV_BASEDOOR:
 			return 0;

@@ -25,6 +25,8 @@ Team::Team() : Object(ObjectTypes::TEAM){
 	peerschecksum = 0;
 	oldsecretprogress = 0;
 	issprite = false;
+	playerwithsecret = 0;
+	disabledtech = 0;
 }
 
 void Team::Serialize(bool write, Serializer & data, Serializer * old){
@@ -40,6 +42,8 @@ void Team::Serialize(bool write, Serializer & data, Serializer * old){
 	for(int i = 0; i < 4; i++){
 		data.Serialize(write, peers[i], old);
 	}
+	data.Serialize(write, playerwithsecret, old);
+	data.Serialize(write, disabledtech, old);
 }
 
 void Team::Tick(World & world){
@@ -58,7 +62,7 @@ void Team::Tick(World & world){
 	}
 	if(secretdelivered){
 		secrets++;
-		Audio::GetInstance().Play(world.resources.soundbank["cathdoor.wav"]);
+		world.SendSound("cathdoor.wav");
 		for(int i = 0; i < numpeers; i++){
 			Player * player = world.GetPeerPlayer(peers[i]);
 			if(player){
@@ -127,9 +131,33 @@ void Team::Tick(World & world){
 		secretdelivered = false;
 	}
 	if(secretprogress >= 180 && oldsecretprogress > 0){
-		Audio::GetInstance().Play(world.resources.soundbank["typerev6.wav"]);
+		char text[256];
+		sprintf(text, "TOP SECRET LOCATION DETERMINED\n\nApproximate time : 60 seconds");
+		for(int i = 0; i < numpeers; i++){
+			Peer * peer = world.peerlist[peers[i]];
+			if(peer && !world.intutorialmode){
+				world.ShowMessage(text, 128, 0, true, peer);
+			}
+		}
+		sprintf(text, "ENEMY BEAMING DETECTED\n\nTracking location on radar");
+		for(int i = 0; i < world.maxpeers; i++){
+			Peer * peer = world.peerlist[i];
+			if(peer){
+				bool onteam = false;
+				for(int i = 0; i < numpeers; i++){
+					Peer * peer2 = world.peerlist[peers[i]];
+					if(peer2 && peer2->id == peer->id){
+						onteam = true;
+					}
+				}
+				if(!onteam){
+					world.ShowMessage(text, 128, 0, true, peer);
+				}
+			}
+		}
+		world.SendSound("typerev6.wav");
 		if(secrets == 2){
-			Audio::GetInstance().Play(world.resources.soundbank["alwarn.wav"]);
+			world.SendSound("alwarn.wav");
 		}
 		secretprogress = 0;
 		oldsecretprogress = 0;
@@ -192,7 +220,6 @@ void Team::Tick(World & world){
 						if(overlay){
 							overlay->text = new char[64];
 							sprintf(overlay->text, "%s", user->name);
-							overlay->textlength = strlen(overlay->text);
 							overlay->textbank = 133;
 							overlay->textwidth = 6;
 							overlay->x = 473;
@@ -204,7 +231,6 @@ void Team::Tick(World & world){
 						if(leveloverlay){
 							leveloverlay->text = new char[64];
 							sprintf(leveloverlay->text, "L:%d", user->agency[agency].level);
-							leveloverlay->textlength = strlen(leveloverlay->text);
 							leveloverlay->textbank = 132;
 							leveloverlay->textwidth = 4;
 							leveloverlay->effectcolor = 170;
@@ -351,6 +377,17 @@ const char * Team::GetAgencyName(void){
 			return "Black Rose";
 		break;
 	}
+}
+
+Uint32 Team::GetAvailableTech(World & world){
+	Uint32 tech = 0;
+	for(int i = 0; i < 4; i++){
+		Peer * peer = world.peerlist[peers[i]];
+		if(peer){
+			tech |= peer->techchoices;
+		}
+	}
+	return tech;
 }
 
 void Team::ShowOverlays(World & world, bool show){

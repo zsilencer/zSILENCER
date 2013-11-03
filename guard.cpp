@@ -5,6 +5,7 @@
 #include "laserprojectile.h"
 #include "rocketprojectile.h"
 #include "pickup.h"
+#include <math.h>
 
 Guard::Guard() : Object(ObjectTypes::GUARD){
 	requiresauthority = true;
@@ -25,15 +26,17 @@ Guard::Guard() : Object(ObjectTypes::GUARD){
 	isphysical = true;
 	snapshotinterval = 48;
 	respawnseconds = 30;
+	patrol = false;
+	lastspoke = 0;
 }
 
 void Guard::Serialize(bool write, Serializer & data, Serializer * old){
 	Object::Serialize(write, data, old);
-	//Bipedal::Serialize(write, data, old);
 	data.Serialize(write, state, old);
 	data.Serialize(write, state_i, old);
 	data.Serialize(write, chasing, old);
 	data.Serialize(write, weapon, old);
+	data.Serialize(write, patrol, old);
 }
 
 void Guard::Tick(World & world){
@@ -112,8 +115,11 @@ void Guard::Tick(World & world){
 		if(found){
 			if(!chasing){
 				chasing = found->id;
-				const char * sounds[5] = {"theres3.wav", "stop4.wav", "freeze3.wav", "freezrt1.wav", "drop4.wav"};
-				Audio::GetInstance().EmitSound(id, world.resources.soundbank[sounds[rand() % 5]], 128);
+				if(world.tickcount - lastspoke > 24 * 10){
+					lastspoke = world.tickcount;
+					const char * sounds[5] = {"theres3.wav", "stop4.wav", "freeze3.wav", "freezrt1.wav", "drop4.wav"};
+					Audio::GetInstance().EmitSound(id, world.resources.soundbank[sounds[rand() % 5]], 128);
+				}
 			}
 		}else{
 			if(state == CROUCHED){
@@ -122,33 +128,10 @@ void Guard::Tick(World & world){
 			}
 		}
 	}
-
-	if(chasing){
-		Player * player = (Player *)world.GetObjectFromId(chasing);
-		if(player){
-			if(state == STANDING || state == WALKING){
-				if(abs(player->x - x) <= 90 && abs(player->x - x) > 80){
-					if(player->x > x){
-						mirrored = false;
-					}else{
-						mirrored = true;
-					}
-				}else
-				if(abs(player->x - x) > 90){
-					state = WALKING;
-					if(player->x > x){
-						mirrored = false;
-					}else{
-						mirrored = true;
-					}
-				}else{
-					state = WALKING;
-				}
-			}
-		}
-	}
 	switch(state){
 		case NEW:{
+			draw = true;
+			currentplatformid = 0;
 			if(FindCurrentPlatform(*this, world)){
 				state = STANDING;
 				state_i = -1;
@@ -156,10 +139,11 @@ void Guard::Tick(World & world){
 			}
 		}break;
 		case STANDING:{
+			yv = 0;
 			res_bank = 59;
 			res_index = 0;
 			if(state_i >= 48){
-				if(rand() % 3 == 0){
+				if(patrol && rand() % 3 == 0){
 					state = WALKING;
 				}else{
 					state = LOOKING;
@@ -169,8 +153,8 @@ void Guard::Tick(World & world){
 		}break;
 		case CROUCHING:{
 			res_bank = 158;
-			res_index = state_i / 2;
-			if(state_i / 2 >= 9){
+			res_index = state_i;
+			if(state_i >= 9){
 				state = CROUCHED;
 				state_i = -1;
 				break;
@@ -201,8 +185,8 @@ void Guard::Tick(World & world){
 		}break;
 		case UNCROUCHING:{
 			res_bank = 158;
-			res_index = 9 - (state_i / 2);
-			if(state_i / 2 >= 9){
+			res_index = 9 - state_i;
+			if(state_i >= 9){
 				state = STANDING;
 				state_i = -1;
 				break;
@@ -211,6 +195,9 @@ void Guard::Tick(World & world){
 		case LOOKING:{
 			if(!found){
 				chasing = 0;
+			}
+			if(state_i == 0 && Look(world, 10)){
+				mirrored = !mirrored;
 			}
 			if(state_i >= 6 * 4){
 				state = STANDING;
@@ -224,14 +211,9 @@ void Guard::Tick(World & world){
 			res_bank = 60;
 			res_index = state_i % 19;
 			xv = mirrored ? -speed : speed;
-			Uint16 oldx = x;
 			FollowGround(*this, world, xv);
-			if(x == oldx){
-				if(!chasing){
-					mirrored = !mirrored;
-				}else{
-					state = STANDING;
-				}
+			if(DistanceToEnd(*this, world) <= world.minwalldistrance){
+				mirrored = !mirrored;
 			}
 			if(state_i == 240){
 				state = LOOKING;
@@ -335,11 +317,80 @@ void Guard::Tick(World & world){
 			}
 		}break;
 		case LADDER:{
+			xv = 0;
+			int ye = yv;
+			int xe = xv;
+			Platform * platform = world.map.TestIncr(x, y, x, y, &xe, &ye, Platform::RECTANGLE | Platform::STAIRSUP | Platform::STAIRSDOWN);
+			Platform * ladder = world.map.TestAABB(x, y + yv, x, y + yv, Platform::LADDER);
+			if(!ladder){
+				if(platform){
+					currentplatformid = platform->id;
+					y = platform->XtoY(x);
+					state = STANDING;
+					state_i = -1;
+					break;
+				}else{
+					yv = -yv;
+				}
+			}
+			if(Look(world, 6)){
+				state = SHOOTLADDERUP;
+				state_i = -1;
+				break;
+			}
+			if(Look(world, 7)){
+				state = SHOOTLADDERDOWN;
+				state_i = -1;
+				break;
+			}
 			if(state_i >= 20){
 				state_i = 0;
 			}
+			y += yv;
 			res_bank = 62;
 			res_index = state_i;
+		}break;
+		case SHOOTLADDERUP:{
+			yv = 0;
+			if(state_i == 12){
+				Fire(world, 6);
+			}
+			if((state_i / 2) == 9){
+				state_i = 13 * 2;
+			}
+			if(state_i / 2 >= 16){
+				state = LADDER;
+				yv = -5;
+				state_i = -1;
+				break;
+			}
+			res_bank = 196;
+			if(state_i / 2 > 8){
+				res_index = 8 - ((state_i / 2) - 8);
+			}else{
+				res_index = state_i / 2;
+			}
+		}break;
+		case SHOOTLADDERDOWN:{
+			yv = 0;
+			if(state_i == 12){
+				Fire(world, 7);
+			}
+			if((state_i / 2) == 9){
+				state_i = 13 * 2;
+			}
+			if(state_i / 2 >= 16){
+				state = LADDER;
+				yv = 5;
+				state_i = -1;
+				break;
+			}
+			res_bank = 197;
+			if(state_i / 2 > 8){
+				res_index = 8 - ((state_i / 2) - 8);
+			}else{
+				res_index = state_i / 2;
+			}
 		}break;
 		case DYING:{
 			if(state_i == 0){
@@ -372,29 +423,18 @@ void Guard::Tick(World & world){
 			break;
 		}break;
 		case DEAD:{
-			/*collidable = false;
-			if(state_i >= 24){
-				draw = false;
-				if(state_i == 240){
-					state = STANDING;
-					state_warp = 12;
-					state_i = -1;
-					draw = true;
-					//collidable = true;
-					health = maxhealth;
-					shield = maxshield;
-					break;
-				}
-			}*/
+			chasing = 0;
 			collidable = false;
 			if(state_i > 1){
 				draw = false;
 			}
 			if(state_i >= respawnseconds){
-				state = STANDING;
+				x = originalx;
+				y = originaly;
+				mirrored = originalmirrored;
+				state = NEW;
 				state_i = -1;
 				state_warp = 12;
-				draw = true;
 				health = maxhealth;
 				shield = maxshield;
 				break;
@@ -403,6 +443,51 @@ void Guard::Tick(World & world){
 				state_i--;
 			}
 		}break;
+	}
+	if(chasing){
+		Player * player = (Player *)world.GetObjectFromId(chasing);
+		if(player){
+			if(player->InBase(world)){
+				chasing = 0;
+			}
+			if(state == STANDING || state == WALKING){
+				if(abs(player->x - x) <= 90 && abs(player->x - x) > 80){
+					if(player->x > x){
+						mirrored = false;
+					}else{
+						mirrored = true;
+					}
+				}else
+					if(abs(player->x - x) > 90){
+						state = WALKING;
+						if(player->x > x){
+							mirrored = false;
+						}else{
+							mirrored = true;
+						}
+					}else{
+						state = WALKING;
+					}
+				Platform * ladder = world.map.TestAABB(x - abs(xv), y, x + abs(xv), y, Platform::LADDER);
+				if(ladder){
+					Uint32 center = ((ladder->x2 - ladder->x1) / 2) + ladder->x1;
+					if(abs(signed(center) - x) <= abs(ceil(float(xv)))){
+						if(ladder->y2 == player->y && y != player->y && ladder->y2 > y){
+							x = center;
+							yv = 5;
+							state = LADDER;
+							state_i = 0;
+						}
+						if(ladder->y1 == player->y && y != player->y && ladder->y1 < y){
+							x = center;
+							yv = -5;
+							state = LADDER;
+							state_i = 0;
+						}
+					}
+				}
+			}
+		}
 	}
 	state_i++;
 }
@@ -468,6 +553,10 @@ void Guard::HandleHit(World & world, Uint8 x, Uint8 y, Object & projectile){
 						bodypart->y = Guard::y - 50;
 						bodypart->type = i;
 						bodypart->xv += (abs(xv) * 2) * xpcnt;
+						if(i == 0){
+							bodypart->xv = 0;
+							bodypart->yv = -20;
+						}
 					}
 				}
 			}
@@ -486,8 +575,7 @@ Object * Guard::Look(World & world, Uint8 direction){
 	// 5: down angled
 	// 6: on ladder and down
 	// 7: on ladder and up
-	// 8: on ladder and left
-	// 9: on ladder and right
+	// 10: standing and backward
 	std::vector<Uint8> types;
 	types.push_back(ObjectTypes::PLAYER);
 	Sint16 y1 = 0;
@@ -531,6 +619,24 @@ Object * Guard::Look(World & world, Uint8 direction){
 			x2 = x1 + 200;
 			y2 = y1 + 200;
 		break;
+		case 6:
+			x1 = 4;
+			x2 = 4;
+			y1 = -150;
+			y2 = -300;
+			break;
+		case 7:
+			x1 = 11;
+			x2 = 11;
+			y1 = 50;
+			y2 = 200;
+			break;
+		case 10:
+			y1 = -55;
+			y2 = y1;
+			x1 = -100;
+			x2 = 0;
+		break;
 	}
 	x1 *= (mirrored ? -1 : 1);
 	x2 *= (mirrored ? -1 : 1);
@@ -550,7 +656,7 @@ Object * Guard::Look(World & world, Uint8 direction){
 		std::vector<Object *> objects = world.TestAABB(x + x1, y + y1, x + x2, y + y2, types);
 		for(std::vector<Object *>::iterator it = objects.begin(); it != objects.end(); it++){
 			Player * player = static_cast<Player *>(*it);
-			if((!chasing && !player->IsDisguised()) || chasing){
+			if((!chasing && !player->IsDisguised() && !player->HasSecurityPass()) || chasing){
 				int xv2 = x2 - x1;
 				int yv2 = y2 - y1;
 				Object * object = world.TestIncr(x + x1, y + y1 - 1, x + x1, y + y1, &xv2, &yv2, types);
@@ -567,7 +673,7 @@ Object * Guard::Look(World & world, Uint8 direction){
 		Object * object = world.TestIncr(x + x1, y + y1 - 1, x + x1, y + y1, &xv2, &yv2, types);
 		if(object){
 			Player * player = static_cast<Player *>(object);
-			if((!chasing && !player->IsDisguised()) || chasing){
+			if((!chasing && !player->IsDisguised() && !player->HasSecurityPass()) || chasing){
 				if(!world.map.TestIncr(x + x1, y + y1 - 1, x + x1, y + y1, &xv2, &yv2, Platform::STAIRSDOWN | Platform::STAIRSDOWN | Platform::RECTANGLE, 0, true)){
 					return object;
 				}
@@ -628,6 +734,16 @@ void Guard::Fire(World & world, Uint8 direction){
 				projectile->y = y - 30 + (projectile->emitoffset * 0.70710678118655);
 				projectile->xv = (mirrored ? -1 : 1) * projectile->velocity * 0.70710678118655;
 				projectile->yv = projectile->velocity * 0.70710678118655;
+			}break;
+			case 6:{
+				projectile->x = x + ((mirrored ? -1 : 1) * 4);
+				projectile->y = y - 95 - projectile->emitoffset;
+				projectile->yv = -projectile->velocity;
+			}break;
+			case 7:{
+				projectile->x = x + ((mirrored ? -1 : 1) * 11);
+				projectile->y = y - 10 + projectile->emitoffset;
+				projectile->yv = projectile->velocity;
 			}break;
 		}
 	}

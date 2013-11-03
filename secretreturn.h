@@ -12,6 +12,11 @@ public:
 	void Tick(World & world);
 
 	Uint16 teamid;
+	Uint8 frame[3];
+	
+private:
+	Uint8 framespeed[3];
+	Uint8 state_i;
 };
 
 #endif

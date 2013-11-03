@@ -257,6 +257,13 @@ bool Map::LoadFile(const char * filename, World & world, Team * team, Uint8 secu
 						guard->x = actorx;
 						guard->y = actory;
 						guard->weapon = 0;
+						guard->mirrored = actordirection ? true : false;
+						guard->originalx = guard->x;
+						guard->originaly = guard->y;
+						guard->originalmirrored = guard->mirrored;
+						if(actortype == 0){
+							guard->patrol = true;
+						}
 					}
 				}
 			}break;
@@ -265,6 +272,14 @@ bool Map::LoadFile(const char * filename, World & world, Team * team, Uint8 secu
 				if(civilian){
 					civilian->x = actorx;
 					civilian->y = actory;
+					switch(actortype){
+						case 0:
+							civilian->speed = 4;
+						break;
+						case 1:
+							civilian->speed = 5;
+						break;
+					}
 				}
 			}break;
 			case 2:{
@@ -278,6 +293,13 @@ bool Map::LoadFile(const char * filename, World & world, Team * team, Uint8 secu
 							guard->x = actorx;
 							guard->y = actory;
 							guard->weapon = 1;
+							guard->mirrored = actordirection ? true : false;
+							guard->originalx = guard->x;
+							guard->originaly = guard->y;
+							guard->originalmirrored = guard->mirrored;
+							if(actortype == 0){
+								guard->patrol = true;
+							}
 						}
 					}
 				}
@@ -294,6 +316,13 @@ bool Map::LoadFile(const char * filename, World & world, Team * team, Uint8 secu
 						guard->x = actorx;
 						guard->y = actory;
 						guard->weapon = 2;
+						guard->mirrored = actordirection ? true : false;
+						guard->originalx = guard->x;
+						guard->originaly = guard->y;
+						guard->originalmirrored = guard->mirrored;
+						if(actortype == 0){
+							guard->patrol = true;
+						}
 					}
 				}
 			}break;
@@ -306,6 +335,11 @@ bool Map::LoadFile(const char * filename, World & world, Team * team, Uint8 secu
 					if(robot){
 						robot->x = actorx;
 						robot->y = actory;
+						if(actortype == 0){
+							robot->patrol = true;
+						}
+						robot->originalx = robot->x;
+						robot->originaly = robot->y;
 					}
 				}
 			}break;
@@ -379,14 +413,37 @@ bool Map::LoadFile(const char * filename, World & world, Team * team, Uint8 secu
 					// 4:1   5:1   6:2,4   7:0
 					switch(actortype){
 						case 4:
-						case 5:
+						case 5:{
 							surveillancemonitor->SetSize(0);
-						break;
+						}break;
 						case 6:
 							surveillancemonitor->SetSize(1);
 						break;
 						case 7:
 							surveillancemonitor->SetSize(2);
+							if(team){
+								SurveillanceMonitor * surv1 = (SurveillanceMonitor *)world.CreateObject(ObjectTypes::SURVEILLANCEMONITOR);
+								if(surv1){
+									surv1->SetSize(10);
+									surv1->x = actorx;
+									surv1->y = actory;
+									surv1->teamid = team->id;
+								}
+								SurveillanceMonitor * surv2 = (SurveillanceMonitor *)world.CreateObject(ObjectTypes::SURVEILLANCEMONITOR);
+								if(surv2){
+									surv2->SetSize(11);
+									surv2->x = actorx;
+									surv2->y = actory;
+									surv2->teamid = team->id;
+								}
+								SurveillanceMonitor * surv3 = (SurveillanceMonitor *)world.CreateObject(ObjectTypes::SURVEILLANCEMONITOR);
+								if(surv3){
+									surv3->SetSize(12);
+									surv3->x = actorx;
+									surv3->y = actory;
+									surv3->teamid = team->id;
+								}
+							}
 						break;
 					}
 					surveillancemonitor->x = actorx;
@@ -450,15 +507,6 @@ bool Map::LoadFile(const char * filename, World & world, Team * team, Uint8 secu
 					}
 				}
 			}break;
-			/*case 60:{
-				if(securitylevel == 3){
-					Robot * robot = (Robot *)world.CreateObject(ObjectTypes::ROBOT);
-					if(robot){
-						robot->x = actorx;
-						robot->y = actory;
-					}
-				}
-			}break;*/
 			case 61:{
 				Warper * warper = (Warper *)world.CreateObject(ObjectTypes::WARPER);
 				if(warper){
@@ -523,19 +571,24 @@ bool Map::LoadFile(const char * filename, World & world, Team * team, Uint8 secu
 					techstation->x = actorx;
 					techstation->y = actory;
 					techstation->type = actortype;
+					if(team){
+						techstation->teamid = team->id;
+					}
 				}
 			}break;
 			case 67:{
 				// 0: base defense
 				// 1: guard defense
-				WallDefense * walldefense = (WallDefense *)world.CreateObject(ObjectTypes::WALLDEFENSE);
-				if(walldefense){
-					walldefense->x = actorx;
-					walldefense->y = actory;
-					if(team){
-						walldefense->teamid = team->id;
-					}else{
-						walldefense->AddDefense();
+				if(securitylevel == 3){
+					WallDefense * walldefense = (WallDefense *)world.CreateObject(ObjectTypes::WALLDEFENSE);
+					if(walldefense){
+						walldefense->x = actorx;
+						walldefense->y = actory;
+						if(team){
+							walldefense->teamid = team->id;
+						}else{
+							walldefense->AddDefense();
+						}
 					}
 				}
 			}break;
@@ -547,9 +600,18 @@ bool Map::LoadFile(const char * filename, World & world, Team * team, Uint8 secu
 					teambillboard->y = actory;
 					if(team){
 						teambillboard->agency = team->agency;
+						teambillboard->teamid = team->id;
 					}else{
 						teambillboard->agency = 0;
 					}
+				}
+				SurveillanceMonitor * surveillancemonitor = (SurveillanceMonitor *)world.CreateObject(ObjectTypes::SURVEILLANCEMONITOR);
+				surveillancemonitor->x = actorx;
+				surveillancemonitor->y = actory;
+				surveillancemonitor->SetSize(3);
+				surveillancemonitor->drawscreen = false;
+				if(team){
+					surveillancemonitor->teamid = team->id;
 				}
 			}break;
 			case 69:{
@@ -644,6 +706,7 @@ bool Map::LoadFile(const char * filename, World & world, Team * team, Uint8 secu
 	//fclose(fileo);
 	
 	CalculateAdjacentPlatforms();
+	CalculateRainPuddleLocations();
 	
 	delete[] levelcompressed;
 	delete[] level;
@@ -657,6 +720,7 @@ void Map::Unload(void){
 	platformids.clear();
 	playerstartlocations.clear();
 	surveillancecameras.clear();
+	rainpuddlelocations.clear();
 	for(unsigned int i = 0; i < 4; i++){
 		if(fg[i]){
 			delete[] fg[i];
@@ -711,6 +775,24 @@ void Map::RandomPlayerStartLocation(Sint16 * x, Sint16 * y){
 	}
 }
 
+void Map::CalculateRainPuddleLocations(void){
+	for(unsigned int i = 0 ; i < platforms.size(); i++){
+		Platform * platform = platforms[i];
+		if(platform->type == Platform::RECTANGLE){
+			for(int x = platform->x1 + 1; x < platform->x2 - 32; x += 32){
+				if(TestAABB(x, platform->y1, x + 32, platform->y1, Platform::OUTSIDEROOM)){
+					if(!TestAABB(x, platform->y1, x + 32, platform->y1, Platform::RECTANGLE | Platform::STAIRSUP | Platform::STAIRSDOWN, platform)){
+						xy xy;
+						xy.x = x;
+						xy.y = platform->y1 - 4;
+						rainpuddlelocations.push_back(xy);
+					}
+				}
+			}
+		}
+	}
+}
+
 void Map::CalculateAdjacentPlatforms(void){
 	for(unsigned int i = 0 ; i < platforms.size(); i++){
 		switch(platforms[i]->type){
@@ -720,12 +802,16 @@ void Map::CalculateAdjacentPlatforms(void){
 						case Platform::RECTANGLE:
 							if(!platforms[i]->adjacentl){
 								if(platforms[j]->x2 == platforms[i]->x1 && platforms[j]->y1 == platforms[i]->y1){
-									platforms[i]->adjacentl = platforms[j];
+									if(!TestAABB(platforms[j]->x2, platforms[j]->y1 - 1, platforms[j]->x2, platforms[j]->y1 - 1, Platform::RECTANGLE)){
+										platforms[i]->adjacentl = platforms[j];
+									}
 								}
 							}
 							if(!platforms[i]->adjacentr){
 								if(platforms[j]->x1 == platforms[i]->x2 && platforms[j]->y1 == platforms[i]->y1){
-									platforms[i]->adjacentr = platforms[j];
+									if(!TestAABB(platforms[j]->x1, platforms[j]->y1 - 1, platforms[j]->x1, platforms[j]->y1 - 1, Platform::RECTANGLE)){
+										platforms[i]->adjacentr = platforms[j];
+									}
 								}
 							}
 						break;
@@ -818,6 +904,32 @@ void Map::CalculateAdjacentPlatforms(void){
 			break;
 		}
 	}
+}
+
+int Map::AdjacentPlatformsLength(Platform & platform){
+	Platform * leftmost = &GetLeftmostPlatform(platform);
+	int length = 0;
+	while(leftmost){
+		length += (leftmost->x2 - leftmost->x1);
+		leftmost = leftmost->adjacentr;
+	}
+	return length;
+}
+
+Platform & Map::GetLeftmostPlatform(Platform & platform){
+	Platform * leftmost = &platform;
+	while(leftmost->adjacentl){
+		leftmost = leftmost->adjacentl;
+	}
+	return *leftmost;
+}
+
+Platform & Map::GetRightmostPlatform(Platform & platform){
+	Platform * rightmost = &platform;
+	while(rightmost->adjacentr){
+		rightmost = rightmost->adjacentr;
+	}
+	return *rightmost;
 }
 
 Platform * Map::TestAABB(int x1, int y1, int x2, int y2, Uint8 type, Platform * except, bool ignorethin){

@@ -19,12 +19,18 @@ public:
 	void HandleInput(Input & input);
 	void HandleDisconnect(World & world, Uint8 peerid);
 	bool InBase(World & world);
+	bool InOwnBase(World & world);
 	bool IsDisguised(void);
 	void UnDisguise(World & world);
+	bool Poison(Uint16 playerid);
+	bool HasSecurityPass(void);
 	Team * GetTeam(World & world);
 	bool AddInventoryItem(Uint8 id, bool settocurrent = false);
 	void RemoveInventoryItem(Uint8 id);
+	Uint8 InventoryItemCount(Uint8 id);
 	bool BuyItem(World & world, Uint8 id);
+	bool RepairItem(World & world, Uint8 id);
+	bool VirusItem(World & world, Uint8 id);
 	void LoadAbilities(World & world);
 	void KillByGovt(World & world);
 	void UnDeploy(void);
@@ -56,7 +62,9 @@ public:
 	bool chatwithteam;
 	Sint8 fallingnudge;
 	Uint16 buyinterfaceid;
+	Uint16 techinterfaceid;
 	bool isbuying;
+	bool techstationactive;
 	Uint8 inventoryitems[4];
 	Uint8 inventoryitemsnum[4];
 	Uint8 currentinventoryitem;
@@ -90,8 +98,9 @@ private:
 	void Warp(World & world, Sint16 x, Sint16 y);
 	void PickUpItem(World & world, PickUp & pickup);
 	enum {STANDING, RUNNING, WALKIN, WALKOUT, FALLING, LADDER, CROUCHING, UNCROUCHING, CROUCHED,
-		CROUCHEDSHOOT, ROLLING, JUMPING, CLIMBINGLEDGE, JETPACK, HACKING, STANDINGSHOOT, FALLINGSHOOT,
-		LADDERSHOOT, JETPACKSHOOT, DYING, DEAD, RESPAWNING, THROWING, DEPLOYING, UNDEPLOYING, RESURRECTING};
+		CROUCHEDSHOOT, CROUCHEDTHROWING, ROLLING, JUMPING, CLIMBINGLEDGE, JETPACK, HACKING, STANDINGSHOOT,
+		FALLINGSHOOT, LADDERSHOOT, JETPACKSHOOT, DYING, DEAD, RESPAWNING, THROWING, DEPLOYING, UNDEPLOYING,
+		RESURRECTING};
 	Uint8 state;
 	Uint8 state_i;
 	Uint16 basedoorentering;
@@ -127,6 +136,8 @@ private:
 	Uint32 radarbonustime;
 	Uint8 tracetime;
 	int secondcounter;
+	Uint16 poisonedby;
+	Uint32 lastweaponchangesound;
 };
 
 #endif

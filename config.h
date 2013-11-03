@@ -16,7 +16,7 @@ public:
 	bool fullscreen;
 	Uint8 defaultagency;
 	char defaultgamename[64];
-	Uint32 defaulttechchoices;
+	Uint32 defaulttechchoices[5];
 	SDL_Scancode keymoveupbinding[2]; bool keymoveupoperator;
 	SDL_Scancode keymovedownbinding[2]; bool keymovedownoperator;
 	SDL_Scancode keymoveleftbinding[2]; bool keymoveleftoperator;

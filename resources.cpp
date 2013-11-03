@@ -350,10 +350,7 @@ bool Resources::LoadSounds(bool dedicatedserver){
 		fwrite(&mem[sizeof(header)], 1, length, file2);
 		fclose(file2);*/
 		
-		if(!SDL_RWFromMem(mem, length)){
-			printf("SDL_RWFromMem failed\n");
-		}
-		Mix_Chunk * chunk = Mix_LoadWAV_RW(SDL_RWFromMem(mem, sizeof(header) + length), true);
+		Mix_Chunk * chunk = Mix_LoadWAV_RW(SDL_RWFromConstMem(mem, sizeof(header) + length), true);
 		delete[] mem;
 		if(!chunk){
 			printf("Could not load sound %s - %s\n", name, Mix_GetError());
@@ -361,6 +358,20 @@ bool Resources::LoadSounds(bool dedicatedserver){
 			return false;
 		}else{
 			soundbank[name] = chunk;
+			// fix pop at end of sounds
+			int v = 0;
+			int length = (chunk->alen / sizeof(Sint16));
+			for(int i = length - 1; i > length - 100; i--, v++){
+				if(i >= 0){
+					((Sint16 *)chunk->abuf)[i] *= v / float(100);
+				}
+			}
+			v = 0;
+			for(int i = 0; i < 100; i++, v++){
+				if(i < length - 1){
+					((Sint16 *)chunk->abuf)[i] *= v / float(100);
+				}
+			}
 		}
 	}
 	SDL_RWclose(file);

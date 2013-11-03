@@ -1,6 +1,10 @@
 #include "surveillancemonitor.h"
 #include "team.h"
 #include "basedoor.h"
+#include "secretreturn.h"
+#include "techstation.h"
+#include "inventorystation.h"
+#include "player.h"
 
 SurveillanceMonitor::SurveillanceMonitor() : Object(ObjectTypes::SURVEILLANCEMONITOR){
 	res_bank = 65;
@@ -10,27 +14,80 @@ SurveillanceMonitor::SurveillanceMonitor() : Object(ObjectTypes::SURVEILLANCEMON
 	objectfollowing = 0;
 	teamid = 0;
 	surveillancecamera = -1;
+	drawscreen = true;
+	scalefactor = 2;
+	size = 0;
+	state_i = 0;
 	// 65 is screen borders 0:large 1:small 2:base screen
-}
-
-void SurveillanceMonitor::Serialize(bool write, Serializer & data, Serializer * old){
-	Object::Serialize(write, data, old);
+	// 151:0 is teambillboard border
 }
 
 void SurveillanceMonitor::Tick(World & world){
 	if(teamid){
-		if(!objectfollowing){
+		if(res_bank == 151){
 			Team * team = static_cast<Team *>(world.GetObjectFromId(teamid));
 			if(team){
-				BaseDoor * basedoor = static_cast<BaseDoor *>(world.GetObjectFromId(team->basedoorid));
-				if(basedoor){
-					objectfollowing = basedoor->id;
+				objectfollowing = team->beamingterminalid;
+				if(!objectfollowing){
+					objectfollowing = team->playerwithsecret;
+				}
+				if(objectfollowing){
+					drawscreen = true;
+				}else{
+					drawscreen = false;
+				}
+			}
+		}else{
+			if(!objectfollowing){
+				Team * team = static_cast<Team *>(world.GetObjectFromId(teamid));
+				if(team){
+					switch(size){
+						case 2:{
+							BaseDoor * basedoor = static_cast<BaseDoor *>(world.GetObjectFromId(team->basedoorid));
+							if(basedoor){
+								objectfollowing = basedoor->id;
+							}
+						}break;
+						case 10:{
+							for(std::list<Object *>::iterator it = world.objectlist.begin(); it != world.objectlist.end(); it++){
+								Object * object = *it;
+								if(object->type == ObjectTypes::SECRETRETURN){
+									SecretReturn * secretreturn = static_cast<SecretReturn *>(object);
+									if(secretreturn->teamid == team->id){
+										objectfollowing = secretreturn->id;
+									}
+								}
+							}
+						}break;
+						case 11:{
+							for(std::list<Object *>::iterator it = world.objectlist.begin(); it != world.objectlist.end(); it++){
+								Object * object = *it;
+								if(object->type == ObjectTypes::INVENTORYSTATION){
+									InventoryStation * inventorystation = static_cast<InventoryStation *>(object);
+									if(inventorystation->teamid == team->id){
+										objectfollowing = inventorystation->id;
+									}
+								}
+							}
+						}break;
+						case 12:{
+							for(std::list<Object *>::iterator it = world.objectlist.begin(); it != world.objectlist.end(); it++){
+								Object * object = *it;
+								if(object->type == ObjectTypes::TECHSTATION){
+									TechStation * techstation = static_cast<TechStation *>(object);
+									if(techstation->teamid == team->id && techstation->type == 2){
+										objectfollowing = techstation->id;
+									}
+								}
+							}
+						}break;
+					}
 				}
 			}
 		}
 	}else{
 		if(world.map.surveillancecameras.size() > 0){
-			if(rand() % 500 == 0){
+			if(state_i == 0){
 				surveillancecamera = -1;
 			}
 			if(surveillancecamera == -1){
@@ -70,10 +127,11 @@ void SurveillanceMonitor::Tick(World & world){
 			objectfollowing = 0;
 		}
 	}
+	state_i++;
 }
 
 void SurveillanceMonitor::SetSize(Uint8 size){
-	res_index = size;
+	SurveillanceMonitor::size = size;
 	switch(size){
 		default:
 		case 0:
@@ -95,7 +153,39 @@ void SurveillanceMonitor::SetSize(Uint8 size){
 			renderxoffset = 5;
 			renderyoffset = 5;
 			camera.w = 101 * 2;
-			camera.h = 125 * 2;
+			camera.h = 97 * 2;
+		break;
+		case 3:
+			res_bank = 151;
+			res_index = 0;
+			renderxoffset = 7;
+			renderyoffset = 6;
+			camera.w = 189 * 2;
+			camera.h = 135 * 2;
+		break;
+		case 10:
+			res_index = 2;
+			renderxoffset = 5;
+			renderyoffset = 106;
+			camera.w = 25 * 4;
+			camera.h = 25 * 4;
+			scalefactor = 4;
+		break;
+		case 11:
+			res_index = 2;
+			renderxoffset = 36;
+			renderyoffset = 106;
+			camera.w = 25 * 4;
+			camera.h = 25 * 4;
+			scalefactor = 4;
+		break;
+		case 12:
+			res_index = 2;
+			renderxoffset = 67;
+			renderyoffset = 106;
+			camera.w = 25 * 4;
+			camera.h = 25 * 4;
+			scalefactor = 4;
 		break;
 	}
 }

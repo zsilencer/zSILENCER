@@ -2,7 +2,10 @@
 #include "object.h"
 #include "walldefense.h"
 #include "player.h"
+#include "robot.h"
+#include "fixedcannon.h"
 #include "flamerprojectile.h"
+#include "flareprojectile.h"
 
 Projectile::Projectile(){
 	shielddamage = 0;
@@ -56,11 +59,38 @@ bool Projectile::TestCollision(Object & object, World & world, Platform ** colli
 			types.push_back(ObjectTypes::WALLDEFENSE);
 		}
 	}
+	Uint16 teamid = 0;
+	if(owner){
+		switch(owner->type){
+			case ObjectTypes::PLAYER:{
+				Player * player = static_cast<Player *>(owner);
+				teamid = player->teamid;
+			}break;
+			case ObjectTypes::ROBOT:{
+				Robot * robot = static_cast<Robot *>(owner);
+				teamid = robot->virusplanter;
+			}break;
+			case ObjectTypes::FIXEDCANNON:{
+				FixedCannon * fixedcannon = static_cast<FixedCannon *>(owner);
+				teamid = fixedcannon->teamid;
+			}break;
+			case ObjectTypes::WALLDEFENSE:{
+				WallDefense * walldefense = static_cast<WallDefense *>(owner);
+				teamid = walldefense->teamid;
+			}break;
+		}
+	}
 	Uint16 skipobject = ownerid;
+	bool poisonous = false;
+	if(object.type == ObjectTypes::FLAREPROJECTILE){
+		FlareProjectile & flareprojectile = static_cast<FlareProjectile &>(object);
+		poisonous = flareprojectile.poisonous;
+	}
 	if(object.type == ObjectTypes::PLASMAPROJECTILE || object.type == ObjectTypes::FLAREPROJECTILE){
 		skipobject = 0;
+		teamid = 0;
 	}
-	Object * thecollidedobject = world.TestIncr(object.x - radius, object.y - radius, object.x + radius, object.y + radius, &xe, &ye, types, skipobject);
+	Object * thecollidedobject = world.TestIncr(object.x - radius, object.y - radius, object.x + radius, object.y + radius, &xe, &ye, types, skipobject, teamid);
 	bool collided = false;
 	if(thecollidedobject){
 		object.x += xe;
@@ -93,6 +123,16 @@ bool Projectile::TestCollision(Object & object, World & world, Platform ** colli
 			if(owner && owner->type == ObjectTypes::PLAYER){
 				Player * player = static_cast<Player *>(owner);
 				Peer * peer = player->GetPeer(world);
+				if(thecollidedobject->type == ObjectTypes::PLAYER){
+					Player * collidedplayer = static_cast<Player *>(thecollidedobject);
+					if(poisonous && collidedplayer->id != ownerid){
+						if(collidedplayer->Poison(ownerid)){
+							if(peer){
+								peer->stats.poisons++;
+							}
+						}
+					}
+				}
 				if(peer){
 					switch(object.type){
 						case ObjectTypes::BLASTERPROJECTILE:{

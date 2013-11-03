@@ -10,6 +10,7 @@ class TeamBillboard : public Object
 public:
 	TeamBillboard();
 	Uint8 agency;
+	Uint16 teamid;
 };
 
 #endif

@@ -1,5 +1,6 @@
 #include "detonator.h"
 #include "plasmaprojectile.h"
+#include "plume.h"
 
 Detonator::Detonator() : Object(ObjectTypes::DETONATOR){
 	requiresauthority = true;
@@ -10,14 +11,15 @@ Detonator::Detonator() : Object(ObjectTypes::DETONATOR){
 	res_index = 0;
 	originaly = y;
 	renderpass = 1;
+	iscamera = false;
 }
 
 void Detonator::Serialize(bool write, Serializer & data, Serializer * old){
 	Object::Serialize(write, data, old);
-	Sprite::Serialize(write, data, old);
 	data.Serialize(write, state_i, old);
 	data.Serialize(write, ownerid, old);
 	data.Serialize(write, originaly, old);
+	data.Serialize(write, iscamera, old);
 }
 
 void Detonator::Tick(World & world){
@@ -33,36 +35,50 @@ void Detonator::Tick(World & world){
 		if(state_i >= (4 * 4) + 6){
 			if(state_i == (4 * 4) + 6){
 				// explode
-				Audio::GetInstance().EmitSound(id, world.resources.soundbank["seekexp1.wav"], 128);
-				Sint8 xvs[] = {-14, 14, -10, 10, -10, 10};
-				Sint8 yvs[] = {-25, -25, 0, 0, 5, 5};
-				Sint8 ys[] = {0, 0, 0, 0, 0, 0, 0, 0};
-				for(int i = 0; i < 6; i++){
-					PlasmaProjectile * plasmaprojectile = (PlasmaProjectile *)world.CreateObject(ObjectTypes::PLASMAPROJECTILE);
-					if(plasmaprojectile){
-						plasmaprojectile->large = false;
-						plasmaprojectile->x = x;
-						plasmaprojectile->y = y + ys[i];
-						plasmaprojectile->ownerid = ownerid;
-						plasmaprojectile->xv = xvs[i];
-						plasmaprojectile->yv = yvs[i];
+				if(iscamera){
+					draw = false;
+					Audio::GetInstance().EmitSound(id, world.resources.soundbank["q_expl02.wav"], 64);
+					for(int i = 0; i < 8; i++){
+						Plume * plume = (Plume *)world.CreateObject(ObjectTypes::PLUME);
+						if(plume){
+							plume->type = 5;
+							plume->SetPosition(x + (rand() % 33) - 16, y + (rand() % 33) - 16);
+						}
+					}
+				}else{
+					Audio::GetInstance().EmitSound(id, world.resources.soundbank["seekexp1.wav"], 128);
+					Sint8 xvs[] = {-14, 14, -10, 10, -10, 10};
+					Sint8 yvs[] = {-25, -25, 0, 0, 5, 5};
+					Sint8 ys[] = {0, 0, 0, 0, 0, 0, 0, 0};
+					for(int i = 0; i < 6; i++){
+						PlasmaProjectile * plasmaprojectile = (PlasmaProjectile *)world.CreateObject(ObjectTypes::PLASMAPROJECTILE);
+						if(plasmaprojectile){
+							plasmaprojectile->large = false;
+							plasmaprojectile->x = x;
+							plasmaprojectile->y = y + ys[i];
+							plasmaprojectile->ownerid = ownerid;
+							plasmaprojectile->xv = xvs[i];
+							plasmaprojectile->yv = yvs[i];
+						}
 					}
 				}
 			}
 			if(state_i == (4 * 4) + 8){
-				// explode
-				Sint8 xvs[] = {-14, 0, 14, -5, 0, 5};
-				Sint8 yvs[] = {-5, -10, -5, 5, 5, 5};
-				Sint8 ys[] = {0, 0, 0, 0, 0, 0};
-				for(int i = 0; i < 6; i++){
-					PlasmaProjectile * plasmaprojectile = (PlasmaProjectile *)world.CreateObject(ObjectTypes::PLASMAPROJECTILE);
-					if(plasmaprojectile){
-						plasmaprojectile->large = true;
-						plasmaprojectile->x = x;
-						plasmaprojectile->y = y + ys[i];
-						plasmaprojectile->ownerid = ownerid;
-						plasmaprojectile->xv = xvs[i];
-						plasmaprojectile->yv = yvs[i];
+				if(!iscamera){
+					// explode
+					Sint8 xvs[] = {-14, 0, 14, -5, 0, 5};
+					Sint8 yvs[] = {-5, -10, -5, 5, 5, 5};
+					Sint8 ys[] = {0, 0, 0, 0, 0, 0};
+					for(int i = 0; i < 6; i++){
+						PlasmaProjectile * plasmaprojectile = (PlasmaProjectile *)world.CreateObject(ObjectTypes::PLASMAPROJECTILE);
+						if(plasmaprojectile){
+							plasmaprojectile->large = true;
+							plasmaprojectile->x = x;
+							plasmaprojectile->y = y + ys[i];
+							plasmaprojectile->ownerid = ownerid;
+							plasmaprojectile->xv = xvs[i];
+							plasmaprojectile->yv = yvs[i];
+						}
 					}
 				}
 			}

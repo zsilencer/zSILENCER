@@ -14,6 +14,8 @@ Plume::Plume() : Object(ObjectTypes::PLUME){
 	life = 0;
 	quick = false;
 	isphysical = true;
+	div = 0;
+	reverse = false;
 }
 
 void Plume::Tick(World & world){
@@ -50,6 +52,14 @@ void Plume::Tick(World & world){
 			res_bank = 70;
 			maxindex = 19;
 		break;
+		case 8:
+			// 176:0-4 cold breath
+			res_bank = 176;
+			maxindex = 4;
+			life = 8 * 4;
+			div = 4;
+			reverse = true;
+		break;
 	}
 	if(!life){
 		life = maxindex;
@@ -69,9 +79,19 @@ void Plume::Tick(World & world){
 			res_index = maxindex + 1;
 		}
 	}else{
-		res_index = state_i;
+		if(div){
+			res_index = state_i / div;
+			if(res_index > maxindex){
+				res_index = maxindex;
+			}
+		}else{
+			res_index = state_i;
+		}
 	}
-	if(res_index > life){
+	if(reverse){
+		res_index = maxindex - res_index;
+	}
+	if(res_index > life || state_i > life){
 		res_index = maxindex;
 		world.MarkDestroyObject(id);
 	}

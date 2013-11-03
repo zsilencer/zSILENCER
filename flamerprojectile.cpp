@@ -9,7 +9,7 @@ FlamerProjectile::FlamerProjectile() : Object(ObjectTypes::FLAMERPROJECTILE){
 	bypassshield = true;
 	healthdamage = 2;
 	shielddamage = 1;
-	velocity = 5;
+	velocity = 7;
 	drawcheckered = true;
 	for(int i = 0; i < plumecount; i++){
 		plumeids[i] = 0;
@@ -27,7 +27,6 @@ FlamerProjectile::FlamerProjectile() : Object(ObjectTypes::FLAMERPROJECTILE){
 
 void FlamerProjectile::Serialize(bool write, Serializer & data, Serializer * old){
 	Object::Serialize(write, data, old);
-	//Projectile::Serialize(write, data, old);
 	data.Serialize(write, state_i, old);
 }
 

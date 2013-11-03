@@ -15,6 +15,8 @@ public:
 	Uint8 state_i;
 	Uint8 life;
 	bool quick;
+	Uint8 div;
+	bool reverse;
 	
 private:
 	Uint32 x2;

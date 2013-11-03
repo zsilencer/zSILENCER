@@ -19,15 +19,16 @@ FlareProjectile::FlareProjectile() : Object(ObjectTypes::FLAREPROJECTILE){
 	stopatobjectcollision = false;
 	isprojectile = true;
 	isphysical = true;
+	poisonous = false;
 	//snapshotinterval = 6;
 }
 
 void FlareProjectile::Serialize(bool write, Serializer & data, Serializer * old){
 	Object::Serialize(write, data, old);
-	//Projectile::Serialize(write, data, old);
 	data.Serialize(write, state_i, old);
 	data.Serialize(write, originalx, old);
 	data.Serialize(write, originaly, old);
+	data.Serialize(write, poisonous, old);
 }
 
 void FlareProjectile::Tick(World & world){
@@ -38,6 +39,9 @@ void FlareProjectile::Tick(World & world){
 				plume->type = 4;
 				plume->xv = (rand() % 17) - 8 + (xv * 8);
 				plume->yv = (rand() % 17) - 8 + (yv * 8);
+				if(poisonous){
+					plume->effectcolor = 224;
+				}
 				plume->SetPosition(originalx + xv, originaly + yv);
 				plumeids[i] = plume->id;
 				plume->state_i = 0;

@@ -11,14 +11,15 @@ public:
 	Overlay();
 	~Overlay();
 	void Tick(World & world);
+	bool MouseInside(World & world, Uint16 mousex, Uint16 mousey);
 	Uint8 state_i;
 	char * text;
-	Uint8 textlength;
 	Uint8 textbank;
 	Uint8 textwidth;
 	bool textcolorramp;
 	bool drawalpha;
 	Uint8 uid;
+	bool clicked;
 };
 
 #endif

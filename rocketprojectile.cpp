@@ -21,7 +21,6 @@ RocketProjectile::RocketProjectile() : Object(ObjectTypes::ROCKETPROJECTILE){
 
 void RocketProjectile::Serialize(bool write, Serializer & data, Serializer * old){
 	Object::Serialize(write, data, old);
-	//Projectile::Serialize(write, data, old);
 	data.Serialize(write, state_i, old);
 	data.Serialize(write, oldxv, old);
 	data.Serialize(write, oldyv, old);
@@ -95,6 +94,7 @@ void RocketProjectile::Tick(World & world){
 				platform->GetNormal(x, y, &xn, &yn);
 			}
 			int numplumes = 6;
+			float anglen = (rand() % 100) / float(100);
 			for(int i = 0; i < numplumes; i++){
 				Plume * plume = (Plume *)world.CreateObject(ObjectTypes::PLUME);
 				if(plume){
@@ -104,6 +104,7 @@ void RocketProjectile::Tick(World & world){
 					plume->xv = (xn * abs(plume->xv)) + (rand() % 33) - 16;
 					plume->yv = (yn * abs(plume->yv)) + (rand() % 33) - 16;*/
 					float angle = (i / float(numplumes)) * (2 * 3.14);
+					angle += anglen;
 					plume->xv = (sin(angle)) * 15;
 					plume->yv = (cos(angle)) * 15;
 					if(xn || yn){

@@ -29,7 +29,7 @@ void BodyPart::Tick(World & world){
 	}
 	x += xv;
 	y += yv;
-	yv += world.gravity;
+	yv += world.gravity / 2;
 	if(res_index > 8){
 		world.MarkDestroyObject(id);
 	}

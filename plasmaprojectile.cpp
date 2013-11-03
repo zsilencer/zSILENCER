@@ -23,7 +23,6 @@ PlasmaProjectile::PlasmaProjectile() : Object(ObjectTypes::PLASMAPROJECTILE){
 
 void PlasmaProjectile::Serialize(bool write, Serializer & data, Serializer * old){
 	Object::Serialize(write, data, old);
-	//Projectile::Serialize(write, data, old);
 	data.Serialize(write, state_i, old);
 	data.Serialize(write, large, old);
 }

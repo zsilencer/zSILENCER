@@ -20,7 +20,6 @@ WallProjectile::WallProjectile() : Object(ObjectTypes::WALLPROJECTILE){
 
 void WallProjectile::Serialize(bool write, Serializer & data, Serializer * old){
 	Object::Serialize(write, data, old);
-	//Projectile::Serialize(write, data, old);
 	data.Serialize(write, state_i, old);
 }
 

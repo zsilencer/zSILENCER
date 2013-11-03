@@ -36,8 +36,6 @@ public:
 	void SetVersion(const char * version);
 	bool Listen(unsigned short port = 0);
 	unsigned short Bind(unsigned short port = 0);
-	//void NATHolePunch(Peer & peer);
-	//void RequestPublicPort(char * serveraddress, unsigned short port);
 	void Connect(Uint8 agency, Uint32 accountid, const char * password = 0);
 	void Disconnect(void);
 	Peer * GetAuthorityPeer(void);
@@ -48,20 +46,24 @@ public:
 	void SwitchToLocalAuthorityMode(void);
 	bool IsAuthority(void);
 	void Illuminate(void);
-	void ShowMessage(const char * message, Uint8 time = 255, Uint8 type = 0);
+	void ShowMessage(const char * message, Uint8 time = 255, Uint8 type = 0, bool networked = false, Peer * peer = 0);
 	void ShowStatus(const char * status, Uint8 color = 0, bool networked = false, Peer * peer = 0);
 	void SendChat(bool toteam, char * message);
+	void SendSound(const char * name);
 	void ChangeTeam(void);
+	void KillByGovt(Peer & peer);
 	void SetTech(Uint32 techchoices);
 	int TechSlotsUsed(Peer & peer);
 	void SendPing(void);
 	int GetPingTime(void);
 	void SetSystemCamera(bool system, Uint16 objectfollow, Sint16 x, Sint16 y);
-	bool TestAABB(int x1, int y1, int x2, int y2, Object * object, std::vector<Uint8> & types);
-	std::vector<Object *> TestAABB(int x1, int y1, int x2, int y2, std::vector<Uint8> & types, Uint16 except = 0);
-	Object * TestIncr(int x1, int y1, int x2, int y2, int * xv, int * yv, std::vector<Uint8> & types, Uint16 except = 0);
+	bool TestAABB(int x1, int y1, int x2, int y2, Object * object, std::vector<Uint8> & types, bool onlycollidable = true);
+	std::vector<Object *> TestAABB(int x1, int y1, int x2, int y2, std::vector<Uint8> & types, Uint16 except = 0, Uint16 teamid = 0, bool onlycollidable = true);
+	Object * TestIncr(int x1, int y1, int x2, int y2, int * xv, int * yv, std::vector<Uint8> & types, Uint16 except = 0, Uint16 teamid = 0);
 	enum modes {AUTHORITY, REPLICA};
-	enum {BUY_NONE, BUY_LASER, BUY_ROCKET, BUY_FLAMER, BUY_HEALTH, BUY_EMPB, BUY_SHAPEDB, BUY_PLASMAB, BUY_NEUTRONB, BUY_DET, BUY_FIXEDC, BUY_FLARE, BUY_DOOR, BUY_DEFENSE, BUY_INFO, BUY_GIVE0, BUY_GIVE1, BUY_GIVE2, BUY_GIVE3};
+	enum {BUY_NONE, BUY_LASER, BUY_ROCKET, BUY_FLAMER, BUY_HEALTH, BUY_TRACT, BUY_SECURITYPASS, BUY_VIRUS, BUY_POISON, BUY_EMPB,
+		BUY_SHAPEDB, BUY_PLASMAB, BUY_NEUTRONB, BUY_DET, BUY_FIXEDC, BUY_FLARE, BUY_POISONFLARE, BUY_CAMERA, BUY_DOOR, BUY_DEFENSE,
+		BUY_INFO, BUY_GIVE0, BUY_GIVE1, BUY_GIVE2, BUY_GIVE3};
 	Input localinput;
 	class Map map;
 	Resources resources;
@@ -72,6 +74,7 @@ public:
 	unsigned int totalsnapshots;
 	unsigned int totalinputpackets;
 	Uint8 gravity;
+	static const int minwalldistrance = 35;
 	Uint8 maxyvelocity;
 	bool replaying;
 	Uint8 quitstate;
@@ -128,9 +131,12 @@ private:
 	void DeleteOldSnapshots(Uint8 peerid);
 	void HandleDisconnect(Uint8 peerid);
 	bool RelevantToPlayer(class Player * player, Object * object);
+	bool BelongsToTeam(Object & object, Uint16 teamid);
 	void ActivateTerminals(void);
 	void LoadBuyableItems(void);
 	void BuyItem(Uint8 id);
+	void RepairItem(Uint8 id);
+	void VirusItem(Uint8 id);
 	void SendStats(Peer & peer);
 	static bool CompareTeamByNumber(Team * team1, Team * team2);
 	std::map<Uint16, class Object *> objectidlookup;
@@ -153,7 +159,9 @@ private:
 	unsigned short localpublicport;
 	enum {IDLE, LISTENING, CONNECTING, CONNECTED} state;
 	enum {NONE, INLOBBY, INGAME} gameplaystate;
-	enum {MSG_CONNECT, MSG_SNAPSHOT, MSG_INPUT, MSG_PEERLIST, MSG_DISCONNECT, MSG_PING, MSG_PONG, MSG_GAMEINFO, MSG_READY, MSG_CHAT, MSG_BUY, MSG_CHANGETEAM, MSG_STATUS, MSG_TECH, MSG_STATS};
+	enum {MSG_CONNECT, MSG_SNAPSHOT, MSG_INPUT, MSG_PEERLIST, MSG_DISCONNECT, MSG_PING, MSG_PONG,
+		MSG_GAMEINFO, MSG_READY, MSG_CHAT, MSG_BUY, MSG_REPAIR, MSG_VIRUS, MSG_CHANGETEAM, MSG_STATUS,
+		MSG_MESSAGE, MSG_GOVTKILL, MSG_SOUND, MSG_TECH, MSG_STATS};
 	Serializer * oldsnapshots[maxpeers][maxoldsnapshots];
 	ObjectTypes objecttypes;
 	Input localinputhistory[maxlocalinputhistory];

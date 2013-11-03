@@ -11,7 +11,6 @@ HealMachine::HealMachine() : Object(ObjectTypes::HEALMACHINE){
 
 void HealMachine::Serialize(bool write, Serializer & data, Serializer * old){
 	Object::Serialize(write, data, old);
-	//Sprite::Serialize(write, data, old);
 	data.Serialize(write, state_i, old);
 }
 

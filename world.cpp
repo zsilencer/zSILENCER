@@ -1,6 +1,10 @@
 #include "world.h"
 #include "serializer.h"
 #include "player.h"
+#include "fixedcannon.h"
+#include "walldefense.h"
+#include "techstation.h"
+#include "surveillancemonitor.h"
 #include "team.h"
 #include "objecttypes.h"
 #include "terminal.h"
@@ -92,7 +96,7 @@ void World::Tick(void){
 	}else{
 		TickObjects();
 	}
-	if(tickcount % 24 == 0 && IsAuthority()){
+	if(tickcount % 25 == 0 && IsAuthority()){
 		ActivateTerminals();
 	}
 	tickcount++;
@@ -248,9 +252,6 @@ void World::DoNetwork_Authority(void){
 				temppeer.ip = ntohl(senderaddr.sin_addr.s_addr);
 				temppeer.port = ntohs(senderaddr.sin_port);
 				SendPacket(&temppeer, response.data, response.BitsToBytes(response.offset));
-				/*if(peer){
-				 NATHolePunch(*peer);
-				 }*/
 			}break;
 			case MSG_INPUT:{ // client sending input
 				if(peer){
@@ -316,15 +317,6 @@ void World::DoNetwork_Authority(void){
 				 SendPeerList();
 				 }*/
 			}break;
-				/*case MSG_PUBLICPORT:{ // RequestPublicPort response
-				 printf("MSG_PUBLICPORT\n");
-				 if(!peer){ // we don't want players sending this
-				 unsigned short publicport = *(unsigned short *)((char *)&data.data[1]);
-				 printf("we received our public port (%d)\n", publicport);
-				 localpublicport = publicport;
-				 GetAuthorityPeer()->publicport = localpublicport;
-				 }
-				 }break;*/
 			case MSG_GAMEINFO:{
 				printf("Received MSG_GAMEINFO\n");
 				if(peer){
@@ -411,6 +403,26 @@ void World::DoNetwork_Authority(void){
 					}
 				}
 			}break;
+			case MSG_REPAIR:{
+				if(peer){
+					Uint8 id;
+					data.Get(id);
+					Player * player = GetPeerPlayer(peer->id);
+					if(player){
+						player->RepairItem(*this, id);
+					}
+				}
+			}break;
+			case MSG_VIRUS:{
+				if(peer){
+					Uint8 id;
+					data.Get(id);
+					Player * player = GetPeerPlayer(peer->id);
+					if(player){
+						player->VirusItem(*this, id);
+					}
+				}
+			}break;
 			case MSG_CHANGETEAM:{
 				if(peer && gameplaystate == INLOBBY){
 					Team * peerteam = GetPeerTeam(peer->id);
@@ -432,6 +444,12 @@ void World::DoNetwork_Authority(void){
 					User * user = lobby.GetUserInfo(peer->accountid);
 					if(user && peerteam && !user->retrieving){
 						Uint32 oldtechchoices = peer->techchoices;
+						for(std::vector<BuyableItem *>::iterator it = buyableitems.begin(); it != buyableitems.end(); it++){
+							BuyableItem * buyableitem = *it;
+							if(buyableitem->agencyspecific != -1 && buyableitem->agencyspecific != peerteam->agency){
+								techchoices &= ~(buyableitem->techchoice);
+							}
+						}
 						peer->techchoices = techchoices;
 						if(user->agency[peerteam->agency].techslots >= TechSlotsUsed(*peer)){
 							SendPeerList();
@@ -489,7 +507,6 @@ void World::DoNetwork_Replica(void){
 						//data.Get(port);
 						//GetAuthorityPeer()->lockedinport = port;
 						printf("we are connected, our peer id is %d\n", localpeerid);
-						//NATHolePunch(*GetAuthorityPeer());
 						RequestPeerList();
 					}else{
 						printf("failed to connect to game\n");
@@ -542,30 +559,10 @@ void World::DoNetwork_Replica(void){
 				if(pingid == lastpingid){
 					pingtime = SDL_GetTicks() - lastpingsent;
 				}
-				/*unsigned short port;
-				 data.Get(port);
-				 if(!GetAuthorityPeer()->lockedinport){
-				 printf("we are now holepunched, lockedinport = %d\n", port);
-				 GetAuthorityPeer()->lockedinport = port;
-				 GetAuthorityPeer()->lastpacket = SDL_GetTicks();
-				 Serializer request;
-				 Uint8 code = MSG_CONNECT;
-				 request.Put(code);
-				 SendPacket(GetAuthorityPeer(), request.data, request.BitsToBytes(request.offset));
-				 //RequestPeerList();
-				 }*/
 			}break;
-				/*case MSG_PUBLICPORT:{ // RequestPublicPort response
-				 printf("MSG_PUBLICPORT\n");
-				 if(!peer){ // we don't want players sending this
-				 unsigned short publicport = *(unsigned short *)((char *)&data.data[1]);
-				 printf("we received our public port (%d)\n", publicport);
-				 localpublicport = publicport;
-				 }
-				 }break;*/
 			case MSG_GAMEINFO:{
 				if(peer){
-				printf("Received MSG_GAMEINFO\n");
+					printf("Received MSG_GAMEINFO\n");
 					gameinfo.Serialize(Serializer::READ, data);
 					/*char info[256];
 					 int i = 0;
@@ -607,6 +604,13 @@ void World::DoNetwork_Replica(void){
 				memcpy(newstatus, &data.data[data.BitsToBytes(data.readoffset)], size);
 				PushStatusString(newstatus);
 			}break;
+			case MSG_MESSAGE:{
+				char message[1024];
+				strcpy(message, &data.data[data.BitsToBytes(data.readoffset)]);
+				Uint8 time = data.data[data.BitsToBytes(data.readoffset) + strlen(message) + 1];
+				Uint8 type = data.data[data.BitsToBytes(data.readoffset) + strlen(message) + 1 + 1];
+				ShowMessage(message, time, type);
+			}break;
 			case MSG_STATS:{
 				if(peer){
 					Peer * localpeer = peerlist[localpeerid];
@@ -616,13 +620,30 @@ void World::DoNetwork_Replica(void){
 						Team * team = GetPeerTeam(localpeer->id);
 						if(team){
 							User * user = lobby.GetUserInfo(localpeer->accountid);
+							char namecopy[64];
+							strcpy(namecopy, user->name);
 							lobby.ForgetUserInfo(localpeer->accountid);
 							user = lobby.GetUserInfo(localpeer->accountid);
+							strcpy(user->name, namecopy);
 							user->statscopy = localpeer->stats;
 							user->statsagency = team->agency;
 						}
 
 					}
+				}
+			}break;
+			case MSG_GOVTKILL:{
+				if(peer){
+					Uint8 peerid = data.data[data.BitsToBytes(data.readoffset)];
+					Player * player = GetPeerPlayer(peerid);
+					if(player){
+						player->KillByGovt(*this);
+					}
+				}
+			}break;
+			case MSG_SOUND:{
+				if(peer){
+					Audio::GetInstance().Play(resources.soundbank[&data.data[data.BitsToBytes(data.readoffset)]]);
 				}
 			}break;
 		}
@@ -858,7 +879,6 @@ void World::SwitchToMode(bool newmode){
 			for(unsigned int i = 0; i < maxpeers; i++){
 				if(peerlist[i]){
 					peerlist[i]->lastpacket = SDL_GetTicks();
-					//NATHolePunch(*peerlist[i]);
 				}
 			}
 			Listen(GetAuthorityPeer()->port);
@@ -907,18 +927,6 @@ void World::HandleDisconnect(Uint8 peerid){
 			ShowMessage("CONNECTION LOST", 128, 20);
 			state = IDLE;
 		}
-		/*for(unsigned int i = 0; i < maxpeers; i++){
-		 if(peerlist[i]){
-		 if(localpeerid <= i){
-		 SwitchToMode(AUTHORITY);
-		 }else{
-		 authoritypeer = i;
-		 peerlist[authoritypeer]->lastpacket = SDL_GetTicks();
-		 NATHolePunch(*peerlist[authoritypeer]);
-		 }
-		 break;
-		 }
-		 }*/
 	}else
 	if(mode == AUTHORITY){
 		/*for(std::list<Uint16>::iterator i = peerlist[peerid]->controlledlist.begin(); i != peerlist[peerid]->controlledlist.end(); i++){
@@ -958,6 +966,9 @@ bool World::RelevantToPlayer(Player * player, Object * object){
 				return true;
 			}
 		}break;
+		case ObjectTypes::SURVEILLANCEMONITOR:{
+			
+		}break;
 	}
 	if(!player){
 		return false;
@@ -965,18 +976,28 @@ bool World::RelevantToPlayer(Player * player, Object * object){
 	if(rand() % objectlist.size() == 0){
 		return true;
 	}
-	if(object->snapshotinterval >= 0 && tickcount % object->snapshotinterval == 0){
+	if(object->snapshotinterval >= 0 && tickcount % (object->snapshotinterval + 1) == 0){
 		return true;
 	}
 	if(object->issprite){
 		if(abs(player->x - object->x) <= 500 && abs(player->y - object->y) <= 450){
 			return true;
 		}
-		if(player->InBase(*this)){
+		/*if(player->InBase(*this)){
 			BaseDoor * basedoor = static_cast<BaseDoor *>(GetObjectFromId(player->basedoorentering));
 			if(basedoor){
 				if(abs(basedoor->x - object->x) <= 300 && abs(basedoor->y - object->y) <= 300){
 					return true;
+				}
+			}
+		}*/
+		for(std::list<Object *>::iterator it = objectlist.begin(); it != objectlist.end(); it++){
+			if((*it)->type == ObjectTypes::SURVEILLANCEMONITOR){
+				if(abs(player->x - (*it)->x) <= 500 && abs(player->y - (*it)->y) <= 500){
+					SurveillanceMonitor * surveillancemonitor = static_cast<SurveillanceMonitor *>(*it);
+					if(surveillancemonitor->camera.IsVisible(*this, *object)){
+						return true;
+					}
 				}
 			}
 		}
@@ -992,6 +1013,37 @@ bool World::RelevantToPlayer(Player * player, Object * object){
 				return true;
 			}
 		}
+	}
+	return false;
+}
+
+bool World::BelongsToTeam(Object & object, Uint16 teamid){
+	switch(object.type){
+		case ObjectTypes::PLAYER:{
+			Player * player = static_cast<Player *>(&object);
+			if(player->teamid == teamid){
+				return true;
+			}
+		}break;
+		case ObjectTypes::FIXEDCANNON:{
+			FixedCannon * fixedcannon = static_cast<FixedCannon *>(&object);
+			Player * player = static_cast<Player *>(GetObjectFromId(fixedcannon->ownerid));
+			if(player && player->teamid == teamid){
+				return true;
+			}
+		}break;
+		case ObjectTypes::WALLDEFENSE:{
+			WallDefense * walldefense = static_cast<WallDefense *>(&object);
+			if(walldefense->teamid == teamid){
+				return true;
+			}
+		}break;
+		case ObjectTypes::TECHSTATION:{
+			TechStation * techstation = static_cast<TechStation *>(&object);
+			if(techstation->teamid == teamid){
+				return true;
+			}
+		}break;
 	}
 	return false;
 }
@@ -1048,29 +1100,49 @@ void World::ActivateTerminals(void){
 
 void World::LoadBuyableItems(void){
 	// 97:0 base door, 1 health pack, 2 laz tract, 3 security pass, 4 camera, 5 poison, 6-9 bomb, 10 flare, 11 cannon, 12 plasma det, 13 poison flare, 14 virus, 15 base def, 16 laser ammo, 17 rockets, 18 flamer,
-	buyableitems.push_back(new BuyableItem(BUY_LASER, "Laser", 150, 97, 16, 1 << 0, 1));
-	buyableitems.push_back(new BuyableItem(BUY_ROCKET, "Rocket", 250, 97, 17, 1 << 1, 1));
-	buyableitems.push_back(new BuyableItem(BUY_FLAMER, "Flamer Ammo", 200, 97, 18, 1 << 2, 1));
-	buyableitems.push_back(new BuyableItem(BUY_HEALTH, "Health Pack", 200, 97, 1, 1 << 3, 1));
-	buyableitems.push_back(new BuyableItem(BUY_EMPB, "E.M.P. Bomb", 1000, 97, 6, 1 << 4, 4));
-	buyableitems.push_back(new BuyableItem(BUY_SHAPEDB, "Shaped Bomb", 100, 97, 7, 1 << 5, 1));
-	buyableitems.push_back(new BuyableItem(BUY_PLASMAB, "Plasma Bomb", 200, 97, 8, 1 << 6, 2));
-	buyableitems.push_back(new BuyableItem(BUY_NEUTRONB, "Neutron Bomb", 4000, 97, 9, 1 << 7, 8));
-	buyableitems.push_back(new BuyableItem(BUY_DET, "Plasma Detonator", 200, 97, 12, 1 << 8, 2));
-	buyableitems.push_back(new BuyableItem(BUY_FIXEDC, "Fixed Cannon", 300, 97, 11, 1 << 9, 1));
-	buyableitems.push_back(new BuyableItem(BUY_FLARE, "Flare", 200, 97, 10, 1 << 10, 1));
-	buyableitems.push_back(new BuyableItem(BUY_DOOR, "Base Door", 300, 97, 0, 1 << 11, 1));
-	buyableitems.push_back(new BuyableItem(BUY_DEFENSE, "Base Defense", 100, 97, 15, 1 << 12, 1));
-	buyableitems.push_back(new BuyableItem(BUY_INFO, "Insider Info", 500, 0xFF, 0, 1 << 13, 1));
-	buyableitems.push_back(new BuyableItem(BUY_GIVE0, "Give To ", 100, 0xFF, 0, 0, 0));
-	buyableitems.push_back(new BuyableItem(BUY_GIVE1, "Give To ", 100, 0xFF, 0, 0, 0));
-	buyableitems.push_back(new BuyableItem(BUY_GIVE2, "Give To ", 100, 0xFF, 0, 0, 0));
-	buyableitems.push_back(new BuyableItem(BUY_GIVE3, "Give To ", 100, 0xFF, 0, 0, 0));
+	buyableitems.push_back(new BuyableItem(BUY_LASER, "Laser", 150, 300, 97, 16, 1 << 0, 1, "Immediately after shield technology\nwas capable of dampening weapon\neffects, the Frost-Light laser was\nreleased.\n \nTwo hits should remove any standard\nshield, but very little damage is\ndone to an unshielded target."));
+	buyableitems.push_back(new BuyableItem(BUY_ROCKET, "Rocket", 250, 400, 97, 17, 1 << 1, 1, "Long range, high yield mini-warheads\nwill devastate any unshielded\nopponent.\n \nIncludes an attached camera for\nin-flight kill tracking."));
+	buyableitems.push_back(new BuyableItem(BUY_FLAMER, "Flamer Ammo", 200, 350, 97, 18, 1 << 2, 1, "Kills any unshielded target.\n \nNo shield has been made that the\nCrucible flamer cannot ignore.\n \nDeadly at close range."));
+	buyableitems.push_back(new BuyableItem(BUY_HEALTH, "Health Pack", 200, 400, 97, 1, 1 << 3, 1, "A small portable boost for Noxis\nagents in the field.\n \nRestores lost health, but must be\nmanually applied.", Team::NOXIS));
+	buyableitems.push_back(new BuyableItem(BUY_TRACT, "Lazarus Tract", 250, 500, 97, 2, 1 << 14, 1, "The definitive and unquestionable\ntruth about Mars' oddest and most\npowerful religious organization.\n \nHelpful in converting disbelieving\ncitizens to your cause.", Team::LAZARUS));
+	buyableitems.push_back(new BuyableItem(BUY_SECURITYPASS, "Security Pass", 1000, 1000, 97, 3, 1 << 17, 1, "Unlimited security access.\n \nGovernment agents will ignore you\nin the field.", Team::CALIBER));
+	buyableitems.push_back(new BuyableItem(BUY_VIRUS, "Virus", 400, 300, 97, 14, 1 << 19, 1, "A portable virus whipped up by the\nsnotty underage hackers of Static.\n \nGives you immediate control over\ncannons and robots in the field.\n \nMay harm enemy in-base weapon\nstations.", Team::STATIC));
+	buyableitems.push_back(new BuyableItem(BUY_POISON, "Poison", 100, 400, 97, 5, 1 << 15, 1, "Hollowhead poisons are pernicious\nbio-rad toxins, administered via\ninjection.\n \nCauses the victim to lose health\nuntil cured, multiple doses\nrecommended.", Team::BLACKROSE));
+	buyableitems.push_back(new BuyableItem(BUY_EMPB, "E.M.P. Bomb", 1000, 1000, 97, 6, 1 << 4, 4, "Upon detonation it emits a\nelectromagnetic pulse that drops all\nshields in a several mile radius.\n \nThe user is protected by a frequency\nmodulator that comes with the\ndevice."));
+	buyableitems.push_back(new BuyableItem(BUY_SHAPEDB, "Shaped Bomb", 100, 200, 97, 7, 1 << 5, 1, "Derived from the plasma bomb, this\nbomb focus its destructive force \nupwards."));
+	buyableitems.push_back(new BuyableItem(BUY_PLASMAB, "Plasma Bomb", 200, 300, 97, 8, 1 << 6, 2, "An indescriminate terrorist device\ncapable of killing even a\nperfectly healthy opponent.\n \nA core explosion with multiple\nshrapnel tendrils, extremely\nlethal."));
+	buyableitems.push_back(new BuyableItem(BUY_NEUTRONB, "Neutron Bomb", 4000, 2000, 97, 9, 1 << 7, 8, "A portable neutron bomb that\nswiftly elimates all opposition in\nthe entire region.\n \nThe only defense against it is to\nbe in your base.\n \nUse with extreme caution."));
+	buyableitems.push_back(new BuyableItem(BUY_DET, "Plasma Detonator", 200, 400, 97, 12, 1 << 8, 2, "A remote detonation device.\n \nDeploy in strategic locations and\ndetonate from a safe distance."));
+	buyableitems.push_back(new BuyableItem(BUY_FIXEDC, "Fixed Cannon", 300, 500, 97, 11, 1 << 9, 1, "A stationary laser turret with\nexcellent offensive and defensive\ncapabilities.\n \nThis mechanical friend in the\nfield can do your work for you."));
+	buyableitems.push_back(new BuyableItem(BUY_FLARE, "Flare", 200, 400, 97, 10, 1 << 10, 1, "The Orion Flare is a stationary\nmini-torch looks like a bomb in\nflight but has a more lingering\neffect.\n \nUseful for blocking off tight areas\nor herding enemies."));
+	buyableitems.push_back(new BuyableItem(BUY_POISONFLARE, "Poison Flare", 200, 700, 97, 13, 1 << 16, 1, "A more devious strain of the Orion\nFlare, the Poison Flare\nincapacitates its victims in seconds\nand leaves them poisoned as\nwell.\n \nEnvironmentally disastrous, but\nhighly lethal.", Team::BLACKROSE));
+	buyableitems.push_back(new BuyableItem(BUY_CAMERA, "Camera", 100, 200, 97, 4, 1 << 18, 1, "A remote viewing device that allows\nan agent to monitor an area on\nhis/her HUD.\n \nCan be discreetly removed in a puff\nof smoke.\n \nWhen secrecy is a way of life."));
+	buyableitems.push_back(new BuyableItem(BUY_DOOR, "Base Door", 300, 600, 97, 0, 1 << 11, 1, "The ability to relocate the warp\ndoor to your base."));
+	buyableitems.push_back(new BuyableItem(BUY_DEFENSE, "Base Defense", 100, 500, 97, 15, 1 << 12, 1, "Internal security systems to deter\nwould-be ambushers.\n \nIn-base laser turrets.\n \nMultiple purchases increase turret\nstructure durability."));
+	buyableitems.push_back(new BuyableItem(BUY_INFO, "Insider Info", 500, 500, 0xFF, 0, 1 << 13, 1, "Your contacts on the inside can\ngive you information about secrets.\n \nFor a price of course."));
+	buyableitems.push_back(new BuyableItem(BUY_GIVE0, "Give To ", 100, 100, 0xFF, 0, 0, 0, ""));
+	buyableitems.push_back(new BuyableItem(BUY_GIVE1, "Give To ", 100, 100, 0xFF, 0, 0, 0, ""));
+	buyableitems.push_back(new BuyableItem(BUY_GIVE2, "Give To ", 100, 100, 0xFF, 0, 0, 0, ""));
+	buyableitems.push_back(new BuyableItem(BUY_GIVE3, "Give To ", 100, 100, 0xFF, 0, 0, 0, ""));
 }
 
 void World::BuyItem(Uint8 id){
 	char msg[2];
 	msg[0] = MSG_BUY;
+	msg[1] = id;
+	SendPacket(GetAuthorityPeer(), msg, sizeof(msg));
+}
+
+void World::RepairItem(Uint8 id){
+	char msg[2];
+	msg[0] = MSG_REPAIR;
+	msg[1] = id;
+	SendPacket(GetAuthorityPeer(), msg, sizeof(msg));
+}
+
+void World::VirusItem(Uint8 id){
+	char msg[2];
+	msg[0] = MSG_VIRUS;
 	msg[1] = id;
 	SendPacket(GetAuthorityPeer(), msg, sizeof(msg));
 }
@@ -1117,38 +1189,6 @@ unsigned short World::Bind(unsigned short port){
 	}
 	return false;
 }
-
-/*void World::NATHolePunch(Peer & peer){
- Serializer data;
- char code = MSG_PING;
- data.Put(code);
- data.Put(peer.port);
- sockaddr_in addr;
- addr.sin_family = AF_INET;
- addr.sin_port = htons(peer.port);
- addr.sin_addr.s_addr = htonl(peer.ip);
- sendto(sockethandle, data.data, data.BitsToBytes(data.offset), 0, (sockaddr *)&addr, sizeof(addr));
- addr.sin_port = htons(peer.publicport);
- data.offset = 0;
- data.Put(code);
- data.Put(peer.publicport);
- sendto(sockethandle, data.data, data.BitsToBytes(data.offset), 0, (sockaddr *)&addr, sizeof(addr));
- printf("sent ping to private + public port of host (%s:%d,%d)\n", inet_ntoa(addr.sin_addr), peer.port, peer.publicport);
- }*/
-
-/*void World::RequestPublicPort(char * serveraddress, unsigned short port){
- printf("requesting public port\n");
- Serializer data;
- char code = 1;
- data.Put(code);
- data.Put(lobby.accountid);
- data.Put(boundport);
- sockaddr_in addr;
- addr.sin_family = AF_INET;
- addr.sin_port = htons(port);
- addr.sin_addr.s_addr = inet_addr(serveraddress);
- sendto(sockethandle, data.data, data.BitsToBytes(data.offset), 0, (sockaddr *)&addr, sizeof(addr));
- }*/
 
 void World::Connect(Uint8 agency, Uint32 accountid, const char * password){
 	sockaddr_in addr;
@@ -1448,15 +1488,36 @@ void World::Illuminate(void){
 	illuminate = 15;
 }
 
-void World::ShowMessage(const char * message, Uint8 time, Uint8 type){
+void World::ShowMessage(const char * message, Uint8 time, Uint8 type, bool networked, Peer * peer){
 	if(messagetype >= 10){
 		return;
 	}
-	strncpy(World::message, message, sizeof(World::message) - 1);
-	World::message[sizeof(World::message) - 1] = 0;
-	message_i = 1;
-	messagetime = time;
-	messagetype = type;
+	if(networked && IsAuthority()){
+		int msgsize = 1 + strlen(message) + 1 + 1 + 1;
+		char * msg = new char[msgsize];
+		msg[0] = MSG_MESSAGE;
+		memcpy(&msg[1], message, strlen(message) + 1);
+		msg[1 + strlen(message) + 1] = time;
+		msg[1 + strlen(message) + 1 + 1] = type;
+		if(!peer){
+			for(unsigned int i = 0; i < maxpeers; i++){
+				Peer * peer = peerlist[i];
+				if(peer && i != localpeerid){
+					SendPacket(peer, msg, msgsize);
+				}
+			}
+		}else{
+			SendPacket(peer, msg, msgsize);
+		}
+		delete[] msg;
+	}
+	if(!networked || IsAuthority()){
+		strncpy(World::message, message, sizeof(World::message) - 1);
+		World::message[sizeof(World::message) - 1] = 0;
+		message_i = 1;
+		messagetime = time;
+		messagetype = type;
+	}
 }
 
 void World::ShowStatus(const char * status, Uint8 color, bool networked, Peer * peer){
@@ -1492,6 +1553,32 @@ void World::ShowStatus(const char * status, Uint8 color, bool networked, Peer * 
 	}
 }
 
+void World::SendChat(bool toteam, char * message){
+	char msg[2 + 100 + 1];
+	memset(msg, 0, sizeof(msg));
+	msg[0] = MSG_CHAT;
+	msg[1] = toteam ? 1 : 0;
+	strncpy(&msg[2], message, 100);
+	msg[2 + 100] = 0;
+	SendPacket(GetAuthorityPeer(), msg, sizeof(msg));
+}
+
+void World::SendSound(const char * name){
+	if(IsAuthority()){
+		Audio::GetInstance().Play(resources.soundbank[name]);
+		char msg[1 + 255];
+		msg[0] = MSG_SOUND;
+		strcpy(&msg[1], name);
+		msg[1 + strlen(name)] = 0;
+		for(unsigned int i = 0; i < maxpeers; i++){
+			Peer * peer = peerlist[i];
+			if(peer && i != localpeerid){
+				SendPacket(peer, msg, 1 + strlen(name) + 1);
+			}
+		}
+	}
+}
+
 char * World::CreateStatusString(const char * status, Uint8 color, Uint8 duration){
 	char * newstatus = new char[strlen(status) + 1 + 1 + 1];
 	strcpy(newstatus, status);
@@ -1508,20 +1595,28 @@ void World::PushStatusString(char * statusstring){
 	statusmessages.push_front(statusstring);
 }
 
-void World::SendChat(bool toteam, char * message){
-	char msg[2 + 100 + 1];
-	memset(msg, 0, sizeof(msg));
-	msg[0] = MSG_CHAT;
-	msg[1] = toteam ? 1 : 0;
-	strncpy(&msg[2], message, 100);
-	msg[2 + 100] = 0;
-	SendPacket(GetAuthorityPeer(), msg, sizeof(msg));
-}
-
 void World::ChangeTeam(void){
 	char msg[1];
 	msg[0] = MSG_CHANGETEAM;
 	SendPacket(GetAuthorityPeer(), msg, sizeof(msg));
+}
+
+void World::KillByGovt(Peer & peer){
+	if(IsAuthority()){
+		char msg[2];
+		msg[0] = MSG_GOVTKILL;
+		msg[1] = peer.id;
+		for(unsigned int i = 0; i < maxpeers; i++){
+			Peer * peer = peerlist[i];
+			if(peer && i != localpeerid){
+				SendPacket(peer, msg, 2);
+				Player * player = GetPeerPlayer(peer->id);
+				if(player){
+					player->KillByGovt(*this);
+				}
+			}
+		}
+	}
 }
 
 void World::SetTech(Uint32 techchoices){
@@ -1814,7 +1909,7 @@ void World::DestroyAllObjects(void){
 	objectdestroylist.clear();
 }
 
-bool World::TestAABB(int x1, int y1, int x2, int y2, Object * object, std::vector<Uint8> & types){
+bool World::TestAABB(int x1, int y1, int x2, int y2, Object * object, std::vector<Uint8> & types, bool onlycollidable){
 	int sx1 = 0, sy1 = 0, sx2 = 0, sy2 = 0;
 	object->GetAABB(resources, &sx1, &sy1, &sx2, &sy2);
 	Uint8 type = object->type;
@@ -1828,15 +1923,17 @@ bool World::TestAABB(int x1, int y1, int x2, int y2, Object * object, std::vecto
 	return false;
 }
 
-std::vector<Object *> World::TestAABB(int x1, int y1, int x2, int y2, std::vector<Uint8> & types, Uint16 except){
+std::vector<Object *> World::TestAABB(int x1, int y1, int x2, int y2, std::vector<Uint8> & types, Uint16 except, Uint16 teamid, bool onlycollidable){
 	std::vector<Object *> objects;
 	for(std::list<Object *>::iterator i = objectlist.begin(); i != objectlist.end(); i++){
 		Object * object = (*i);
 		if(object->issprite){
 			if(object->id != except){
-				if(!object->isphysical || (object->isphysical && object->collidable)){
-					if(TestAABB(x1, y1, x2, y2, object, types)){
-						objects.push_back(object);
+				if(!object->isphysical || !onlycollidable || (object->isphysical && object->collidable)){
+					if(!teamid || (teamid && !BelongsToTeam(*object, teamid))){
+						if(TestAABB(x1, y1, x2, y2, object, types)){
+							objects.push_back(object);
+						}
 					}
 				}
 			}
@@ -1845,7 +1942,7 @@ std::vector<Object *> World::TestAABB(int x1, int y1, int x2, int y2, std::vecto
 	return objects;
 }
 
-Object * World::TestIncr(int x1, int y1, int x2, int y2, int * xv, int * yv, std::vector<Uint8> & types, Uint16 except){
+Object * World::TestIncr(int x1, int y1, int x2, int y2, int * xv, int * yv, std::vector<Uint8> & types, Uint16 except, Uint16 teamid){
 	int xb1 = x1 + (*xv < 0 ? *xv : 0);
 	int yb1 = y1 + (*yv < 0 ? *yv : 0);
 	int xb2 = x2 + (*xv > 0 ? *xv : 0);
@@ -1854,7 +1951,7 @@ Object * World::TestIncr(int x1, int y1, int x2, int y2, int * xv, int * yv, std
 	 int yb1 = y1 + *yv;
 	 int xb2 = x2 + *xv;
 	 int yb2 = y2 + *yv;*/
-	std::vector<Object *> testobjects = TestAABB(xb1, yb1, xb2, yb2, types, except); // broadphase
+	std::vector<Object *> testobjects = TestAABB(xb1, yb1, xb2, yb2, types, except, teamid); // broadphase
 	std::vector<Object *> test;
 	for(std::vector<Object *>::iterator it = testobjects.begin(); it != testobjects.end(); it++){
 		if((*it)->issprite){

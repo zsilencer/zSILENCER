@@ -20,6 +20,8 @@ Terminal::Terminal() : Object(ObjectTypes::TERMINAL){
 	sizeset = false;
 	snapshotinterval = 24;
 	tracetime = 0;
+	soundchannel = -1;
+	secretreadynotified = false;
 }
 
 void Terminal::Serialize(bool write, Serializer & data, Serializer * old){
@@ -37,6 +39,9 @@ void Terminal::Serialize(bool write, Serializer & data, Serializer * old){
 void Terminal::Tick(World & world){
 	if(!sizeset){
 		SetSize(isbig);
+	}
+	if(soundchannel == -1){
+		soundchannel = Audio::GetInstance().EmitSound(id, world.resources.soundbank["ambloop4.wav"], isbig ? 45 : 32, true);
 	}
 	if(hackerid){
 		Player * player = (Player *)world.GetObjectFromId(hackerid);
@@ -60,9 +65,22 @@ void Terminal::Tick(World & world){
 			}*/
 		}break;
 		case SECRETREADY:
-			if(!readysoundplayed){
-				Audio::GetInstance().Play(world.resources.soundbank["typerev6.wav"]);
-				readysoundplayed = true;
+			if(!secretreadynotified){
+				world.SendSound("typerev6.wav");
+				for(std::list<Object *>::iterator it = world.objectlist.begin(); it != world.objectlist.end(); it++){
+					if((*it)->type == ObjectTypes::TEAM){
+						Team * team = static_cast<Team *>(*it);
+						if(team->beamingterminalid == id){
+							for(int i = 0; i < team->numpeers; i++){
+								Peer * peer = world.peerlist[team->peers[i]];
+								if(peer){
+									world.ShowMessage("TOP SECRET AVAILABLE\n\nGovernment will be able to trace in 120 seconds", 255, 0, true, peer);
+								}
+							}
+						}
+					}
+				}
+				secretreadynotified = true;
 			}
 		case READY:{
 			if(state_i >= (inactiveframes + beamingframes + readyframes) * 4){
@@ -81,7 +99,7 @@ void Terminal::Tick(World & world){
 			}
 		}break;
 		case BEAMING:{
-			readysoundplayed = false;
+			secretreadynotified = false;
 			if(world.IsAuthority()){
 				if(state_i % 24 == 0){
 					beamingcount++;
@@ -177,7 +195,7 @@ void Terminal::SetSize(bool big){
 		inactiveframes = 5;
 		beamingframes = 9;
 		readyframes = 9;
-		beamingseconds = 30;
+		//beamingseconds = 30;
 	}else{
 		res_bank = 183;
 		res_index = 0;
@@ -187,6 +205,6 @@ void Terminal::SetSize(bool big){
 		inactiveframes = 5;
 		beamingframes = 0;
 		readyframes = 5;
-		beamingseconds = 3;
+		//beamingseconds = 3;
 	}
 }

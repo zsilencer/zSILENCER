@@ -17,16 +17,22 @@ Stats::Stats(){
 	powerupspickedup = 0;
 	deaths = 0;
 	kills = 0;
+	suicides = 0;
+	poisons = 0;
+	tractsplanted = 0;
 	grenadesthrown = 0;
 	neutronsthrown = 0;
 	empsthrown = 0;
 	shapedthrown = 0;
 	plasmasthrown = 0;
 	flaresthrown = 0;
+	poisonflaresthrown = 0;
 	healthpacksused = 0;
 	fixedcannonsplaced = 0;
 	fixedcannonsdestroyed = 0;
 	detsplanted = 0;
+	camerasplanted = 0;
+	virusesused = 0;
 	fileshacked = 0;
 	filesreturned = 0;
 }
@@ -48,28 +54,34 @@ void Stats::Serialize(bool write, Serializer & data, Serializer * old){
 	data.Serialize(write, powerupspickedup, old);
 	data.Serialize(write, deaths, old);
 	data.Serialize(write, kills, old);
+	data.Serialize(write, suicides, old);
+	data.Serialize(write, poisons, old);
+	data.Serialize(write, tractsplanted, old);
 	data.Serialize(write, grenadesthrown, old);
 	data.Serialize(write, neutronsthrown, old);
 	data.Serialize(write, empsthrown, old);
 	data.Serialize(write, shapedthrown, old);
 	data.Serialize(write, plasmasthrown, old);
 	data.Serialize(write, flaresthrown, old);
+	data.Serialize(write, poisonflaresthrown, old);
 	data.Serialize(write, healthpacksused, old);
 	data.Serialize(write, fixedcannonsplaced, old);
 	data.Serialize(write, fixedcannonsdestroyed, old);
 	data.Serialize(write, detsplanted, old);
+	data.Serialize(write, camerasplanted, old);
+	data.Serialize(write, virusesused, old);
 	data.Serialize(write, fileshacked, old);
 	data.Serialize(write, filesreturned, old);
 }
 
 Uint32 Stats::CalculateExperience(void){
 	int xp = 0;
-	xp += kills * 15;
+	xp += kills * 35;
 	xp -= deaths * 10;
-	xp += secretsreturned * 75;
-	xp += secretsstolen * 100;
-	xp += secretspickedup * 10;
-	xp -= secretsdropped * 15;
+	xp += secretsreturned * 125;
+	xp += secretsstolen * 200;
+	xp += secretspickedup * 25;
+	xp -= secretsdropped * 10;
 	xp += fileshacked / 50;
 	xp += filesreturned / 50;
 	xp += fixedcannonsdestroyed * 10;

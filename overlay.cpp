@@ -7,11 +7,11 @@ Overlay::Overlay() : Object(ObjectTypes::OVERLAY){
 	text = 0;
 	textbank = 135;
 	textwidth = 8;
-	textlength = 0;
 	drawalpha = false;
 	uid = 0;
 	requiresmaptobeloaded = false;
 	textcolorramp = false;
+	clicked = false;
 }
 
 Overlay::~Overlay(){
@@ -77,4 +77,37 @@ void Overlay::Tick(World & world){
 		break;
 	}
 	state_i++;
+}
+
+bool Overlay::MouseInside(World & world, Uint16 mousex, Uint16 mousey){
+	Sint16 x1, y1, x2, y2;
+	if(text){
+		x1 = x;
+		x2 = x + (strlen(text) * textwidth);
+		y1 = y;
+		y2 = y;
+		switch(textbank){
+			case 133:
+				y2 += 11;
+			break;
+			case 134:
+				y2 += 15;
+			break;
+			case 135:
+				y2 += 19;
+			break;
+			case 136:
+				y2 += 23;
+			break;
+		}
+	}else{
+		x1 = x - world.resources.spriteoffsetx[res_bank][res_index];
+		x2 = x + world.resources.spritewidth[res_bank][res_index] - world.resources.spriteoffsetx[res_bank][res_index];
+		y1 = y - world.resources.spriteoffsety[res_bank][res_index];
+		y2 = y + world.resources.spriteheight[res_bank][res_index] - world.resources.spriteoffsety[res_bank][res_index];
+	}
+	if(mousex < x2 && mousex > x1 && mousey < y2 && mousey > y1){
+		return true;
+	}
+	return false;
 }

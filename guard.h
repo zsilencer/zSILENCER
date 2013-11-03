@@ -12,6 +12,10 @@ public:
 	void Tick(World & world);
 	void HandleHit(World & world, Uint8 x, Uint8 y, Object & projectile);
 	Uint8 weapon;
+	bool patrol;
+	Sint16 originalx;
+	Sint16 originaly;
+	bool originalmirrored;
 	
 private:
 	Object * Look(World & world, Uint8 direction);
@@ -26,6 +30,7 @@ private:
 	Uint8 maxhealth;
 	Uint8 maxshield;
 	Uint8 respawnseconds;
+	Uint32 lastspoke;
 };
 
 #endif

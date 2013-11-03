@@ -12,6 +12,7 @@ public:
 	void Tick(World & world);
 	Sint16 originalx;
 	Sint16 originaly;
+	bool poisonous;
 	
 private:
 	Uint8 state_i;

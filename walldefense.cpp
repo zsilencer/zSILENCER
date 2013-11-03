@@ -44,7 +44,7 @@ void WallDefense::Tick(World & world){
 				state_i = 11;
 				Object * object = Look(world);
 				if(object){
-					Audio::GetInstance().EmitSound(id, world.resources.soundbank["!laserew.wav"], 128);
+					Audio::GetInstance().EmitSound(id, world.resources.soundbank["!laserew.wav"], 64);
 					WallProjectile * wallprojectile = (WallProjectile *)world.CreateObject(ObjectTypes::WALLPROJECTILE);
 					if(wallprojectile){
 						int x1, y1, x2, y2;
@@ -142,11 +142,11 @@ Object * WallDefense::Look(World & world){
 	for(std::vector<Object *>::iterator it = objects.begin(); it != objects.end(); it++){
 		Object * object = *it;
 		Player * player = static_cast<Player *>(object);
-		if(player->IsDisguised()){
+		if(player->IsDisguised() || player->HasSecurityPass()){
 			continue;
 		}
 		Team * team = player->GetTeam(world);
-		if(team && (team->id == teamid || team->agency == Team::BLACKROSE)){
+		if(team && (team->id == teamid || (team->agency == Team::BLACKROSE && teamid))){
 			continue;
 		}
 		int x1, y1, x2, y2;

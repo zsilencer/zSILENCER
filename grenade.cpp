@@ -24,8 +24,6 @@ Grenade::Grenade() : Object(ObjectTypes::GRENADE){
 
 void Grenade::Serialize(bool write, Serializer & data, Serializer * old){
 	Object::Serialize(write, data, old);
-	//Sprite::Serialize(write, data, old);
-	//Physical::Serialize(write, data, old);
 	data.Serialize(write, type, old);
 	data.Serialize(write, state_i, old);
 	data.Serialize(write, ownerid, old);
@@ -43,19 +41,22 @@ void Grenade::Tick(World & world){
 			y = player->y - 60;
 		}*/
 	}else{
-		if(state_i < 30 || type == FLARE){
+		if(state_i < 30 || (type == FLARE || type == POISONFLARE)){
 			if(state_i < 30){
 				res_index = state_i % 16;
 			}
 			Move(world);
 		}
-		if(state_i >= 30 && type == FLARE && state_i % 3 == 0){
+		if(state_i >= 30 && (type == FLARE || type == POISONFLARE) && state_i % 3 == 0){
 			for(int i = 0; i < 3; i++){
 				FlareProjectile * flareprojectile = static_cast<FlareProjectile *>(world.CreateObject(ObjectTypes::FLAREPROJECTILE));
 				if(flareprojectile){
 					flareprojectile->ownerid = ownerid;
 					flareprojectile->x = x;
 					flareprojectile->y = y;
+					if(type == POISONFLARE){
+						flareprojectile->poisonous = true;
+					}
 					flareprojectile->originalx = flareprojectile->x;
 					flareprojectile->originaly = flareprojectile->y;
 					switch(i){
@@ -99,7 +100,6 @@ void Grenade::Tick(World & world){
 								empprojectile.shielddamage = 0xFFFF;
 								empprojectile.ownerid = ownerid;
 								object->HandleHit(world, 50, 50, empprojectile);
-								object->HandleHit(world, 50, 50, empprojectile);
 							//}
 						}
 					}
@@ -139,7 +139,7 @@ void Grenade::Tick(World & world){
 					}
 				}break;
 				case NEUTRON:{
-					Audio::GetInstance().Play(world.resources.soundbank["grenade1.wav"], 128);
+					world.SendSound("grenade1.wav");
 					Audio::GetInstance().EmitSound(id, world.resources.soundbank["q_expl02.wav"], 128);
 					for(int i = 0; i < 8; i++){
 						Plume * plume = (Plume *)world.CreateObject(ObjectTypes::PLUME);
@@ -149,6 +149,7 @@ void Grenade::Tick(World & world){
 						}
 					}
 				}break;
+				case POISONFLARE:
 				case FLARE:{
 					draw = true;
 					Audio::GetInstance().EmitSound(id, world.resources.soundbank["rocket1.wav"], 128);
@@ -194,7 +195,7 @@ void Grenade::Tick(World & world){
 				}break;
 			}
 		}else
-		if(state_i == 40 && type != NEUTRON && type != FLARE){
+		if(state_i == 40 && type != NEUTRON && type != FLARE && type != POISONFLARE){
 			world.MarkDestroyObject(id);
 		}else
 		if(state_i == 120 && type == NEUTRON){
@@ -261,6 +262,11 @@ bool Grenade::UpdatePosition(World & world, Player & player){
 				xv = 25;
 				yv = -20;
 			}
+			if(player.state == Player::CROUCHEDTHROWING){
+				xv = 20;
+				y = player.y - 30;
+				yv = -10;
+			}
 			if(xv < 0){
 				if(!mirrored){
 					xv = abs(xv);
@@ -294,6 +300,9 @@ void Grenade::SetType(Uint8 type){
 		break;
 		case NEUTRON:
 			color = (15 << 4) + (13 & 0xF);
+		break;
+		case POISONFLARE:
+			color = (11 << 4) + (14 & 0xF);
 		break;
 		case FLARE:
 			color = (9 << 4) + (12 & 0xF);

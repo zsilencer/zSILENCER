@@ -2,28 +2,29 @@
 #include "projectile.h"
 #include "bodypart.h"
 #include "player.h"
+#include "plasmaprojectile.h"
 
 Civilian::Civilian() : Object(ObjectTypes::CIVILIAN){
 	requiresauthority = true;
 	state = NEW;
 	state_i = 0;
-	speed = (rand() % 2) + 3;
+	speed = 4;
 	res_bank = 121;
 	res_index = 0;
-	suitcolor = (9 << 4) + 11;
+	suitcolor = (7 << 4) + 11;
 	renderpass = 2;
 	ishittable = true;
 	isbipedal = true;
 	isphysical = true;
 	snapshotinterval = 72;
+	tractteamid = 0;
 }
 
 void Civilian::Serialize(bool write, Serializer & data, Serializer * old){
 	Object::Serialize(write, data, old);
-	//Bipedal::Serialize(write, data, old);
 	data.Serialize(write, state, old);
 	data.Serialize(write, state_i, old);
-	data.Serialize(write, speed, old);
+	data.Serialize(write, tractteamid, old);
 }
 
 void Civilian::Tick(World & world){
@@ -54,6 +55,9 @@ void Civilian::Tick(World & world){
 			y = ye;*/
 		}break;
 		case STANDING:{
+			if(CheckTractVictim(world)){
+				break;
+			}
 			if(state_i >= 10){
 				state_i = 0;
 			}
@@ -61,10 +65,12 @@ void Civilian::Tick(World & world){
 			res_index = state_i;
 		}break;
 		case WALKING:{
+			if(CheckTractVictim(world)){
+				break;
+			}
 			if(state_i >= 20){
 				state_i = 0;
 			}
-			xv = mirrored ? -speed : speed;
 			res_bank = 122;
 			res_index = state_i;
 			if(res_index == 5){
@@ -73,16 +79,19 @@ void Civilian::Tick(World & world){
 			if(res_index == 15){
 				Audio::GetInstance().EmitSound(id, world.resources.soundbank["stostepr.wav"], 16);
 			}
-			Uint16 oldx = x;
-			FollowGround(*this, world, xv);
-			if(x == oldx){
+			if(DistanceToEnd(*this, world) <= world.minwalldistrance){
 				mirrored = mirrored ? false : true;
 			}
+			xv = mirrored ? -speed : speed;
+			FollowGround(*this, world, xv);
 			if(state_i % 5 == 0){
 				Look(world);
 			}
 		}break;
 		case RUNNING:{
+			if(CheckTractVictim(world)){
+				break;
+			}
 			if(state_i >= 150){
 				state = WALKING;
 				state_i = -1;
@@ -97,16 +106,16 @@ void Civilian::Tick(World & world){
 			if(res_index == 14){
 				Audio::GetInstance().EmitSound(id, world.resources.soundbank["futstonr.wav"], 16);
 			}
-			Uint16 oldx = x;
-			FollowGround(*this, world, xv);
-			if(x == oldx){
+			if(DistanceToEnd(*this, world) <= world.minwalldistrance){
 				mirrored = mirrored ? false : true;
 			}
+			FollowGround(*this, world, xv);
 			if(state_i % 10 == 9){
 				Look(world);
 			}
 		}break;
 		case DYINGFORWARD:{
+			tractteamid = 0;
 			if(state_i == 0){
 				switch(rand() % 3){
 					case 0:
@@ -131,6 +140,7 @@ void Civilian::Tick(World & world){
 			res_index = state_i;
 		}break;
 		case DYINGBACKWARD:{
+			tractteamid = 0;
 			if(state_i == 0){
 				switch(rand() % 3){
 					case 0:
@@ -155,6 +165,7 @@ void Civilian::Tick(World & world){
 			res_index = state_i;
 		}break;
 		case DYINGEXPLODE:{
+			tractteamid = 0;
 			draw = false;
 			state = DEAD;
 			state_i = -1;
@@ -177,6 +188,9 @@ void Civilian::Tick(World & world){
 
 void Civilian::HandleHit(World & world, Uint8 x, Uint8 y, Object & projectile){
 	Hittable::HandleHit(*this, world, x, y, projectile);
+	if(projectile.healthdamage == 0){
+		return;
+	}
 	if(state == DYINGFORWARD || state == DYINGBACKWARD || state == DEAD || state == DYINGEXPLODE){
 		return;
 	}
@@ -202,7 +216,7 @@ void Civilian::HandleHit(World & world, Uint8 x, Uint8 y, Object & projectile){
 		}break;
 		case ObjectTypes::ROCKETPROJECTILE:{
 			state = DYINGEXPLODE;
-			//draw = false;
+			draw = false;
 			for(int i = 0; i < 6; i++){
 				BodyPart * bodypart = (BodyPart *)world.CreateObject(ObjectTypes::BODYPART);
 				if(bodypart){
@@ -211,6 +225,10 @@ void Civilian::HandleHit(World & world, Uint8 x, Uint8 y, Object & projectile){
 					bodypart->y = Civilian::y - 50;
 					bodypart->type = i;
 					bodypart->xv += (abs(xv) * 2) * xpcnt;
+					if(i == 0){
+						bodypart->xv = 0;
+						bodypart->yv = -20;
+					}
 				}
 			}
 		}break;
@@ -246,6 +264,66 @@ bool Civilian::Look(World & world){
 			state = RUNNING;
 			state_i = -1;
 		}
+		return true;
+	}
+	return false;
+}
+
+bool Civilian::CheckTractVictim(World & world){
+	if(!tractteamid){
+		return false;
+	}
+	std::vector<Uint8> types;
+	types.push_back(ObjectTypes::PLAYER);
+	int x1, y1, x2, y2;
+	GetAABB(world.resources, &x1, &y1, &x2, &y2);
+	std::vector<Object *> objects = world.TestAABB(x1, y1, x2, y2, types);
+	for(std::vector<Object *>::iterator it = objects.begin(); it != objects.end(); it++){
+		Player * player = static_cast<Player *>(*it);
+		if(player->teamid != tractteamid){
+			draw = false;
+			for(int i = 0; i < 6; i++){
+				BodyPart * bodypart = (BodyPart *)world.CreateObject(ObjectTypes::BODYPART);
+				if(bodypart){
+					bodypart->suitcolor = suitcolor;
+					bodypart->x = x;
+					bodypart->y = y - 50;
+					bodypart->type = i;
+					if(i == 0){
+						bodypart->xv = 0;
+						bodypart->yv = -20;
+					}
+				}
+			}
+			state = DYINGEXPLODE;
+			Audio::GetInstance().EmitSound(id, world.resources.soundbank["seekexp1.wav"], 128);
+			Object tractprojectile(ObjectTypes::PLASMAPROJECTILE);
+			tractprojectile.healthdamage = 80;
+			tractprojectile.shielddamage = 80;
+			tractprojectile.ownerid = id;
+			player->HandleHit(world, 50, 50, tractprojectile);
+			Sint8 xvs[] = {-14, 14, -10, 10, -10, 10};
+			Sint8 yvs[] = {-25, -25, -10, -10, -5, -5};
+			for(int i = 0; i < 6; i++){
+				PlasmaProjectile * plasmaprojectile = (PlasmaProjectile *)world.CreateObject(ObjectTypes::PLASMAPROJECTILE);
+				if(plasmaprojectile){
+					plasmaprojectile->large = false;
+					plasmaprojectile->x = x;
+					plasmaprojectile->y = y - 40;
+					plasmaprojectile->ownerid = id;
+					plasmaprojectile->xv = xvs[i];
+					plasmaprojectile->yv = yvs[i];
+				}
+			}
+			return true;
+		}
+	}
+	return false;
+}
+
+bool Civilian::AddTract(Uint16 teamid){
+	if(!tractteamid){
+		tractteamid = teamid;
 		return true;
 	}
 	return false;

@@ -22,12 +22,11 @@ public:
 	virtual void HandleHit(class World & world, Uint8 x, Uint8 y, class Object & projectile);
 	virtual void HandleInput(Input & input);
 	virtual void HandleDisconnect(World & world, Uint8 peerid);
-	void EmitSound(Mix_Chunk * chunk, Uint8 volume = 128, bool loop = false, int endms = -1);
 	bool requiresauthority;
 	bool requiresmaptobeloaded;
 	Uint8 type;
 	Uint16 id;
-	Sint8 snapshotinterval;
+	int snapshotinterval;
 	bool wasdestroyed;
 	bool issprite;
 	bool isphysical;

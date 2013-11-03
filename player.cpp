@@ -2,6 +2,8 @@
 #include "resources.h"
 #include "objecttypes.h"
 #include "plume.h"
+#include "civilian.h"
+#include "robot.h"
 #include "terminal.h"
 #include "vent.h"
 #include "basedoor.h"
@@ -18,6 +20,7 @@
 #include "textinput.h"
 #include "selectbox.h"
 #include "inventorystation.h"
+#include "techstation.h"
 #include "detonator.h"
 #include "fixedcannon.h"
 #include "warper.h"
@@ -69,6 +72,7 @@ Player::Player() : Object(ObjectTypes::PLAYER){
 	lastfire = 0;
 	chatinterfaceid = 0;
 	buyinterfaceid = 0;
+	techinterfaceid = 0;
 	chatwithteam = true;
 	fallingnudge = 0;
 	oldfiles = 0;
@@ -81,6 +85,7 @@ Player::Player() : Object(ObjectTypes::PLAYER){
 	//for(int i = 0; i < 4; i++)
 	//AddInventoryItem(INV_PLASMABOMB);
 	isbuying = false;
+	techstationactive = false;
 	currentinventoryitem = 0;
 	currentdetonator = 0;
 	currentgrenade = 0;
@@ -113,11 +118,12 @@ Player::Player() : Object(ObjectTypes::PLAYER){
 	radarbonustime = 0;
 	tracetime = 0;
 	secondcounter = 0;
+	poisonedby = 0;
+	lastweaponchangesound = 0;
 };
 
 void Player::Serialize(bool write, Serializer & data, Serializer * old){
 	Object::Serialize(write, data, old);
-	//Bipedal::Serialize(write, data, old);
 	int oldoffset = data.offset;
 	input.Serialize(write, data);
 	//oldinput.Serialize(write, data);
@@ -149,10 +155,12 @@ void Player::Serialize(bool write, Serializer & data, Serializer * old){
 		data.Serialize(write, inventoryitemsnum[i], old);
 	}
 	data.Serialize(write, isbuying, old);
+	data.Serialize(write, techstationactive, old);
 	data.Serialize(write, currentinventoryitem, old);
 	data.Serialize(write, justjumpedfromladder, old);
 	data.Serialize(write, disguised, old);
 	data.Serialize(write, tracetime, old);
+	data.Serialize(write, canresurrect, old);
 }
 
 void Player::Tick(World & world){
@@ -164,7 +172,7 @@ void Player::Tick(World & world){
 	}
 	Hittable::Tick(*this, world);
 	Bipedal::Tick(*this, world);
-	if(input.keychat && !chatinterfaceid && !buyinterfaceid && this == world.GetPeerPlayer(world.localpeerid)){
+	if(input.keychat && !chatinterfaceid && !buyinterfaceid && !techinterfaceid && this == world.GetPeerPlayer(world.localpeerid)){
 		Interface * iface = (Interface *)world.CreateObject(ObjectTypes::INTERFACE);
 		if(iface){
 			TextInput * textinput = (TextInput *)world.CreateObject(ObjectTypes::TEXTINPUT);
@@ -206,15 +214,35 @@ void Player::Tick(World & world){
 			}
 		}
 	}
-	secondcounter++;
-	if(secondcounter >= 24){
-		secondcounter = 0;
+	if(!world.replaying){
+		secondcounter++;
+		if(secondcounter >= 24){
+			secondcounter = 0;
+		}
+	}
+	if(poisonedby && world.tickcount % 25 == 0){
+		Player * player = static_cast<Player *>(world.GetObjectFromId(poisonedby));
+		Object poisonprojectile(ObjectTypes::PLASMAPROJECTILE);
+		poisonprojectile.healthdamage = 3;
+		poisonprojectile.bypassshield = true;
+		poisonprojectile.ownerid = player->id;
+		HandleHit(world, 50, 50, poisonprojectile);
 	}
 	if(tracetime > 0 && secondcounter == 0 && !world.replaying){
 		tracetime--;
+		if(tracetime == 10){
+			world.SendSound("vModDeto.wav");
+		}
 		if(tracetime == 0){
 			hassecret = false;
-			KillByGovt(world);
+			Team * team = GetTeam(world);
+			if(team){
+				team->playerwithsecret = false;
+			}
+			Peer * peer = GetPeer(world);
+			if(peer){
+				world.KillByGovt(*peer);
+			}
 		}
 	}
 	std::vector<Uint16> detlist;
@@ -328,13 +356,11 @@ void Player::Tick(World & world){
 			disguised--;
 		}
 	}
-	if(hacksoundchannel != -1){
-		if(state != HACKING || state_i >= 17){
-			if(!world.replaying){
-				Audio::GetInstance().EmitSound(id, world.resources.soundbank["jackout.wav"], 15);
-				Audio::GetInstance().Stop(hacksoundchannel, 700);
-				hacksoundchannel = -1;
-			}
+	if(state != HACKING || state_i >= 17){
+		if(!world.replaying && hacksoundchannel != -1){
+			Audio::GetInstance().EmitSound(id, world.resources.soundbank["jackout.wav"], 20);
+			Audio::GetInstance().Stop(hacksoundchannel, 700);
+			hacksoundchannel = -1;
 		}
 	}
 	if(jetpacksoundchannel != -1){
@@ -382,9 +408,12 @@ void Player::Tick(World & world){
 	}else{
 		effecthacking = false;
 	}
-	if(isbuying){
-		if(input.keymoveleft || input.keymoveright){
+	if(input.keymoveleft || input.keymoveright){
+		if(isbuying){
 			isbuying = false;
+		}
+		if(techstationactive){
+			techstationactive = false;
 		}
 	}
 	if(world.GetPeerPlayer(world.localpeerid) == this){
@@ -414,6 +443,41 @@ void Player::Tick(World & world){
 				iface->DestroyInterface(world, iface);
 			}
 			buyinterfaceid = 0;
+		}
+		
+		if(techstationactive && !techinterfaceid){
+			Interface * iface = (Interface *)world.CreateObject(ObjectTypes::INTERFACE);
+			if(iface){
+				Team * team = GetTeam(world);
+				SelectBox * selectbox = (SelectBox *)world.CreateObject(ObjectTypes::SELECTBOX);
+				selectbox->draw = false;
+				selectbox->uid = 1;
+				int i = 0;
+				for(std::vector<BuyableItem *>::iterator it = world.buyableitems.begin(); it != world.buyableitems.end(); it++, i++){
+					BuyableItem * buyableitem = *it;
+					if(InOwnBase(world)){
+						if(team && buyableitem->techchoice & team->disabledtech){
+							selectbox->AddItem((*it)->name, (*it)->id);
+						}
+					}else{
+						if(team && buyableitem->techchoice & team->GetAvailableTech(world)){
+							selectbox->AddItem((*it)->name, (*it)->id);
+						}
+					}
+				}
+				selectbox->selecteditem = 0;
+				iface->AddObject(selectbox->id);
+				iface->activeobject = selectbox->id;
+				Audio::GetInstance().Play(world.resources.soundbank["cliksel2.wav"], 96);
+				techinterfaceid = iface->id;
+			}
+		}else
+		if(!techstationactive && techinterfaceid && !world.replaying){
+			Interface * iface = (Interface *)world.GetObjectFromId(techinterfaceid);
+			if(iface){
+				iface->DestroyInterface(world, iface);
+			}
+			techinterfaceid = 0;
 		}
 	}
 	if(fuel < maxfuel){
@@ -454,12 +518,12 @@ void Player::Tick(World & world){
 	if(oldhassecret != hassecret && !world.replaying){
 		Peer * peer = GetPeer(world);
 		if(hassecret){
-			Audio::GetInstance().Play(world.resources.soundbank["alinvest.wav"]);
+			world.SendSound("alinvest.wav");
 			if(peer && !world.intutorialmode){
 				User * user = world.lobby.GetUserInfo(peer->accountid);
 				char text[64];
 				sprintf(text, "Secret picked up by\n%s", user->name);
-				world.ShowMessage(text);
+				world.ShowMessage(text, 128, 0, true);
 				peer->stats.secretspickedup++;
 			}
 		}else{
@@ -481,7 +545,7 @@ void Player::Tick(World & world){
 				}
 				tracetime = 0;
 				if(!world.intutorialmode){
-					world.ShowMessage(text);
+					world.ShowMessage(text, 128, 0, true);
 				}
 			}
 		}
@@ -506,7 +570,7 @@ void Player::Tick(World & world){
 	}
 	if(currentweapon != oldweapon && !world.replaying){
 		Player * localplayer = world.GetPeerPlayer(world.localpeerid);
-		if(localplayer && localplayer->id == id){
+		if(localplayer && localplayer->id == id && world.tickcount - lastweaponchangesound >= 4){
 			switch(currentweapon){
 				case 0:
 					Audio::GetInstance().Play(world.resources.soundbank["ammo01.wav"]);
@@ -521,6 +585,7 @@ void Player::Tick(World & world){
 					Audio::GetInstance().Play(world.resources.soundbank["ammo05.wav"]);
 				break;
 			}
+			lastweaponchangesound = world.tickcount;
 		}
 		oldweapon = currentweapon;
 	}
@@ -533,11 +598,12 @@ void Player::Tick(World & world){
 				types.push_back(ObjectTypes::BASEDOOR);
 				types.push_back(ObjectTypes::VENT);
 				types.push_back(ObjectTypes::INVENTORYSTATION);
+				types.push_back(ObjectTypes::TECHSTATION);
 				/*Uint16 x1 = x - world.resources.spriteoffsetx[res_bank][res_index];
 				Uint16 x2 = x - world.resources.spriteoffsetx[res_bank][res_index] + world.resources.spritewidth[res_bank][res_index];
 				Uint16 y1 = y - world.resources.spriteoffsety[res_bank][res_index];
 				Uint16 y2 = y - world.resources.spriteoffsety[res_bank][res_index] + world.resources.spriteheight[res_bank][res_index];*/
-				std::vector<Object *> objects = world.TestAABB(x, y - height, x, y, types);
+				std::vector<Object *> objects = world.TestAABB(x, y - height, x, y, types, 0, 0, false);
 				for(std::vector<Object *>::iterator it = objects.begin(); it != objects.end(); it++){
 					switch((*it)->type){
 						case ObjectTypes::TERMINAL:{
@@ -567,6 +633,11 @@ void Player::Tick(World & world){
 								}
 							}
 						}break;
+						case ObjectTypes::TECHSTATION:{
+							if(world.IsAuthority()){
+								techstationactive = !techstationactive;
+							}
+						}break;
 						case ObjectTypes::VENT:{
 							Vent * vent = static_cast<Vent *>(*it);
 							vent->Activate();
@@ -591,9 +662,84 @@ void Player::Tick(World & world){
 						RemoveInventoryItem(INV_HEALTHPACK);
 					}
 				}break;
+				case INV_LAZARUSTRACT:{
+					std::vector<Uint8> types;
+					types.push_back(ObjectTypes::CIVILIAN);
+					int x1, y1, x2, y2;
+					GetAABB(world.resources, &x1, &y1, &x2, &y2);
+					std::vector<Object *> objects = world.TestAABB(x1, y1, x2, y2, types);
+					for(std::vector<Object *>::iterator it = objects.begin(); it != objects.end(); it++){
+						Civilian * civilian = static_cast<Civilian *>(*it);
+						if(civilian->AddTract(teamid)){
+							Peer * peer = GetPeer(world);
+							if(peer){
+								peer->stats.tractsplanted++;
+							}
+							RemoveInventoryItem(INV_LAZARUSTRACT);
+							break;
+						}
+					}
+				}break;
+				case INV_VIRUS:{
+					std::vector<Uint8> types;
+					types.push_back(ObjectTypes::ROBOT);
+					types.push_back(ObjectTypes::FIXEDCANNON);
+					int x1, y1, x2, y2;
+					GetAABB(world.resources, &x1, &y1, &x2, &y2);
+					std::vector<Object *> objects = world.TestAABB(x1, y1, x2, y2, types, id);
+					for(std::vector<Object *>::iterator it = objects.begin(); it != objects.end(); it++){
+						switch((*it)->type){
+							case ObjectTypes::ROBOT:{
+								Robot * robot = static_cast<Robot *>(*it);
+								Team * team = GetTeam(world);
+								if(team && robot->ImplantVirus(team->id)){
+									Peer * peer = GetPeer(world);
+									if(peer){
+										peer->stats.virusesused++;
+									}
+									RemoveInventoryItem(INV_VIRUS);
+									break;
+								}
+							}break;
+							case ObjectTypes::FIXEDCANNON:{
+								FixedCannon * fixedcannon = static_cast<FixedCannon *>(*it);
+								if(fixedcannon->ImplantVirus(world, id)){
+									Peer * peer = GetPeer(world);
+									if(peer){
+										peer->stats.virusesused++;
+									}
+									RemoveInventoryItem(INV_VIRUS);
+									break;
+								}
+							}break;
+						}
+					}
+				}break;
+				case INV_POISON:{
+					std::vector<Uint8> types;
+					types.push_back(ObjectTypes::PLAYER);
+					int x1, y1, x2, y2;
+					GetAABB(world.resources, &x1, &y1, &x2, &y2);
+					std::vector<Object *> objects = world.TestAABB(x1, y1, x2, y2, types, id);
+					for(std::vector<Object *>::iterator it = objects.begin(); it != objects.end(); it++){
+						Player * player = static_cast<Player *>(*it);
+						if(player->Poison(id)){
+							Peer * peer = GetPeer(world);
+							if(peer){
+								peer->stats.poisons++;
+							}
+							RemoveInventoryItem(INV_POISON);
+							break;
+						}
+					}
+				}break;
 				case INV_EMPBOMB:{
 					if(state == STANDING || state == THROWING){
 						state = THROWING;
+						state_i = 3;
+					}
+					if(state == CROUCHED || state == CROUCHEDTHROWING){
+						state = CROUCHEDTHROWING;
 						state_i = 3;
 					}
 					Grenade * grenade = (Grenade *)world.CreateObject(ObjectTypes::GRENADE);
@@ -617,6 +763,10 @@ void Player::Tick(World & world){
 						state = THROWING;
 						state_i = 3;
 					}
+					if(state == CROUCHED || state == CROUCHEDTHROWING){
+						state = CROUCHEDTHROWING;
+						state_i = 3;
+					}
 					Grenade * grenade = (Grenade *)world.CreateObject(ObjectTypes::GRENADE);
 					if(grenade){
 						grenade->ownerid = id;
@@ -636,6 +786,10 @@ void Player::Tick(World & world){
 				case INV_PLASMABOMB:{
 					if(state == STANDING || state == THROWING){
 						state = THROWING;
+						state_i = 3;
+					}
+					if(state == CROUCHED || state == CROUCHEDTHROWING){
+						state = CROUCHEDTHROWING;
 						state_i = 3;
 					}
 					Grenade * grenade = (Grenade *)world.CreateObject(ObjectTypes::GRENADE);
@@ -660,6 +814,10 @@ void Player::Tick(World & world){
 							state = THROWING;
 							state_i = 3;
 						}
+						if(state == CROUCHED || state == CROUCHEDTHROWING){
+							state = CROUCHEDTHROWING;
+							state_i = 3;
+						}
 						Grenade * grenade = (Grenade *)world.CreateObject(ObjectTypes::GRENADE);
 						if(grenade){
 							grenade->ownerid = id;
@@ -677,6 +835,7 @@ void Player::Tick(World & world){
 						}
 					}
 				}break;
+				case INV_CAMERA:
 				case INV_PLASMADET:{
 					if(OnGround()){
 						Detonator * detonator = (Detonator *)world.CreateObject(ObjectTypes::DETONATOR);
@@ -685,10 +844,18 @@ void Player::Tick(World & world){
 							detonator->y = y;
 							detonator->originaly = detonator->y;
 							detonator->ownerid = id;
-							RemoveInventoryItem(INV_PLASMADET);
 							Peer * peer = GetPeer(world);
-							if(peer){
-								peer->stats.detsplanted++;
+							if(inventoryitems[currentinventoryitem] == INV_CAMERA){
+								detonator->iscamera = true;
+								RemoveInventoryItem(INV_CAMERA);
+								if(peer){
+									peer->stats.camerasplanted++;
+								}
+							}else{
+								RemoveInventoryItem(INV_PLASMADET);
+								if(peer){
+									peer->stats.detsplanted++;
+								}
 							}
 						}
 					}
@@ -699,7 +866,7 @@ void Player::Tick(World & world){
 						if(fixedcannon){
 							fixedcannon->x = x;
 							fixedcannon->y = y;
-							fixedcannon->SetOwner(id);
+							fixedcannon->SetOwner(world, id);
 							fixedcannon->mirrored = mirrored;
 							RemoveInventoryItem(INV_FIXEDCANNON);
 							Peer * peer = GetPeer(world);
@@ -712,6 +879,10 @@ void Player::Tick(World & world){
 				case INV_FLARE:{
 					if(state == STANDING || state == THROWING){
 						state = THROWING;
+						state_i = 3;
+					}
+					if(state == CROUCHED || state == CROUCHEDTHROWING){
+						state = CROUCHEDTHROWING;
 						state_i = 3;
 					}
 					Grenade * grenade = (Grenade *)world.CreateObject(ObjectTypes::GRENADE);
@@ -730,6 +901,31 @@ void Player::Tick(World & world){
 						}
 					}
 				}break;
+				case INV_POISONFLARE:{
+					if(state == STANDING || state == THROWING){
+						state = THROWING;
+						state_i = 3;
+					}
+					if(state == CROUCHED || state == CROUCHEDTHROWING){
+						state = CROUCHEDTHROWING;
+						state_i = 3;
+					}
+					Grenade * grenade = (Grenade *)world.CreateObject(ObjectTypes::GRENADE);
+					if(grenade){
+						grenade->ownerid = id;
+						grenade->SetType(Grenade::POISONFLARE);
+						if(grenade->UpdatePosition(world, *this)){
+							RemoveInventoryItem(INV_POISONFLARE);
+							Peer * peer = GetPeer(world);
+							if(peer){
+								peer->stats.grenadesthrown++;
+								peer->stats.poisonflaresthrown++;
+							}
+						}else{
+							world.DestroyObject(grenade->id);
+						}
+					}
+				}break;
 				case INV_BASEDOOR:{
 					if(OnGround() && !world.replaying){
 						Team * team = GetTeam(world);
@@ -740,6 +936,7 @@ void Player::Tick(World & world){
 									basedoor->x = x;
 									basedoor->y = y;
 									basedoor->SetTeam(*team);
+									basedoor->discoveredby[team->number] = true;
 									team->basedoorid = basedoor->id;
 									for(int i = 0; i < team->numpeers; i++){
 										Player * player = world.GetPeerPlayer(team->peers[i]);
@@ -834,7 +1031,7 @@ void Player::Tick(World & world){
 		}break;
 		case UNDEPLOYING:{
 			collidable = false;
-			if(state_i == 0){
+			if(state_i == 0 && !world.winningteamid){
 				Audio::GetInstance().EmitSound(id, world.resources.soundbank["transrev.wav"], 96);
 			}
 			res_bank = 68;
@@ -849,6 +1046,16 @@ void Player::Tick(World & world){
 		case STANDING:{
 			xv = 0;
 			yv = 0;
+			if(state_i == 12 && world.map.TestAABB(x, y, x, y, Platform::OUTSIDEROOM)){
+				Audio::GetInstance().EmitSound(id, world.resources.soundbank["breath2.wav"], 16);
+				Plume * plume = static_cast<Plume *>(world.CreateObject(ObjectTypes::PLUME));
+				if(plume){
+					plume->type = 8;
+					plume->SetPosition(x + (8 * (mirrored ? -1 : 1)), y - 56);
+					plume->yv = 2;
+					plume->xv = 3 * (mirrored ? -1 : 1);
+				}
+			}
 			if(IsDisguised()){
 				if(input.keymovedown){
 					// 121:0-9 civilian standing
@@ -925,6 +1132,11 @@ void Player::Tick(World & world){
 					res_bank = 25;
 					mirrored = true;
 				}
+			}
+			if(input.keymovedown && !(input.keylookdownleft || input.keylookdownright)){
+				state = CROUCHING;
+				state_i = -1;
+				break;
 			}
 			//if(state_i > 4 + delay){
 			//	res_index = state_i - delay;
@@ -1006,7 +1218,7 @@ void Player::Tick(World & world){
 				}
 				mirrored = false;
 			}else{
-				xv = 0;
+				xv *= 0.5;
 				if(IsDisguised()){
 					if(state_i < 25){
 						state_i = 25;
@@ -1043,7 +1255,7 @@ void Player::Tick(World & world){
 					break;
 				}
 			}
-			if(IsDisguised() && state_i >= 25 && oldx == x){
+			if(IsDisguised() && state_i >= 25 && DistanceToEnd(*this, world) <= world.minwalldistrance){
 				mirrored = !mirrored;
 			}
 			if(state_i >= 0 && state_i <= 5){
@@ -1119,18 +1331,16 @@ void Player::Tick(World & world){
 			}
 		}break;
 		case WALKIN:{
-			UnDisguise(world);
+			//UnDisguise(world);
 			BaseDoor * basedoor = (BaseDoor *)world.GetObjectFromId(basedoorentering);
 			if(basedoor){
 				if(!basealarmplayed){
 					Player * localplayer = world.GetPeerPlayer(world.localpeerid);
 					if(localplayer && id != localplayer->id && basedoor->teamid != teamid){
 						basealarmplaytick = world.tickcount;
-						printf("sound the base door alarm\n");
 						Team * team = localplayer->GetTeam(world);
 						if(team && !basedoor->enteredby[team->number]){
 							intrudealarmplaytick = world.tickcount + 24;
-							printf("sound the intrude alarm sound\n");
 							basedoor->enteredby[team->number] = true;
 						}
 					}
@@ -1168,7 +1378,7 @@ void Player::Tick(World & world){
 			}
 		}break;
 		case WALKOUT:{
-			UnDisguise(world);
+			//UnDisguise(world);
 			BaseDoor * basedoor = (BaseDoor *)world.GetObjectFromId(basedoorentering);
 			if(basedoor){
 				basedoor->CheckForPlayersInView(world);
@@ -1215,6 +1425,16 @@ void Player::Tick(World & world){
 			}
 		}break;
 		case CROUCHED:{
+			if(state_i == 12 && world.map.TestAABB(x, y, x, y, Platform::OUTSIDEROOM)){
+				Audio::GetInstance().EmitSound(id, world.resources.soundbank["breath2.wav"], 16);
+				Plume * plume = static_cast<Plume *>(world.CreateObject(ObjectTypes::PLUME));
+				if(plume){
+					plume->type = 8;
+					plume->SetPosition(x + (16 * (mirrored ? -1 : 1)), y - 28);
+					plume->yv = 2;
+					plume->xv = 3 * (mirrored ? -1 : 1);
+				}
+			}
 			xv = 0;
 			res_bank = 18;
 			res_index = state_i / 4;
@@ -1291,6 +1511,36 @@ void Player::Tick(World & world){
 				if(state_i >= 1){
 					state_i -= 2;
 				}
+			}
+			if(!input.keymovedown){
+				state = UNCROUCHING;
+				state_i = -1;
+				break;
+			}
+		}break;
+		case CROUCHEDTHROWING:{
+			xv = 0;
+			res_bank = 114;
+			res_index = state_i;
+			if(!input.keymovedown){
+				state = UNCROUCHING;
+				state_i = -1;
+				break;
+			}
+			if(input.keymoveright || input.keymoveleft){
+				if(input.keymoveleft){
+					mirrored = true;
+				}else{
+					mirrored = false;
+				}
+				state = ROLLING;
+				state_i = -1;
+				break;
+			}
+			if(state_i >= 16){
+				state_i = -1;
+				state = CROUCHED;
+				break;
 			}
 		}break;
 		case ROLLING:{
@@ -1402,7 +1652,7 @@ void Player::Tick(World & world){
 			// 33:0-8 inair shoot down
 			// 34:0-8 inair shoot up angle
 			// 35:0-8 inair shoot down angle
-			Uint8 direction;
+			Uint8 direction = 200;
 			Uint8 delay = weaponfiredelay[currentweapon];
 			if(state_i >= 8 + delay){
 				state_i = 4;
@@ -1535,7 +1785,9 @@ void Player::Tick(World & world){
 			}
 			if(hackable && terminal){
 				if(state_i == 14){
-					Audio::GetInstance().EmitSound(id, world.resources.soundbank["jackin.wav"], 15);
+					Audio::GetInstance().EmitSound(id, world.resources.soundbank["jackin.wav"], 30);
+				}
+				if(state_i >= 14){
 					if(hacksoundchannel == -1){
 						hacksoundchannel = Audio::GetInstance().EmitSound(id, world.resources.soundbank["ambloop5.wav"], 50, true);
 					}
@@ -1660,7 +1912,7 @@ void Player::Tick(World & world){
 			// 29:0-8 ladder shoot up angle
 			// 30:0-8 ladder shoot down angle
 			// 0-3 is moving toward direction, 4 is the resting direction, 5-8 is firing
-			Uint8 direction;
+			Uint8 direction = 200;
 			Uint8 delay = weaponfiredelay[currentweapon];
 			if(state_i >= 8 + delay){
 				state_i = 4;
@@ -1780,6 +2032,7 @@ void Player::Tick(World & world){
 		}break;
 		case DEAD:{
 			collidable = false;
+			poisonedby = 0;
 			yv += world.gravity;
 			if(yv > world.maxyvelocity){
 				yv = world.maxyvelocity;
@@ -1793,15 +2046,16 @@ void Player::Tick(World & world){
 			x += xe;
 			y += ye;
 			if(state_i > 48 && !state_warp && !world.winningteamid){
-				draw = true;
 				Team * team = GetTeam(world);
 				if(team && team->agency == Team::LAZARUS && canresurrect && !world.winningteamid){
 					state = RESURRECTING;
 					state_i = -1;
 				}else{
-					canresurrect = true;
 					if(team && team->basedoorid){
 						state = RESPAWNING;
+						if(!world.replaying){
+							canresurrect = true;
+						}
 						SetToRespawnPosition(world);
 						health = maxhealth;
 						shield = maxshield;
@@ -1809,6 +2063,7 @@ void Player::Tick(World & world){
 						state_i = -1;
 						break;
 					}else{
+						draw = true;
 						Sint16 x;
 						Sint16 y;
 						world.map.RandomPlayerStartLocation(&x, &y);
@@ -1818,6 +2073,7 @@ void Player::Tick(World & world){
 			}
 		}break;
 		case RESPAWNING:{
+			draw = true;
 			res_bank = 198;
 			if(state_i / 2 > 27){
 				//rocketammo = 10;
@@ -1840,6 +2096,7 @@ void Player::Tick(World & world){
 		}break;
 		case RESURRECTING:{
 			// 199:0-27 lazarus resurrection
+			draw = true;
 			canresurrect = false;
 			collidable = false;
 			res_bank = 199;
@@ -1850,6 +2107,9 @@ void Player::Tick(World & world){
 			if(state_i >= 27){
 				health = maxhealth;
 				collidable = true;
+				HandleAgainstWall(world);
+				currentplatformid = 0;
+				FindCurrentPlatform(*this, world);
 				state = STANDING;
 				state_i = 1;
 				break;
@@ -1896,6 +2156,7 @@ void Player::Tick(World & world){
 								tracetime = terminal->tracetime;
 								terminal->tracetime = 0;
 								hassecret = true;
+								team->playerwithsecret = id;
 							}
 						}
 					}
@@ -1907,6 +2168,7 @@ void Player::Tick(World & world){
 						if(team && team->basedoorid == basedoorentering && (health < maxhealth || shield < maxshield)){
 							if(world.IsAuthority()){
 								if(healmachine->Activate()){
+									poisonedby = 0;
 									if(health < maxhealth){
 										health = maxhealth;
 									}
@@ -1950,6 +2212,7 @@ void Player::Tick(World & world){
 									if(world.IsAuthority()){
 										team->secretdelivered = true;
 										hassecret = false;
+										team->playerwithsecret = 0;
 									}
 								}
 							}
@@ -1987,10 +2250,14 @@ void Player::Tick(World & world){
 			state_i = -1;
 		}
 	}
-	if(OnGround() || state == FALLING){
+	if(OnGround() || state == FALLING || state == FALLINGSHOOT){
 		if(input.keyjetpack && !fuellow){
-			state = JETPACK;
-			state_i = -1;
+			if(state == FALLINGSHOOT){
+				state = JETPACKSHOOT;
+			}else{
+				state = JETPACK;
+				state_i = -1;
+			}
 		}
 	}
 	// Uncomment this if you want the projectiles to follow the player before they are actually moving/shot
@@ -2017,7 +2284,6 @@ void Player::HandleHit(World & world, Uint8 x, Uint8 y, Object & projectile){
 		}
 		hitsoundplaytick = world.tickcount;
 	}
-	Uint8 hit_type = state_hit / 32;
 	float xpcnt = -((x - 50) / 50.0) * (mirrored ? -1 : 1);
 	float ypcnt = -((y - 50) / 50.0);
 	switch(state){
@@ -2041,19 +2307,17 @@ void Player::HandleHit(World & world, Uint8 x, Uint8 y, Object & projectile){
 	}else{
 		xv = -(abs(xv) + 5) * (mirrored ? -1 : 1);
 	}*/
-	if(hit_type == 1){
-		Audio::GetInstance().EmitSound(id, world.resources.soundbank["shlddn1.wav"]);
-	}
 	if(health == 0 && state != DYING && state != DEAD){
 		Peer * peer = GetPeer(world);
 		if(peer){
 			peer->stats.deaths++;
 			const char * killedby = "?";
+			bool killedself = false;
 			Object * owner = world.GetObjectFromId(projectile.ownerid);
 			if(owner){
 				switch(owner->type){
 					case ObjectTypes::WALLDEFENSE:{
-						killedby = "a Wall Defense Turret";
+						killedby = "a Laser Turret";
 					}break;
 					case ObjectTypes::FIXEDCANNON:{
 						killedby = "a Fixed Cannon";
@@ -2067,13 +2331,20 @@ void Player::HandleHit(World & world, Uint8 x, Uint8 y, Object & projectile){
 					case ObjectTypes::TEAM:{
 						killedby = "a Government Satellite";
 					}break;
+					case ObjectTypes::CIVILIAN:{
+						killedby = "a Lazarus Tract";
+					}break;
 					case ObjectTypes::PLAYER:{
 						killedby = "a Player";
 						Player * player = static_cast<Player *>(owner);
 						Peer * killedbypeer = player->GetPeer(world);
 						if(killedbypeer){
 							killedby = world.lobby.GetUserInfo(killedbypeer->accountid)->name;
-							killedbypeer->stats.kills++;
+							if(player->id == id){
+								killedself = true;
+							}else{
+								killedbypeer->stats.kills++;
+							}
 							switch(projectile.type){
 								case ObjectTypes::BLASTERPROJECTILE:{
 									killedbypeer->stats.playerkillsweapon[0]++;
@@ -2093,7 +2364,11 @@ void Player::HandleHit(World & world, Uint8 x, Uint8 y, Object & projectile){
 				}
 			}
 			char temp[256];
-			sprintf(temp, "%s was killed by %s", world.lobby.GetUserInfo(peer->accountid)->name, killedby);
+			if(killedself){
+				sprintf(temp, "%s committed suicide", world.lobby.GetUserInfo(peer->accountid)->name);
+			}else{
+				sprintf(temp, "%s was killed by %s", world.lobby.GetUserInfo(peer->accountid)->name, killedby);
+			}
 			world.ShowStatus(temp, 153, true);
 		}
 		if(projectile.type == ObjectTypes::ROCKETPROJECTILE){
@@ -2106,6 +2381,10 @@ void Player::HandleHit(World & world, Uint8 x, Uint8 y, Object & projectile){
 					bodypart->y = Player::y - 50;
 					bodypart->type = i;
 					bodypart->xv += (abs(xv) * 2) * xpcnt;
+					if(i == 0){
+						bodypart->xv = 0;
+						bodypart->yv = -20;
+					}
 				}
 			}
 		}
@@ -2159,6 +2438,14 @@ bool Player::InBase(World & world){
 	return false;
 }
 
+bool Player::InOwnBase(World & world){
+	BaseDoor * basedoor = static_cast<BaseDoor *>(world.GetObjectFromId(basedoorentering));
+	if(InBase(world) && basedoor && basedoor->teamid == teamid){
+		return true;
+	}
+	return false;
+}
+
 bool Player::IsDisguised(void){
 	if(disguised >= 100){
 		return true;
@@ -2171,6 +2458,23 @@ void Player::UnDisguise(World & world){
 		disguised = 12;
 		Audio::GetInstance().EmitSound(id, world.resources.soundbank["disguise.wav"], 64);
 	}
+}
+
+bool Player::Poison(Uint16 playerid){
+	if(!poisonedby){
+		poisonedby = playerid;
+		return true;
+	}
+	return false;
+}
+
+bool Player::HasSecurityPass(void){
+	for(int i = 0; i < 4; i++){
+		if(inventoryitems[i] == INV_SECURITYPASS){
+			return true;
+		}
+	}
+	return false;
 }
 
 bool Player::CheckForBaseExit(World & world){
@@ -2259,22 +2563,25 @@ bool Player::HandleAgainstWall(World & world){
 	// handle when player is up against a wall
 	y--;
 	if(world.map.TestAABB(x, y - height, x, y, Platform::RECTANGLE | Platform::STAIRSUP | Platform::STAIRSDOWN, 0, true)){
-		if(mirrored){
-			x++;
+		x++;
+		if(!world.map.TestAABB(x, y - height, x, y, Platform::RECTANGLE | Platform::STAIRSUP | Platform::STAIRSDOWN, 0, true)){
+			y++;
+			FindCurrentPlatform(*this, world);
+			xv = 0;
+			/*state = STANDING;
+			state_i = -1;*/
+			return true;
 		}else{
 			x--;
-		}
-		if(world.map.TestAABB(x, y - height, x, y, Platform::RECTANGLE | Platform::STAIRSUP | Platform::STAIRSDOWN, 0, true)){
-			y++;
-			if(mirrored){
-				x--;
-			}else{
-				x++;
+			x--;
+			if(!world.map.TestAABB(x, y - height, x, y, Platform::RECTANGLE | Platform::STAIRSUP | Platform::STAIRSDOWN, 0, true)){
+				y++;
+				FindCurrentPlatform(*this, world);
+				xv = 0;
+				/*state = STANDING;
+				state_i = -1;*/
+				return true;
 			}
-			FindCurrentPlatform(*this, world);
-			state = STANDING;
-			state_i = -1;
-			return true;
 		}
 	}
 	return false;
@@ -2343,6 +2650,9 @@ bool Player::AddInventoryItem(Uint8 id, bool settocurrent){
 				case INV_BASEDOOR:
 					maxitems = 1;
 				break;
+				case INV_SECURITYPASS:
+					maxitems = 1;
+				break;
 			}
 			if(inventoryitemsnum[i] >= maxitems){
 				return false;
@@ -2378,6 +2688,15 @@ void Player::RemoveInventoryItem(Uint8 id){
 	}
 }
 
+Uint8 Player::InventoryItemCount(Uint8 id){
+	for(int i = 0; i < 4; i++){
+		if(inventoryitems[i] == id){
+			return inventoryitemsnum[i];
+		}
+	}
+	return 0;
+}
+
 bool Player::BuyItem(World & world, Uint8 id){
 	if(!BuyAvailable(world, id)){
 		return false;
@@ -2390,13 +2709,28 @@ bool Player::BuyItem(World & world, Uint8 id){
 		}
 	}
 	if(buyableitem && credits >= buyableitem->price){
+		Team * team = GetTeam(world);
+		if(team && buyableitem->techchoice & team->disabledtech){
+			return false;
+		}
+		BaseDoor * basedoor = static_cast<BaseDoor *>(world.GetObjectFromId(basedoorentering));
+		if(!InBase(world) || (basedoor && basedoor->teamid != teamid)){
+			return false;
+		}
+		int x1, y1, x2, y2;
+		GetAABB(world.resources, &x1, &y1, &x2, &y2);
+		std::vector<Uint8> types;
+		types.push_back(ObjectTypes::INVENTORYSTATION);
+		if(world.TestAABB(x1, y1, x2, y2, types).size() == 0){
+			return false;
+		}
 		bool bought = false;
 		switch(id){
 			case World::BUY_LASER:{
-				if(laserammo < 99){
+				if(laserammo < 30){
 					laserammo += 5;
-					if(laserammo > 99){
-						laserammo = 99;
+					if(laserammo > 30){
+						laserammo = 30;
 					}
 					bought = true;
 				}
@@ -2411,16 +2745,36 @@ bool Player::BuyItem(World & world, Uint8 id){
 				}
 			}break;
 			case World::BUY_FLAMER:{
-				if(flamerammo < 99){
+				if(flamerammo < 75){
 					flamerammo += 15;
-					if(flamerammo > 99){
-						flamerammo = 99;
+					if(flamerammo > 75){
+						flamerammo = 75;
 					}
 					bought = true;
 				}
 			}break;
 			case World::BUY_HEALTH:{
 				if(AddInventoryItem(INV_HEALTHPACK, true)){
+					bought = true;
+				}
+			}break;
+			case World::BUY_TRACT:{
+				if(AddInventoryItem(INV_LAZARUSTRACT, true)){
+					bought = true;
+				}
+			}break;
+			case World::BUY_SECURITYPASS:{
+				if(AddInventoryItem(INV_SECURITYPASS, true)){
+					bought = true;
+				}
+			}break;
+			case World::BUY_VIRUS:{
+				if(AddInventoryItem(INV_VIRUS, true)){
+					bought = true;
+				}
+			}break;
+			case World::BUY_POISON:{
+				if(AddInventoryItem(INV_POISON, true)){
 					bought = true;
 				}
 			}break;
@@ -2456,6 +2810,16 @@ bool Player::BuyItem(World & world, Uint8 id){
 			}break;
 			case World::BUY_FLARE:{
 				if(AddInventoryItem(INV_FLARE, true)){
+					bought = true;
+				}
+			}break;
+			case World::BUY_POISONFLARE:{
+				if(AddInventoryItem(INV_POISONFLARE, true)){
+					bought = true;
+				}
+			}break;
+			case World::BUY_CAMERA:{
+				if(AddInventoryItem(INV_CAMERA, true)){
 					bought = true;
 				}
 			}break;
@@ -2546,6 +2910,67 @@ bool Player::BuyItem(World & world, Uint8 id){
 	return false;
 }
 
+bool Player::RepairItem(World & world, Uint8 id){
+	BuyableItem * buyableitem = 0;
+	for(std::vector<BuyableItem *>::iterator it = world.buyableitems.begin(); it != world.buyableitems.end(); it++){
+		if((*it)->id == id){
+			buyableitem = (*it);
+			break;
+		}
+	}
+	if(buyableitem && credits >= buyableitem->repairprice){
+		Team * team = GetTeam(world);
+		if(team && team->disabledtech & buyableitem->techchoice){
+			int x1, y1, x2, y2;
+			GetAABB(world.resources, &x1, &y1, &x2, &y2);
+			std::vector<Uint8> types;
+			types.push_back(ObjectTypes::TECHSTATION);
+			if(world.TestAABB(x1, y1, x2, y2, types, 0, 0, false).size() == 0){
+				return false;
+			}
+			
+			team->disabledtech &= ~(buyableitem->techchoice);
+			world.audio.EmitSound(Player::id, world.resources.soundbank["reload2.wav"], 96);
+			world.RepairItem(id);
+			credits -= buyableitem->repairprice;
+			return true;
+		}
+	}
+	return false;
+}
+
+bool Player::VirusItem(World & world, Uint8 id){
+	BuyableItem * buyableitem = 0;
+	for(std::vector<BuyableItem *>::iterator it = world.buyableitems.begin(); it != world.buyableitems.end(); it++){
+		if((*it)->id == id){
+			buyableitem = (*it);
+			break;
+		}
+	}
+	if(buyableitem && InventoryItemCount(INV_VIRUS) > 0){
+		BaseDoor * basedoor = static_cast<BaseDoor *>(world.GetObjectFromId(basedoorentering));
+		if(basedoor){
+			Team * team = static_cast<Team *>(world.GetObjectFromId(basedoor->teamid));
+			if(team && !(team->disabledtech & buyableitem->techchoice)){
+				int x1, y1, x2, y2;
+				GetAABB(world.resources, &x1, &y1, &x2, &y2);
+				std::vector<Uint8> types;
+				types.push_back(ObjectTypes::TECHSTATION);
+				if(world.TestAABB(x1, y1, x2, y2, types, 0, 0, false).size() == 0){
+					return false;
+				}
+				
+				team->disabledtech |= buyableitem->techchoice;
+				world.audio.EmitSound(Player::id, world.resources.soundbank["reload2.wav"], 96);
+				world.VirusItem(id);
+				RemoveInventoryItem(INV_VIRUS);
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
 void Player::LoadAbilities(World & world){
 	Peer * peer = GetPeer(world);
 	if(peer){
@@ -2597,6 +3022,9 @@ void Player::UnDeploy(void){
 }
 
 Projectile * Player::Fire(World & world, Uint8 direction){
+	if(direction == 200){
+		return 0;
+	}
 	Uint8 delay = weaponfiredelay[currentweapon];
 	Projectile * projectile = 0;
 	if(world.tickcount - lastfire >= delay + 3){
@@ -2819,7 +3247,7 @@ Projectile * Player::Fire(World & world, Uint8 direction){
 }
 
 bool Player::ProcessJetpackState(World & world){
-	if(HandleAgainstWall(world)){
+	if(currentplatformid && HandleAgainstWall(world)){
 		return true;
 	}
 	currentplatformid = 0;
@@ -2837,7 +3265,7 @@ bool Player::ProcessJetpackState(World & world){
 	}
 	if(state_i == 0){
 		y--;
-		if(world.map.TestAABB(x, y - height, x, y, Platform::RECTANGLE | Platform::STAIRSUP | Platform::STAIRSDOWN)){
+		if(world.map.TestAABB(x, y - height, x, y, Platform::RECTANGLE | Platform::STAIRSUP | Platform::STAIRSDOWN, 0, true)){
 			y++;
 			state = STANDING;
 			state_i = -1;
@@ -3211,6 +3639,7 @@ bool Player::OnGround(void){
 		case UNCROUCHING:
 		case CROUCHED:
 		case CROUCHEDSHOOT:
+		case CROUCHEDTHROWING:
 		case STANDINGSHOOT:
 		case ROLLING:
 		case HACKING:
@@ -3242,6 +3671,10 @@ void Player::PickUpItem(World & world, PickUp & pickup){
 		case PickUp::SECRET:{
 			if(!hassecret){
 				hassecret = true;
+				Team * team = GetTeam(world);
+				if(team){
+					team->playerwithsecret = id;
+				}
 				secretteamid = pickup.quantity;
 				tracetime = pickup.tracetime;
 				if(islocalplayer){
@@ -3272,8 +3705,8 @@ void Player::PickUpItem(World & world, PickUp & pickup){
 		}break;
 		case PickUp::LASERAMMO:{
 			laserammo += pickup.quantity;
-			if(laserammo > 99){
-				laserammo = 99;
+			if(laserammo > 30){
+				laserammo = 30;
 			}
 			if(islocalplayer){
 				char temp[256];
@@ -3296,8 +3729,8 @@ void Player::PickUpItem(World & world, PickUp & pickup){
 		}break;
 		case PickUp::FLAMERAMMO:{
 			flamerammo += pickup.quantity;
-			if(flamerammo > 99){
-				flamerammo = 99;
+			if(flamerammo > 75){
+				flamerammo = 75;
 			}
 			if(islocalplayer){
 				char temp[256];
@@ -3306,23 +3739,23 @@ void Player::PickUpItem(World & world, PickUp & pickup){
 			}
 			world.audio.EmitSound(id, world.resources.soundbank["reload2.wav"], 96);
 		}break;
-		case PickUp::EMPBOMB:{
-			invtype = INV_EMPBOMB;
-			invname = "E.M.P. Bomb";
-		}break;
-		case PickUp::SHAPEDBOMB:{
-			invtype = INV_SHAPEDBOMB;
-			invname = "Shaped Bomb";
-		}break;
-		case PickUp::PLASMABOMB:{
-			invtype = INV_PLASMABOMB;
-			invname = "Plasma Bomb";
-		}break;
 		case PickUp::NEUTRONBOMB:{
 			if(!pickup.powerup){
 				invtype = INV_NEUTRONBOMB;
 				invname = "Neutron Bomb";
 			}
+		}break;
+		case PickUp::EMPBOMB:{
+			invtype = INV_EMPBOMB;
+			invname = "E.M.P. Bomb";
+		}break;
+		case PickUp::PLASMABOMB:{
+			invtype = INV_PLASMABOMB;
+			invname = "Plasma Bomb";
+		}break;
+		case PickUp::SHAPEDBOMB:{
+			invtype = INV_SHAPEDBOMB;
+			invname = "Shaped Bomb";
 		}break;
 		case PickUp::PLASMADET:{
 			invtype = INV_PLASMADET;
@@ -3335,6 +3768,10 @@ void Player::PickUpItem(World & world, PickUp & pickup){
 		case PickUp::FLARE:{
 			invtype = INV_FLARE;
 			invname = "Flare";
+		}break;
+		case PickUp::CAMERA:{
+			invtype = INV_CAMERA;
+			invname = "Camera";
 		}break;
 	}
 	if(invtype != INV_NONE){
@@ -3450,6 +3887,10 @@ void Player::DropItems(World & world){
 			pickup->tracetime = tracetime;
 			tracetime = 0;
 		}
+		Team * team = GetTeam(world);
+		if(team){
+			team->playerwithsecret =  0;
+		}
 		hassecret = false;
 	}
 	if(files > 0){
@@ -3528,6 +3969,9 @@ void Player::DropItems(World & world){
 				case INV_FLARE:{
 					droptype = PickUp::FLARE;
 				}break;
+				case INV_CAMERA:{
+					droptype = PickUp::CAMERA;
+				}break;
 			}
 			if(droptype != PickUp::NONE){
 				PickUp * pickup = (PickUp *)world.CreateObject(ObjectTypes::PICKUP);
@@ -3556,7 +4000,10 @@ bool Player::BuyAvailable(World & world, Uint8 id){
 		if(buyableitem->id == id){
 			Peer * peer = GetPeer(world);
 			if(peer && peer->techchoices & buyableitem->techchoice){
-				return true;
+				Team * team = GetTeam(world);
+				if(buyableitem->agencyspecific == -1 || (team && buyableitem->agencyspecific == team->agency)){
+					return true;
+				}
 			}
 		}
 	}
