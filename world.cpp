@@ -1607,12 +1607,14 @@ void World::KillByGovt(Peer & peer){
 		msg[0] = MSG_GOVTKILL;
 		msg[1] = peer.id;
 		for(unsigned int i = 0; i < maxpeers; i++){
-			Peer * peer = peerlist[i];
-			if(peer && i != localpeerid){
-				SendPacket(peer, msg, 2);
-				Player * player = GetPeerPlayer(peer->id);
-				if(player){
-					player->KillByGovt(*this);
+			Peer * ipeer = peerlist[i];
+			if(ipeer && i != localpeerid){
+				SendPacket(ipeer, msg, 2);
+				if(ipeer->id == peer.id){
+					Player * player = GetPeerPlayer(ipeer->id);
+					if(player){
+						player->KillByGovt(*this);
+					}
 				}
 			}
 		}

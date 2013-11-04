@@ -98,7 +98,10 @@ void Team::Tick(World & world){
 						if(team && team->id == world.winningteamid){
 							player->UnDeploy();
 						}else{
-							player->KillByGovt(world);
+							Peer * peer = player->GetPeer(world);
+							if(peer){
+								world.KillByGovt(*peer);
+							}
 						}
 					}
 				}
