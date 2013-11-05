@@ -20,7 +20,6 @@ Lobby::Lobby(World * world){
 	channelchanged = false;
 	channel[0] = 0;
 	serverip[0] = 0;
-	udpsockethandle = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
 	sockethandle = 0;
 	statupgraded = false;
 }
@@ -29,8 +28,6 @@ Lobby::~Lobby(){
 	LockMutex();
 	delete[] sendbuffer;
 	Disconnect();
-    shutdown(udpsockethandle, SHUT_RDWR);
-    closesocket(udpsockethandle);
 	ClearGames();
 	SDL_DestroyMutex(mutex);
 }
@@ -308,6 +305,12 @@ void Lobby::DoNetwork(void){
 									user->retrieving = false;
 									user->Serialize(Serializer::READ, data);
 									printf("account id = %d\n", user->accountid);
+									for(int i = 0; i < world->maxpeers; i++){
+										Peer * peer = world->peerlist[i];
+										if(peer && peer->accountid == accountid){
+											world->UserInfoReceived(*peer);
+										}
+									}
 								}break;
 								case MSG_PING:{
 									//printf("received MSG_PING\n");

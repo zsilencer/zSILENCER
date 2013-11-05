@@ -19,6 +19,7 @@ public:
 	void BlitSurface(SDL_Surface * src, SDL_Rect * srcrect, SDL_Surface * dst, SDL_Rect * dstrect);
 	bool BlitSurfaceUpper(SDL_Surface * src, SDL_Rect * srcrect, SDL_Surface * dst, SDL_Rect * dstrect);
 	void BlitSurfaceSlow(SDL_Surface * src, SDL_Rect * srcrect, SDL_Surface * dst, SDL_Rect * dstrect);
+	void BlitSurfaceFast(SDL_Surface * src, SDL_Rect * srcrect, SDL_Surface * dst, SDL_Rect * dstrect);
 	void BlitSprite(Object * object, Camera & camera, SDL_Surface * dst, SDL_Rect * dstrect, SDL_Surface * src, SDL_Rect * srcrect);
 	void DrawText(SDL_Surface * surface, Uint16 x, Uint16 y, const char * text, Uint8 bank, Uint8 width, bool alpha = false, Uint8 tint = 0, Uint8 brightness = 128, bool rampcolor = false);
 	void DrawTextInput(SDL_Surface * surface, TextInput & textinput);

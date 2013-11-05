@@ -67,14 +67,12 @@ Game::~Game(){
 }
 
 bool Game::Load(char * cmdline){
-	bool fullscreen = false;
 	if((cmdline = strtok(cmdline, " "))){
 		do{
 			if(strncmp(cmdline, "-s", 2) == 0){
 				char * lobbyaddress = strtok(NULL, " ");
 				char * lobbyport = strtok(NULL, " ");
 				char * hostaccountid = strtok(NULL, " ");
-				char * password = strtok(NULL, " ");
 				if(hostaccountid && lobbyaddress && lobbyport){
 					world.Listen();
 					world.lobby.Connect(lobbyaddress, atoi(lobbyport));
@@ -89,13 +87,6 @@ bool Game::Load(char * cmdline){
 						SDL_Delay(1);
 					}while(world.lobby.state != Lobby::CONNECTED);
 					world.gameplaystate = World::INLOBBY;
-					if(password){
-						int passwordlength = strlen(password);
-						if(passwordlength > sizeof(world.password) - 1){
-							passwordlength = sizeof(world.password) - 1;
-						}
-						memcpy(world.password, password, passwordlength);
-					}
 					/*User * user;
 					do{
 						user = world.lobby.GetUserInfo(2);
@@ -113,9 +104,6 @@ bool Game::Load(char * cmdline){
 				 strncpy(serverconnect, cmdline, sizeof(serverconnect));
 				 cmdline = strtok(0, " ");
 				 serverconnectport = atoi(cmdline);*/
-			}else
-			if(strncmp(cmdline, "-f", 2) == 0){
-				fullscreen = true;
 			}
 		}while((cmdline = strtok(0, " ")));
 	}
@@ -145,7 +133,7 @@ bool Game::Load(char * cmdline){
 	SDL_EventState(SDL_TEXTINPUT, SDL_TRUE); //SDL_EnableUNICODE(true);
 	//SDL_EnableKeyRepeat(SDL_DEFAULT_REPEAT_DELAY, SDL_DEFAULT_REPEAT_INTERVAL);
 	//screen = SDL_SetVideoMode(640, 480, 8, SDL_DOUBLEBUF | SDL_SWSURFACE);
-	window = SDL_CreateWindow("zSILENCER", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 640, 480, SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | (fullscreen ? SDL_WINDOW_FULLSCREEN : 0));
+	window = SDL_CreateWindow("zSILENCER", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 640, 480, SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | (Config::GetInstance().fullscreen ? SDL_WINDOW_FULLSCREEN : 0));
 	windowrenderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
 	screenbuffer = SDL_CreateRGBSurface(SDL_SWSURFACE, 640, 480, 8, 0, 0, 0, 0);
 	SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "2");
@@ -431,8 +419,10 @@ bool Game::Tick(void){
 								world.Connect(GetSelectedAgency(), world.lobby.accountid, lobbygame->password);
 								char temp[256];
 								GetGameChannelName(*lobbygame, temp);
-								strcpy(lastchannel, world.lobby.channel);
-								world.lobby.JoinChannel(temp);
+								if(strcmp(lastchannel, temp) != 0){
+									strcpy(lastchannel, world.lobby.channel);
+									world.lobby.JoinChannel(temp);
+								}
 							}
 							/*Team * team = (Team *)world.CreateObject(ObjectTypes::TEAM);
 							team->AddPeer(world.GetAuthorityPeer()->id);
@@ -445,39 +435,39 @@ bool Game::Tick(void){
 					}
 					if(gameselectinterface || gamecreateinterface){
 						if(world.state == World::CONNECTED){
-							/*for(std::vector<Uint16>::iterator it = gameselectinterface->objects.begin(); it != gameselectinterface->objects.end(); it++){
-								world.MarkDestroyObject((*it));
-							}
-							Object * object = world.GetObjectFromId(currentinterface);
-							Interface * iface = static_cast<Interface *>(object);
-							for(std::vector<Uint16>::iterator it = iface->objects.begin(); it != iface->objects.end(); it++){
-								if((*it) == gameselectinterface->id){
-									iface->objects.erase(it);
-									break;
-								}
-							}*/
-							if(gameselectinterface){
-								gameselectinterface->DestroyInterface(world, iface);
-								gameselectinterface = 0;
-							}
-							if(gamecreateinterface){
-								gamecreateinterface->DestroyInterface(world, iface);
-								gamecreateinterface = 0;
-							}
-							gamejoininterface = CreateGameJoinInterface();
 							Peer * peer = world.peerlist[world.localpeerid];
 							if(peer){
+								/*for(std::vector<Uint16>::iterator it = gameselectinterface->objects.begin(); it != gameselectinterface->objects.end(); it++){
+									world.MarkDestroyObject((*it));
+								}
+								Object * object = world.GetObjectFromId(currentinterface);
+								Interface * iface = static_cast<Interface *>(object);
+								for(std::vector<Uint16>::iterator it = iface->objects.begin(); it != iface->objects.end(); it++){
+									if((*it) == gameselectinterface->id){
+										iface->objects.erase(it);
+										break;
+									}
+								}*/
+								if(gameselectinterface){
+									gameselectinterface->DestroyInterface(world, iface);
+									gameselectinterface = 0;
+								}
+								if(gamecreateinterface){
+									gamecreateinterface->DestroyInterface(world, iface);
+									gamecreateinterface = 0;
+								}
 								world.SetTech(Config::GetInstance().defaulttechchoices[GetSelectedAgency()]);
+								gamejoininterface = CreateGameJoinInterface();
+								LobbyGame * lobbygame = world.lobby.GetGameByAccountId(currentlobbygameid);
+								if(lobbygame){
+									char temp[256];
+									GetGameChannelName(*lobbygame, temp);
+									//printf("joining %s\n", temp);
+									strcpy(lastchannel, world.lobby.channel);
+									world.lobby.JoinChannel(temp);
+								}
+								iface->AddObject(gamejoininterface->id);
 							}
-							LobbyGame * lobbygame = world.lobby.GetGameByAccountId(currentlobbygameid);
-							if(lobbygame){
-								char temp[256];
-								GetGameChannelName(*lobbygame, temp);
-								//printf("joining %s\n", temp);
-								strcpy(lastchannel, world.lobby.channel);
-								world.lobby.JoinChannel(temp);
-							}
-							iface->AddObject(gamejoininterface->id);
 						}
 					}
 					ProcessLobbyInterface(iface);

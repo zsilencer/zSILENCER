@@ -138,6 +138,8 @@ private:
 	void RepairItem(Uint8 id);
 	void VirusItem(Uint8 id);
 	void SendStats(Peer & peer);
+	void UserInfoReceived(Peer & peer);
+	void ApplyWantedTech(Peer & peer);
 	static bool CompareTeamByNumber(Team * team1, Team * team2);
 	std::map<Uint16, class Object *> objectidlookup;
 	std::list<Uint16> objectdestroylist;

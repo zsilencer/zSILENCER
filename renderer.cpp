@@ -1085,7 +1085,7 @@ bool Renderer::BlitSurfaceUpper(SDL_Surface * src, SDL_Rect * srcrect, SDL_Surfa
         sr.y = srcy;
         sr.w = dstrect->w = w;
         sr.h = dstrect->h = h;
-        BlitSurfaceSlow(src, &sr, dst, dstrect);
+		BlitSurfaceFast(src, &sr, dst, dstrect);
 		return true;
     }
     dstrect->w = dstrect->h = 0;
@@ -1093,13 +1093,32 @@ bool Renderer::BlitSurfaceUpper(SDL_Surface * src, SDL_Rect * srcrect, SDL_Surfa
 }
 
 void Renderer::BlitSurfaceSlow(SDL_Surface * src, SDL_Rect * srcrect, SDL_Surface * dst, SDL_Rect * dstrect){
+	// A slow blit, x and y bounds are checked for safety by GetPixel/SetPixel
 	int maxh = srcrect->h + srcrect->y;
 	int maxw = srcrect->w + srcrect->x;
-	for(register int ys = srcrect->y, yd = dstrect->y; ys < maxh; ys++, yd++){
-		for(register int xs = srcrect->x, xd = dstrect->x; xs < maxw; xs++, xd++){
+	for(int ys = srcrect->y, yd = dstrect->y; ys < maxh; ys++, yd++){
+		for(int xs = srcrect->x, xd = dstrect->x; xs < maxw; xs++, xd++){
 			Uint8 pixel = GetPixel(src, xs, ys);
 			if(pixel != 0){
 				SetPixel(dst, xd, yd, pixel);
+			}
+		}
+	}
+}
+	
+void Renderer::BlitSurfaceFast(SDL_Surface * src, SDL_Rect * srcrect, SDL_Surface * dst, SDL_Rect * dstrect){
+	// This function is slightly faster than BlitSurfaceSlow but there is no bounds checking
+	int srcw = src->w;
+	int dstw = dst->w;
+	int maxh = (srcrect->h + srcrect->y) * srcw;
+	int maxw = srcrect->w + srcrect->x;
+	void * srcpixels = src->pixels;
+	void * dstpixels = dst->pixels;
+	for(int ys = (srcrect->y * srcw), yd = (dstrect->y * dstw); ys < maxh; ys += srcw, yd += dstw){
+		for(int xs = srcrect->x, xd = dstrect->x; xs < maxw; xs++, xd++){
+			Uint8 pixel = ((Uint8 *)srcpixels)[xs + ys];
+			if(pixel){
+				((Uint8 *)dstpixels)[xd + yd] = pixel;
 			}
 		}
 	}
@@ -1740,11 +1759,15 @@ void Renderer::MiniMapCircle(int x, int y, Uint8 color){
 }
 
 void Renderer::DrawMirrored(SDL_Surface * src, SDL_Rect * srcrect, SDL_Surface * dst, SDL_Rect * dstrect){
-	for(int y = 0; y < src->h; y++){
-        for(int x = 0; x < src->w; x++){
-			Uint8 color = GetPixel(src, src->w - (x + 1), y);
+	int srch = src->h;
+	int srcw = src->w;
+	int dstrectx = dstrect->x;
+	int dstrecty = dstrect->y;
+	for(int y = 0; y < srch; y++){
+        for(int x = 0; x < srcw; x++){
+			Uint8 color = GetPixel(src, srcw - (x + 1), y);
 			if(color){
-				SetPixel(dst, dstrect->x + x, dstrect->y + y, color);
+				SetPixel(dst, dstrectx + x, dstrecty + y, color);
 			}
         }
     }
@@ -1759,20 +1782,18 @@ void Renderer::ApplyLighting(SDL_Surface * surface, SDL_Surface * src, SDL_Rect 
 	if(rect->x <= surface->w && rect->y <= surface->h && rect->x >= -src->w && rect->y >= -src->h){
 		//Uint32 surfacew = (surface->w / 4);
 		//Uint32 ym = rect->y * surfacew;
-		register int i = 0;
-		register int maxh = rect->y + src->h;
-		register int maxw = rect->x + src->w;
-		register int srcw = src->w;
-		register int surfacew = surface->w;
-		register int surfaceh = surface->h;
+		int maxh = rect->y + src->h;
+		int maxw = rect->x + src->w;
+		int srcw = src->w;
+		int surfacew = surface->w;
+		int surfaceh = surface->h;
 		Uint8 * pixels = (Uint8 *)src->pixels;
-		for(register int y1 = 0, y2 = rect->y; y2 < maxh; y1++, y2++){
-			for(register int x1 = 0, x2 = rect->x; x2 < maxw; x1++, x2++){
+		for(int y1 = 0, y2 = rect->y; y2 < maxh; y1++, y2++){
+			for(int x1 = 0, x2 = rect->x; x2 < maxw; x1++, x2++){
 				if(x2 < surfacew && y2 < surfaceh && x2 >= 0 && y2 >= 0){
 					Uint8 lum = pixels[y1 * srcw + (x1)];
 					((Uint8 *)lightmap)[(y2 * surfacew) + x2] += lum / 2;
 				}
-				i++;
 			}
 			/*for(signed int x1 = 0, x2 = rect->x; x2 < rect->x + src->w; x1 += 4, x2 += 4){
 				if(x2 >= 0 && y2 >= 0 && x2 < surface->w && y2 < surface->h){
@@ -1790,20 +1811,20 @@ void Renderer::ApplyAmbience(SDL_Surface * surface, Uint8 * lightmap){
 	if(!lightmap){
 		return;
 	}
-	register int i = 0;
+	int i = 0;
 	Sint8 ambience = world.map.ambience;
 	if(localplayer && localplayer->InBase(world)){
 		ambience = world.map.baseambience;
 	}
-	register Uint8 ambiencelevel = 128 + (ambience * 4) + ambience_r;
-	register int surfacew = surface->w;
-	register int surfaceh = surface->h;
+	Uint8 ambiencelevel = 128 + (ambience * 4) + ambience_r;
+	int surfacew = surface->w;
+	int surfaceh = surface->h;
 	Uint8 * pixels = (Uint8 *)surface->pixels;
-	for(register int x = 0; x < surfacew; x++){
-		for(register int y = 0; y < surfaceh; y++){
+	for(int x = 0; x < surfacew; x++){
+		for(int y = 0; y < surfaceh; y++){
 			Uint8 pixel = pixels[i/*(y * surface->w) + x*/];
 			if(pixel < 114){
-				register Uint8 ambience_l = ambiencelevel;
+				Uint8 ambience_l = ambiencelevel;
 				Uint8 lum = lightmap[i/*(y * surface->w) + x*/];
 				//if(lum){
 					Uint8 lumw = palette.colors[0][lum].r; // use only one component = faster
@@ -1829,8 +1850,8 @@ void Renderer::DrawTile(SDL_Surface * surface, SDL_Surface * tile, SDL_Rect * re
 			int surfaceh = surface->h;
 			Uint8 * pixels = (Uint8 *)tile->pixels;
 			int tilew = tile->w;
-			for(register int x = rect->x, x1 = 0; x < maxw; x++, x1++){
-				for(register int y = rect->y, y1 = 0; y < maxh; y++, y1++){
+			for(int x = rect->x, x1 = 0; x < maxw; x++, x1++){
+				for(int y = rect->y, y1 = 0; y < maxh; y++, y1++){
 					if(x < surfacew && y < surfaceh && x >= 0 && y >= 0){
 						Uint8 pixel = pixels[(y1 * tilew) + x1];
 						if(pixel > 2){

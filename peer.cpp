@@ -12,6 +12,7 @@ Peer::Peer(){
 	gameinfoloaded = false;
 	isready = false;
 	techchoices = 0;
+	wantedtechchoices = 0;
 }
 
 void Peer::Serialize(bool write, Serializer & data){

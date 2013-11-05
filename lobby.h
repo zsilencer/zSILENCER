@@ -55,7 +55,6 @@ private:
 	void ResolveHostname(const char * host);
 	static int ResolveThreadFunc(void * param);
 	SOCKET sockethandle;
-	SOCKET udpsockethandle;
 	Uint8 msgsize;
 	Uint8 msgoffset;
 	char msg[0xFF];

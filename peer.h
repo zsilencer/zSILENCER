@@ -31,6 +31,7 @@ public:
 	Uint32 theirlasttick;
 	Uint32 lastpacket;
 	Stats stats;
+	Uint32 wantedtechchoices;
 };
 
 #endif

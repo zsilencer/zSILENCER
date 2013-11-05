@@ -74,7 +74,9 @@ void Terminal::Tick(World & world){
 							for(int i = 0; i < team->numpeers; i++){
 								Peer * peer = world.peerlist[team->peers[i]];
 								if(peer){
-									world.ShowMessage("TOP SECRET AVAILABLE\n\nGovernment will be able to trace in 120 seconds", 255, 0, true, peer);
+									if(!world.intutorialmode){
+										world.ShowMessage("TOP SECRET AVAILABLE\n\nGovernment will be able to trace in 120 seconds", 255, 0, true, peer);
+									}
 								}
 							}
 						}

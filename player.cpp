@@ -1787,7 +1787,7 @@ void Player::Tick(World & world){
 				if(state_i == 14){
 					Audio::GetInstance().EmitSound(id, world.resources.soundbank["jackin.wav"], 30);
 				}
-				if(state_i >= 14){
+				if(state_i >= 14 && state_i <= 16){
 					if(hacksoundchannel == -1){
 						hacksoundchannel = Audio::GetInstance().EmitSound(id, world.resources.soundbank["ambloop5.wav"], 50, true);
 					}

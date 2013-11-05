@@ -227,9 +227,12 @@ void World::DoNetwork_Authority(void){
 					if(memcmp(temp, password, passwordsize) == 0){
 						Peer * newpeer = AddPeer(host, port, agency, accountid);
 						if(newpeer){
-							if(dedicatedserver.active && newpeer->accountid == dedicatedserver.accountid){
-								newpeer->ishost = true;
-								newpeer->gameinfoloaded = true;
+							if(dedicatedserver.active){
+								lobby.GetUserInfo(newpeer->accountid);
+								if(newpeer->accountid == dedicatedserver.accountid){
+									newpeer->ishost = true;
+									newpeer->gameinfoloaded = true;
+								}
 							}
 							response.PutBit(true);
 							response.Put(newpeer->id);
@@ -440,23 +443,9 @@ void World::DoNetwork_Authority(void){
 				if(peer && gameplaystate == INLOBBY){
 					Uint32 techchoices;
 					data.Get(techchoices);
-					Team * peerteam = GetPeerTeam(peer->id);
-					User * user = lobby.GetUserInfo(peer->accountid);
-					if(user && peerteam && !user->retrieving){
-						Uint32 oldtechchoices = peer->techchoices;
-						for(std::vector<BuyableItem *>::iterator it = buyableitems.begin(); it != buyableitems.end(); it++){
-							BuyableItem * buyableitem = *it;
-							if(buyableitem->agencyspecific != -1 && buyableitem->agencyspecific != peerteam->agency){
-								techchoices &= ~(buyableitem->techchoice);
-							}
-						}
-						peer->techchoices = techchoices;
-						if(user->agency[peerteam->agency].techslots >= TechSlotsUsed(*peer)){
-							SendPeerList();
-						}else{
-							peer->techchoices = oldtechchoices;
-						}
-					}
+					lobby.GetUserInfo(peer->accountid);
+					peer->wantedtechchoices = techchoices;
+					ApplyWantedTech(*peer);
 				}
 			}break;
 		}
@@ -532,7 +521,7 @@ void World::DoNetwork_Replica(void){
 						SendGameInfo(GetAuthorityPeer()->id);
 						printf("We are host, sending game info\n");
 					}
-					if(state == CONNECTING){
+					if(state == CONNECTING && localpeer){
 						state = CONNECTED;
 					}
 				}
@@ -816,7 +805,7 @@ void World::ClearSnapshotQueue(void){
 }
 
 void World::ReadPeerList(Serializer & data){
-	printf("reading peerlist\n");
+	//printf("reading peerlist\n");
 	for(unsigned int i = 0; i < maxpeers; i++){
 		if(i == authoritypeer){
 			continue;
@@ -841,7 +830,7 @@ void World::ReadPeerList(Serializer & data){
 			continue;
 		}
 		peerlist[peer->id] = peer;
-		printf("peerlist[%d]\n", peer->id);
+		//printf("peerlist[%d]\n", peer->id);
 		peercount++;
 	}
 }
@@ -1153,6 +1142,31 @@ void World::SendStats(Peer & peer){
 	msg.Put(code);
 	peer.stats.Serialize(Serializer::WRITE, msg);
 	SendPacket(&peer, msg.data, msg.BitsToBytes(msg.offset));
+}
+
+void World::UserInfoReceived(Peer & peer){
+	ApplyWantedTech(peer);
+}
+
+void World::ApplyWantedTech(Peer & peer){
+	Team * peerteam = GetPeerTeam(peer.id);
+	User * user = lobby.GetUserInfo(peer.accountid);
+	Uint32 techchoices = peer.wantedtechchoices;
+	if(peerteam){
+		Uint32 oldtechchoices = peer.techchoices;
+		for(std::vector<BuyableItem *>::iterator it = buyableitems.begin(); it != buyableitems.end(); it++){
+			BuyableItem * buyableitem = *it;
+			if(buyableitem->agencyspecific != -1 && buyableitem->agencyspecific != peerteam->agency){
+				techchoices &= ~(buyableitem->techchoice);
+			}
+		}
+		peer.techchoices = techchoices;
+		if(user && user->agency[peerteam->agency].techslots >= TechSlotsUsed(peer)){
+			SendPeerList();
+		}else{
+			peer.techchoices = oldtechchoices;
+		}
+	}
 }
 
 bool World::CompareTeamByNumber(Team * team1, Team * team2){
