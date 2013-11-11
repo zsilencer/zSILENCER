@@ -1,4 +1,5 @@
 #include "game.h"
+#include <math.h>
 #include "overlay.h"
 #include "interface.h"
 #include "textbox.h"
@@ -10,9 +11,9 @@
 #include "scrollbar.h"
 #include "team.h"
 #include "player.h"
+#include "playerai.h"
 #include "terminal.h"
 #include "config.h"
-#include <math.h>
 #include "cocoawrapper.h"
 
 Game::Game() : renderer(world){
@@ -278,7 +279,7 @@ bool Game::Tick(void){
 			sharedstate->oldstate = sharedstate->state;
 		}
 	}
-	if(world.gameplaystate == World::INGAME && (state == INGAME || state == SINGLEPLAYERGAME)){
+	if(world.gameplaystate == World::INGAME && (state == INGAME || state == SINGLEPLAYERGAME || state == TESTGAME)){
 		UpdateAmbienceChannels();
 	}else{
 		/*if(ambientbgchannel != -1){
@@ -507,7 +508,7 @@ bool Game::Tick(void){
 										player->oldy = player->y;
 										player->teamid = team->id;
 										Uint8 teamcolor = team->GetColor();
-										player->suitcolor = (((teamcolor >> 4) - i) << 4) + (teamcolor & 0xF);
+										player->suitcolor = teamcolor;//(((teamcolor >> 4) - i) << 4) + (teamcolor & 0xF);
 										world.peerlist[team->peers[i]]->controlledlist.clear();
 										world.peerlist[team->peers[i]]->controlledlist.push_back(player->id);
 									}
@@ -1258,6 +1259,91 @@ bool Game::Tick(void){
 				}
 			}
 		}break;
+		case TESTGAME:{
+			if(stateisnew){
+				world.GetAuthorityPeer()->controlledlist.clear();
+				world.DestroyAllObjects();
+				world.gameplaystate = World::INGAME;
+				currentinterface = 0;
+				Audio::GetInstance().StopMusic();
+				world.GetAuthorityPeer()->techchoices = 0xffffffff;//World::BUY_LASER | World::BUY_ROCKET;
+				Team * team = (Team *)world.CreateObject(ObjectTypes::TEAM);
+				team->AddPeer(world.GetAuthorityPeer()->id);
+				team->agency = Team::NOXIS;
+				//team->color = ((8 << 4) + 13);
+				Player * player = (Player *)world.CreateObject(ObjectTypes::PLAYER);
+				player->suitcolor = team->GetColor();
+				player->laserammo = 0;
+				player->credits = 0xffff;
+				player->oldx = player->x;
+				player->oldy = player->y;
+				world.GetAuthorityPeer()->controlledlist.push_back(player->id);
+				int botnum = 0;
+				for(int i = 0; i < 40; i++){
+					Uint8 agency;
+					do{
+						agency = rand() % 5;
+					}while(agency == Team::BLACKROSE);
+					Peer * botpeer = world.AddBot(agency);
+					if(botpeer){
+						botpeer->accountid = 0xFFFFFFFF - botnum;
+						Team * botteam = world.GetPeerTeam(botpeer->id);
+						Player * botplayer = (Player *)world.CreateObject(ObjectTypes::PLAYER);
+						botplayer->suitcolor = botteam->GetColor();
+						botplayer->laserammo = 0;
+						botplayer->credits = 500;
+						botplayer->ai = new PlayerAI(*botplayer);
+						botpeer->controlledlist.push_back(botplayer->id);
+						world.map.RandomPlayerStartLocation(&botplayer->x, &botplayer->y);
+						botplayer->oldx = botplayer->x;
+						botplayer->oldy = botplayer->y;
+						botnum++;
+					}
+				}
+				LoadMap("level/ALLY10c.sil", 3);
+				for(std::list<Object *>::iterator it = world.objectlist.begin(); it != world.objectlist.end(); it++){
+					if((*it)->type == ObjectTypes::PLAYER){
+						Player * player = static_cast<Player *>(*it);
+						world.map.RandomPlayerStartLocation(&player->x, &player->y);
+					}
+				}
+				ShowDeployMessage();
+				renderer.palette.SetPalette(0);
+				renderer.palette.SetParallaxColors(world.map.parallax);
+				SDL_FillRect(screenbuffer, 0, 0);
+				SetColors(renderer.palette.GetColors());
+				singleplayermessage = 0;
+				stateisnew = false;
+			}else{
+				/*Player * localplayer = world.GetPeerPlayer(world.authoritypeer);
+				if(localplayer){
+					if(localplayer->state == Player::STANDINGSHOOT){
+						for(std::list<Object *>::iterator it = world.objectlist.begin(); it != world.objectlist.end(); it++){
+							if((*it)->type == ObjectTypes::PLAYER){
+								Player * player = static_cast<Player *>(*it);
+								if(player->ai){
+									//player->ai->SetTarget(world, localplayer->x, localplayer->y);
+									player->hassecret = true;
+									break;
+								}
+							}
+						}
+					}
+				}*/
+				if(CheckForQuit()){
+					state = FADEOUT;
+					nextstate = MAINMENU;
+					fade_i = 0;
+					stateisnew = true;
+				}
+				if(CheckForEndOfGame()){
+					state = FADEOUT;
+					nextstate = MAINMENU;
+					fade_i = 0;
+					stateisnew = true;
+				}
+			}
+		}break;
 	}
 	if(fade_i < 16 && state != FADEOUT){
 		if(fade_i == 15){
@@ -1573,8 +1659,17 @@ Interface * Game::CreateMainMenuInterface(void){
 		joinbutton->x = -240;
 		joinbutton->uid = 5;
 		strcpy(joinbutton->text, "Join Game");
+		
+		Button * testbutton = (Button *)world.CreateObject(ObjectTypes::BUTTON);
+		testbutton->y = -201;
+		testbutton->x = 0;
+		testbutton->uid = 6;
+		strcpy(testbutton->text, "Test");
+		
 		iface->AddObject(hostbutton->id);
 		iface->AddObject(joinbutton->id);
+		iface->AddObject(testbutton->id);
+		iface->AddTabObject(testbutton->id);
 	}
 	iface->AddObject(optionsbutton->id);
 	iface->AddObject(exitbutton->id);
@@ -2634,6 +2729,12 @@ bool Game::ProcessMainMenuInterface(Interface * iface){
 					break;
 					case 5:
 						nextstate = JOINGAME;
+						state = FADEOUT;
+						fade_i = 0;
+						stateisnew = true;
+					break;
+					case 6:
+						nextstate = TESTGAME;
 						state = FADEOUT;
 						fade_i = 0;
 						stateisnew = true;

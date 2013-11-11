@@ -10,6 +10,7 @@ Platform::Platform(Uint8 type, Uint16 id, int x1, int y1, int x2, int y2){
 	Platform::y2 = y2;
 	adjacentl = 0;
 	adjacentr = 0;
+	set = 0;
 }
 
 void Platform::GetTopSegment(int & x1, int & y1, int & x2, int & y2){
@@ -41,9 +42,9 @@ int Platform::XtoY(int x){
 		int pos = abs(signed(x) - signed(tx1));
 		float time = float(pos) / length;
 		if(type == STAIRSUP){
-			return -abs(signed(ty1) - signed(ty2)) * time + ty1;
+			return (-abs(signed(ty1) - signed(ty2)) * time) + ty1;
 		}else{
-			return abs(signed(ty1) - signed(ty2)) * time + ty1;
+			return (abs(signed(ty1) - signed(ty2)) * time) + ty1;
 		}
 	}else{
 		return y1;
@@ -100,4 +101,8 @@ void Platform::GetNormal(int x, int y, float * xn, float * yn){
 	float length = sqrt((*xn * *xn) + (*yn * *yn));
 	*xn = *xn / length;
 	*yn = *yn / length;
+}
+
+int Platform::GetLength(void){
+	return abs(x2 - x1);
 }

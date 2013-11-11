@@ -1,7 +1,7 @@
 AM_CPPFLAGS = -I/usr/include/SDL2
 AM_LDFLAGS = -lSDL2 -lSDL2_mixer
 bin_PROGRAMS = zSILENCERlinux
-zSILENCERlinux_SOURCES = audio.cpp basedoor.cpp terminal.cpp bipedal.cpp \
+zSILENCERlinux_SOURCES = audio.cpp basedoor.cpp baseexit.cpp terminal.cpp bipedal.cpp \
 					blasterprojectile.cpp bodypart.cpp button.cpp \
 					buyableitem.cpp camera.cpp civilian.cpp \
 					config.cpp creditmachine.cpp dedicatedserver.cpp detonator.cpp \
@@ -10,9 +10,9 @@ zSILENCERlinux_SOURCES = audio.cpp basedoor.cpp terminal.cpp bipedal.cpp \
 					hittable.cpp input.cpp interface.cpp inventorystation.cpp lagsimulator.cpp \
 					laserprojectile.cpp lobby.cpp lobbygame.cpp main.cpp map.cpp \
 					minimap.cpp object.cpp objecttypes.cpp overlay.cpp palette.cpp \
-					peer.cpp physical.cpp platform.cpp player.cpp plasmaprojectile.cpp \
-					plume.cpp projectile.cpp pickup.cpp renderer.cpp resources.cpp \
-					robot.cpp rocketprojectile.cpp scrollbar.cpp secretreturn.cpp \
+					peer.cpp physical.cpp platform.cpp platformset.cpp player.cpp playerai.cpp \
+					plasmaprojectile.cpp plume.cpp projectile.cpp pickup.cpp renderer.cpp
+					resources.cpp robot.cpp rocketprojectile.cpp scrollbar.cpp secretreturn.cpp \
 					selectbox.cpp serializer.cpp sha1.cpp shrapnel.cpp \
 					sprite.cpp stats.cpp state.cpp surface.cpp surveillancemonitor.cpp team.cpp \
 					teambillboard.cpp techstation.cpp textbox.cpp \

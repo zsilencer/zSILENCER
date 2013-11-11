@@ -100,12 +100,14 @@ public:
 	friend class Grenade;
 	friend class BaseDoor;
 	friend class Terminal;
+	friend class PlayerAI;
 	
 protected:
 	std::list<class Object *> objectlist;
 	void SaveSnapshot(Serializer & data, Uint8 peerid);
 	void LoadSnapshot(Serializer & data, bool create = true, Serializer * delta = 0, Uint16 objectid = 0);
 	Peer * AddPeer(char * address, unsigned short port, Uint8 agency, Uint32 accountid);
+	Peer * AddBot(Uint8 agency);
 	char mapname[256];
 	std::vector<Uint32> ingameusers;
 

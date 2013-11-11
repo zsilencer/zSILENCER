@@ -134,27 +134,17 @@ void Team::Tick(World & world){
 		secretdelivered = false;
 	}
 	if(secretprogress >= 180 && oldsecretprogress > 0){
-		char text[256];
-		sprintf(text, "TOP SECRET LOCATION DETERMINED\n\nApproximate time : 60 seconds");
-		for(int i = 0; i < numpeers; i++){
-			Peer * peer = world.peerlist[peers[i]];
-			if(peer && !world.intutorialmode){
-				world.ShowMessage(text, 128, 0, true, peer);
-			}
-		}
-		sprintf(text, "ENEMY BEAMING DETECTED\n\nTracking location on radar");
+		char teamtext[256];
+		char enemytext[256];
+		sprintf(teamtext, "TOP SECRET LOCATION DETERMINED\n\nApproximate time : 60 seconds");
+		sprintf(enemytext, "ENEMY BEAMING DETECTED\n\nTracking location on radar");
 		for(int i = 0; i < world.maxpeers; i++){
 			Peer * peer = world.peerlist[i];
 			if(peer){
-				bool onteam = false;
-				for(int i = 0; i < numpeers; i++){
-					Peer * peer2 = world.peerlist[peers[i]];
-					if(peer2 && peer2->id == peer->id){
-						onteam = true;
-					}
-				}
-				if(!onteam){
-					world.ShowMessage(text, 128, 0, true, peer);
+				if(world.GetPeerTeam(peer->id) == this){
+					world.ShowMessage(teamtext, 128, 0, true, peer);
+				}else{
+					world.ShowMessage(enemytext, 128, 0, true, peer);
 				}
 			}
 		}
@@ -337,6 +327,7 @@ Uint8 Team::GetColor(void){
 	switch(number){
 		case 0:
 			basecolor = 10;
+			shade = 7;
 		break;
 		case 1:
 			basecolor = 14;
@@ -345,13 +336,16 @@ Uint8 Team::GetColor(void){
 			basecolor = 13;
 		break;
 		case 3:
-			basecolor = 11;
+			basecolor = 15;
+			shade = 11;
 		break;
 		case 4:
 			basecolor = 12;
+			shade = 10;
 		break;
 		case 5:
-			basecolor = 9;
+			basecolor = 10;
+			shade = 4;
 		break;
 	}
 	if(agency == BLACKROSE){

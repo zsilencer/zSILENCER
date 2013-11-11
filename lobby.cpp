@@ -479,8 +479,18 @@ User * Lobby::GetUserInfo(Uint32 accountid){
 		data.Put(code);
 		data.Put(accountid);
 		SendMessage(data.data, data.BitsToBytes(data.offset));
-		printf("requested user info for account id %d\n", accountid);
+		printf("requested user info for account id %u\n", accountid);
 		userinfo->retrieving = true;
+		if(accountid >= 0xFFFFFFFF - 24){
+			// Bot
+			static const char * botnames[] = {"Sweet Pea", "Breadloaf", "Cheeseboy", "Damien", "Quicknades", "Giblets",
+				"State Machine", "MileyFan5", "J0hnny", "Young Watson", "Flynn", "Wi11i4m",
+				"HURRDURR", "0b4m4", "bitcoin", "strlen", "juan valdez", "Rebdomine",
+				"cyber criminal", "ID10T", "barnacle", "nodule", "u r bad", "widowmaker"};
+			Uint32 index = 0xFFFFFFFF - accountid;
+			printf("index = %d\n", index);
+			strcpy(userinfo->name, botnames[index]);
+		}
 	}
 	return userinfo;
 }

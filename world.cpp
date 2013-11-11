@@ -130,7 +130,7 @@ void World::TickObjects(void){
 			//if(IsAuthority()){
 			for(int i = 0; i < maxpeers; i++){
 				Peer * peer = peerlist[i];
-				if(peer){
+				if(peer && !peer->isbot){
 					for(std::list<Uint16>::iterator it = peer->controlledlist.begin(); it != peer->controlledlist.end(); it++){
 						if((*it) == object->id){
 							peercontrolled = true;
@@ -453,7 +453,7 @@ void World::DoNetwork_Authority(void){
 	Uint32 tickcheck = SDL_GetTicks();
 	for(int i = 0; i < maxpeers; i++){
 		if(peerlist[i]){
-			if(i != localpeerid && peerlist[i]->lastpacket < tickcheck && tickcheck - peerlist[i]->lastpacket >= peertimeout){
+			if(i != localpeerid && !peerlist[i]->isbot && peerlist[i]->lastpacket < tickcheck && tickcheck - peerlist[i]->lastpacket >= peertimeout){
 				HandleDisconnect(i);
 			}
 		}
@@ -691,6 +691,36 @@ Peer * World::AddPeer(char * address, unsigned short port, Uint8 agency, Uint32 
 	}else{
 		printf("existing peer added, peer id: %d\n", peer->id);
 		return peer;
+	}
+	return 0;
+}
+
+Peer * World::AddBot(Uint8 agency){
+	Uint8 newpeerid = 0;
+	bool peeradded = false;
+	for(unsigned int i = 1; i < maxpeers; i++){
+		if(!peerlist[i]){
+			newpeerid = i;
+			peeradded = true;
+			break;
+		}
+	}
+	Peer * newpeer = new Peer();
+	newpeer->id = newpeerid;
+	if(peeradded){
+		if(!FindTeamForPeer(*newpeer, agency)){
+			printf("could not find team for new peer\n");
+			delete newpeer;
+			return 0;
+		}
+		newpeer->isbot = true;
+		peerlist[newpeerid] = newpeer;
+		peercount++;
+		printf("added bot, peer id: %d peercount = %d\n", newpeerid, peercount);
+		return newpeer;
+	}else{
+		delete newpeer;
+		return 0;
 	}
 	return 0;
 }
@@ -1270,10 +1300,10 @@ void World::SendInput(void){
 			SendPacket(GetAuthorityPeer(), data.data, data.offset);
 		}
 	}else
-		if(mode == AUTHORITY){
-			peer = GetAuthorityPeer();
-			peer->input = localinput;
-		}
+	if(mode == AUTHORITY){
+		peer = GetAuthorityPeer();
+		peer->input = localinput;
+	}
 	if(peer){
 		for(std::list<Uint16>::iterator i = peer->controlledlist.begin(); i != peer->controlledlist.end(); i++){
 			Object * object = GetObjectFromId((*i));
@@ -1526,11 +1556,13 @@ void World::ShowMessage(const char * message, Uint8 time, Uint8 type, bool netwo
 		delete[] msg;
 	}
 	if(!networked || IsAuthority()){
-		strncpy(World::message, message, sizeof(World::message) - 1);
-		World::message[sizeof(World::message) - 1] = 0;
-		message_i = 1;
-		messagetime = time;
-		messagetype = type;
+		if((peer && peer->id == localpeerid) || !peer){
+			strncpy(World::message, message, sizeof(World::message) - 1);
+			World::message[sizeof(World::message) - 1] = 0;
+			message_i = 1;
+			messagetime = time;
+			messagetype = type;
+		}
 	}
 }
 
@@ -1557,7 +1589,7 @@ void World::ShowStatus(const char * status, Uint8 color, bool networked, Peer * 
 		}
 		delete[] msg;
 	}
-	if(!networked || IsAuthority()){
+	if(!networked || (IsAuthority() && !peer) || (IsAuthority() && peer && peer->id == localpeerid)){
 		/*while(statusmessages.size() >= maxstatusmessages){
 			delete[] statusmessages.back();
 			statusmessages.pop_back();

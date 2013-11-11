@@ -207,6 +207,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\baseexit.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\bipedal.cpp"
 				>
 			</File>
@@ -359,7 +363,15 @@
 				>
 			</File>
 			<File
+				RelativePath=".\platformset.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\player.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\playerai.cpp"
 				>
 			</File>
 			<File
@@ -545,6 +557,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\baseexit.h"
+				>
+			</File>
+			<File
 				RelativePath=".\bipedal.h"
 				>
 			</File>
@@ -701,7 +717,15 @@
 				>
 			</File>
 			<File
+				RelativePath=".\platformset.h"
+				>
+			</File>
+			<File
 				RelativePath=".\player.h"
+				>
+			</File>
+			<File
+				RelativePath=".\playerai.h"
 				>
 			</File>
 			<File

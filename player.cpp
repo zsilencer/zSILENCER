@@ -120,6 +120,7 @@ Player::Player() : Object(ObjectTypes::PLAYER){
 	secondcounter = 0;
 	poisonedby = 0;
 	lastweaponchangesound = 0;
+	ai = 0;
 };
 
 void Player::Serialize(bool write, Serializer & data, Serializer * old){
@@ -172,6 +173,9 @@ void Player::Tick(World & world){
 	}
 	Hittable::Tick(*this, world);
 	Bipedal::Tick(*this, world);
+	if(ai){
+		ai->Tick(world);
+	}
 	if(input.keychat && !chatinterfaceid && !buyinterfaceid && !techinterfaceid && this == world.GetPeerPlayer(world.localpeerid)){
 		Interface * iface = (Interface *)world.CreateObject(ObjectTypes::INTERFACE);
 		if(iface){
@@ -230,7 +234,7 @@ void Player::Tick(World & world){
 	}
 	if(tracetime > 0 && secondcounter == 0 && !world.replaying){
 		tracetime--;
-		if(tracetime == 10){
+		if(tracetime == 8){
 			world.SendSound("vModDeto.wav");
 		}
 		if(tracetime == 0){
@@ -538,7 +542,8 @@ void Player::Tick(World & world){
 						peer->stats.secretsstolen++;
 						stolen = true;
 					}
-					sprintf(text, "%s returned a %s\nTeam awarded 1000 credits", user->name, stolen ? "stolen secret\n" : "secret\n");
+					int remaining = 3 - team->secrets;
+					sprintf(text, "%s returned a %s\n(%d remaining)\n\nTeam awarded 1000 credits", user->name, stolen ? "stolen secret" : "secret", remaining);
 				}else{
 					sprintf(text, "%s dropped a secret", user->name);
 					peer->stats.secretsdropped++;
@@ -1334,7 +1339,7 @@ void Player::Tick(World & world){
 			//UnDisguise(world);
 			BaseDoor * basedoor = (BaseDoor *)world.GetObjectFromId(basedoorentering);
 			if(basedoor){
-				if(!basealarmplayed){
+				if(state_i >= 5 && !basealarmplayed){
 					Player * localplayer = world.GetPeerPlayer(world.localpeerid);
 					if(localplayer && id != localplayer->id && basedoor->teamid != teamid){
 						basealarmplaytick = world.tickcount;
@@ -1764,7 +1769,6 @@ void Player::Tick(World & world){
 			if(input.keyfire){
 				state = JETPACKSHOOT;
 				state_i = -1;
-				break;
 			}
 		}break;
 		case HACKING:{
@@ -2191,7 +2195,11 @@ void Player::Tick(World & world){
 									files = maxfiles;
 								}
 								Uint16 creditamount = files * (1 + creditsbonus);
-								credits += creditamount;
+								if(int(credits) + creditamount > 0xFFFF){
+									credits = 0xFFFF;
+								}else{
+									credits += creditamount;
+								}
 								Peer * peer = GetPeer(world);
 								if(peer){
 									peer->stats.filesreturned += files;
@@ -2431,6 +2439,13 @@ void Player::HandleDisconnect(World & world, Uint8 peerid){
 	}
 }
 
+void Player::OnDestroy(World & world){
+	if(ai){
+		delete ai;
+		ai = 0;
+	}
+}
+
 bool Player::InBase(World & world){
 	if(y > world.map.height * 64){
 		return true;
@@ -2505,7 +2520,7 @@ bool Player::CheckForLadder(World & world){
 bool Player::CheckForGround(World & world, Platform & platform){
 	justjumpedfromladder = false;
 	Uint32 yt = platform.XtoY(x);
-	if(y <= yt){
+	if(y <= yt || ((platform.type == Platform::STAIRSUP || platform.type == Platform::STAIRSDOWN) && y <= yt + 1)){
 		Audio::GetInstance().EmitSound(id, world.resources.soundbank["futstonr.wav"], 32);
 		Audio::GetInstance().EmitSound(id, world.resources.soundbank["land11.wav"], 96);
 		yv = 0;
@@ -3263,7 +3278,7 @@ bool Player::ProcessJetpackState(World & world){
 	if(jetpacksoundchannel == -1){
 		jetpacksoundchannel = world.audio.EmitSound(id, world.resources.soundbank["jetpak1.wav"], 64, true);
 	}
-	if(state_i == 0){
+	/*if(currentplatformid){
 		y--;
 		if(world.map.TestAABB(x, y - height, x, y, Platform::RECTANGLE | Platform::STAIRSUP | Platform::STAIRSDOWN, 0, true)){
 			y++;
@@ -3271,7 +3286,7 @@ bool Player::ProcessJetpackState(World & world){
 			state_i = -1;
 			return true;
 		}
-	}
+	}*/
 	res_bank = 13;
 	res_index = (state_i / 4) + 1;
 	if(res_index > 6){
@@ -3281,7 +3296,7 @@ bool Player::ProcessJetpackState(World & world){
 		state_i = 12 * 4;
 	}
 	if(input.keymoveleft){
-		if(state_i % 3 == 0){
+		if(state_i % 2 == 0){
 			xv += -1;
 		}
 		mirrored = true;
@@ -3300,7 +3315,7 @@ bool Player::ProcessJetpackState(World & world){
 	Platform * platform1 = world.map.TestIncr(x, y - height, x, y, &xv2, &yv2, Platform::RECTANGLE | Platform::STAIRSUP | Platform::STAIRSDOWN, 0, true);
 	if(platform1 && y >= platform1->y2){
 		//float close = ((float)yv2 / -30);
-		yv = 1;
+		yv = 0;
 		//yv = (yv * close) + (10 * (1 - close)) + 5;
 		//xv = xv / 2;
 		state_i = -1;
@@ -3659,7 +3674,7 @@ void Player::Warp(World & world, Sint16 x, Sint16 y){
 	}
 }
 
-void Player::PickUpItem(World & world, PickUp & pickup){
+bool Player::PickUpItem(World & world, PickUp & pickup){
 	bool islocalplayer = false;
 	if(this == world.GetPeerPlayer(world.localpeerid)){
 		islocalplayer = true;
@@ -3823,20 +3838,23 @@ void Player::PickUpItem(World & world, PickUp & pickup){
 			if(peer){
 				peer->stats.powerupspickedup++;
 			}
-			if(world.peerlist[world.localpeerid] == GetPeer(world)){
+			if(islocalplayer){
 				char temp[256];
 				sprintf(temp, "%s", powerupname);
 				world.ShowStatus(temp);
-				Audio::GetInstance().Play(world.resources.soundbank["power11.wav"], 128);
+				Audio::GetInstance().EmitSound(id, world.resources.soundbank["power11.wav"], 128);
 			}
-			pickup.draw = false;
+		}
+		/*	pickup.draw = false;
 			pickup.quantity = pickup.poweruprespawntime;
 		}else{
 			pickup.draw = false;
 			pickup.collidable = false;
 			world.MarkDestroyObject(pickup.id);
-		}
+		}*/
+		return true;
 	}
+	return false;
 }
 
 Peer * Player::GetPeer(World & world){

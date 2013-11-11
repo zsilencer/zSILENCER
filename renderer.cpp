@@ -919,7 +919,7 @@ void Renderer::DrawMiniMap(Object * object){
 						Uint8 color = 0;
 						Team * team = (Team *)world.GetObjectFromId(basedoor->teamid);
 						if(team){
-							if(team && localplayer && localplayer->teamid != team->id){
+							if(team/* && localplayer && localplayer->teamid != team->id*/){
 								color = team->GetColor();
 							}
 							MiniMapBlit(104, 5, basedoor->x, basedoor->y, false, color);
@@ -1280,7 +1280,7 @@ void Renderer::DrawRainPuddles(SDL_Surface * surface, Camera & camera){
 	// 186:0-9 is rain puddle
 	SDL_Rect dstrect;
 	int j = 0;
-	for(std::vector<Map::xy>::iterator it = world.map.rainpuddlelocations.begin(); it != world.map.rainpuddlelocations.end(); it++){
+	for(std::vector<Map::XY>::iterator it = world.map.rainpuddlelocations.begin(); it != world.map.rainpuddlelocations.end(); it++){
 		Sint16 x = (*it).x;
 		Sint16 y = (*it).y;
 		dstrect.x = x + camera.GetXOffset();
@@ -1841,8 +1841,8 @@ void Renderer::ApplyAmbience(SDL_Surface * surface, Uint8 * lightmap){
 	}
 }
 
-void Renderer::DrawTile(SDL_Surface * surface, SDL_Surface * tile, SDL_Rect * rect, Uint8 * lightmap){
-	if(lightmap){
+void Renderer::DrawTile(SDL_Surface * surface, SDL_Surface * tile, SDL_Rect * rect){
+	/*if(lightmap){
 		if(rect->x <= surface->w && rect->y <= surface->h && rect->x >= -tile->w && rect->y >= -tile->h){
 			int maxw = tile->w + rect->x;
 			int maxh = tile->h + rect->y;
@@ -1861,7 +1861,7 @@ void Renderer::DrawTile(SDL_Surface * surface, SDL_Surface * tile, SDL_Rect * re
 				}
 			}
 		}
-	}
+	}*/
 	BlitSurface(tile, 0, surface, rect);
 }
 
@@ -1877,7 +1877,7 @@ void Renderer::DrawParallax(SDL_Surface * surface, Camera & camera){
 			int cy = -(camera.GetYOffset() - 240);
 			dstrect.x = dstrect.x -ceil(((float)cx / (world.map.width * 64)) * 320);
 			dstrect.y = dstrect.y -ceil(((float)cy / (world.map.height * 64)) * 240);
-			DrawTile(surface, world.resources.spritebank[world.map.parallax][(y * 20) + x], &dstrect, 0);
+			DrawTile(surface, world.resources.spritebank[world.map.parallax][(y * 20) + x], &dstrect);
 		}
 	}
 }
@@ -1885,13 +1885,29 @@ void Renderer::DrawParallax(SDL_Surface * surface, Camera & camera){
 void Renderer::DrawBackground(SDL_Surface * surface, Camera & camera, Uint8 * lightmap){
 	SDL_Rect dstrect;
 	SDL_Surface * tile;
-	for(int y = 0; y < world.map.expandedheight; y++){
-		for(int x = 0; x < world.map.expandedwidth; x++){
+	int minx = (camera.x - (camera.w / 2)) / 64;
+	if(minx < 0){
+		minx = 0;
+	}
+	int maxx = ceil(float(camera.x + (camera.w / 2)) / 64);
+	if(maxx > world.map.expandedwidth){
+		maxx = world.map.expandedwidth;
+	}
+	int miny = (camera.y - (camera.h / 2)) / 64;
+	if(miny < 0){
+		miny = 0;
+	}
+	int maxy = ceil(float(camera.y + (camera.h / 2)) / 64);
+	if(maxy > world.map.expandedheight){
+		maxy = world.map.expandedheight;
+	}
+	for(int y = miny; y < maxy; y++){
+		for(int x = minx; x < maxx; x++){
 			int i = (y * world.map.expandedwidth) + x;
 			for(int j = 0; j < 4; j++){
 				if(world.map.bg[j][i]){
-					dstrect.x = x * 64 + camera.GetXOffset();
-					dstrect.y = y * 64 + camera.GetYOffset();
+					dstrect.x = (x * 64) + camera.GetXOffset();
+					dstrect.y = (y * 64) + camera.GetYOffset();
 					if(world.map.bgflipped[j][i]){
 						tile = world.resources.tileflippedbank[(world.map.bg[j][i] & 0xFF00) >> 8][world.map.bg[j][i] & 0xFF];
 					}else{
@@ -1915,13 +1931,29 @@ void Renderer::DrawBackground(SDL_Surface * surface, Camera & camera, Uint8 * li
 void Renderer::DrawForeground(SDL_Surface * surface, Camera & camera, Uint8 * lightmap){
 	SDL_Rect dstrect;
 	SDL_Surface * tile;
-	for(int y = 0; y < world.map.expandedheight; y++){
-		for(int x = 0; x < world.map.expandedwidth; x++){
+	int minx = (camera.x - (camera.w / 2)) / 64;
+	if(minx < 0){
+		minx = 0;
+	}
+	int maxx = ceil(float(camera.x + (camera.w / 2)) / 64);
+	if(maxx > world.map.expandedwidth){
+		maxx = world.map.expandedwidth;
+	}
+	int miny = (camera.y - (camera.h / 2)) / 64;
+	if(miny < 0){
+		miny = 0;
+	}
+	int maxy = ceil(float(camera.y + (camera.h / 2)) / 64);
+	if(maxy > world.map.expandedheight){
+		maxy = world.map.expandedheight;
+	}
+	for(int y = miny; y < maxy; y++){
+		for(int x = minx; x < maxx; x++){
 			int i = (y * world.map.expandedwidth) + x;
 			for(int j = 0; j < 4; j++){
 				if(world.map.fg[j][i]){
-					dstrect.x = x * 64 + camera.GetXOffset();
-					dstrect.y = y * 64 + camera.GetYOffset();
+					dstrect.x = (x * 64) + camera.GetXOffset();
+					dstrect.y = (y * 64) + camera.GetYOffset();
 					if(world.map.fgflipped[j][i]){
 						tile = world.resources.tileflippedbank[(world.map.fg[j][i] & 0xFF00) >> 8][world.map.fg[j][i] & 0xFF];
 					}else{
@@ -1933,11 +1965,14 @@ void Renderer::DrawForeground(SDL_Surface * surface, Camera & camera, Uint8 * li
 								ApplyLighting(surface, tile, &dstrect, lightmap);
 							}
 						}else{
-							DrawTile(surface, tile, &dstrect, lightmap);//SDL_BlitSurface(tile, 0, surface, &dstrect);
+							DrawTile(surface, tile, &dstrect);//SDL_BlitSurface(tile, 0, surface, &dstrect);
 						}
 					}
 				}
 			}
+			/*if(world.map.nodetypes[i]){
+				DrawFilledRectangle(surface, (x * 64) + camera.GetXOffset() + 28, (y * 64) + camera.GetYOffset() + 28, (x * 64) + camera.GetXOffset() + 36, (y * 64) + camera.GetYOffset() + 36, 224);
+			}*/
 		}
 	}
 }

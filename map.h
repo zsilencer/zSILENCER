@@ -5,6 +5,7 @@
 #include <vector>
 #include <map>
 #include "platform.h"
+#include "platformset.h"
 #include "minimap.h"
 #include "zlib/zlib.h"
 
@@ -21,9 +22,13 @@ public:
 	void RandomPlayerStartLocation(Sint16 * x, Sint16 * y);
 	void CalculateRainPuddleLocations(void);
 	void CalculateAdjacentPlatforms(void);
+	void CalculatePlatformSets(void);
+	void CalculatePlatformSetConnections(void);
+	void CalculateNodes(void);
 	int AdjacentPlatformsLength(Platform & platform);
 	Platform & GetLeftmostPlatform(Platform & platform);
 	Platform & GetRightmostPlatform(Platform & platform);
+	std::vector<Platform *> LaddersToPlatform(PlatformSet & from, PlatformSet & to);
 	Platform * TestAABB(int x1, int y1, int x2, int y2, Uint8 type, Platform * except = 0, bool ignorethin = false);
 	bool TestAABB(int x1, int y1, int x2, int y2, Platform * platform, Uint8 type, bool ignorethin = false);
 	Platform * TestLine(int x1, int y1, int x2, int y2, int * xe, int * ye, Uint8 type);
@@ -45,15 +50,18 @@ public:
 	Sint8 ambience;
 	Sint8 baseambience;
 	std::map<Uint16, Platform *> platformids;
-	struct xy { Sint16 x, y; };
-	std::vector<xy> playerstartlocations;
-	std::vector<xy> surveillancecameras;
-	std::vector<xy> rainpuddlelocations;
+	struct XY { Sint16 x, y; };
+	std::vector<XY> playerstartlocations;
+	std::vector<XY> surveillancecameras;
+	std::vector<XY> rainpuddlelocations;
 	Uint16 currentid;
 	MiniMap minimap;
+	Uint8 * nodetypes;
 	
-private:
+//private:
+	static bool CompareType(Platform * a, Platform * b);
 	std::vector<Platform *> platforms;
+	std::vector<PlatformSet *> platformsets;
 };
 
 #endif

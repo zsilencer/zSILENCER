@@ -1,4 +1,5 @@
 #include <math.h>
+#include <algorithm>
 #include "map.h"
 #include "platform.h"
 #include "civilian.h"
@@ -18,6 +19,7 @@
 #include "warper.h"
 #include "walldefense.h"
 #include "pickup.h"
+#include "baseexit.h"
 
 Map::Map(){
 	for(unsigned int i = 0; i < 4; i++){
@@ -33,6 +35,7 @@ Map::Map(){
 	ambience = 0;
 	memset(description, 0, sizeof(description));
 	loaded = false;
+	nodetypes = 0;
 }
 
 Map::~Map(){
@@ -59,6 +62,13 @@ bool Map::Load(const char * filename, World & world, Uint8 securitylevel){
 		}
 		if(result2){
 			loaded = true;
+			// Put stairs at the beginning so that they collide first in tests, otherwise players can sometimes hit rectangle directly under triangle edge and start walking on it
+			std::sort(platforms.begin(), platforms.end(), CompareType);
+			CalculateAdjacentPlatforms();
+			CalculatePlatformSets();
+			CalculateNodes();
+			CalculatePlatformSetConnections();
+			CalculateRainPuddleLocations();
 			return true;
 		}
 	}
@@ -128,7 +138,7 @@ bool Map::LoadFile(const char * filename, World & world, Team * team, Uint8 secu
 	
 	if(team == 0){ // team is 0 for main map
 		expandedwidth = (width > 47 ? width : 47);
-		expandedheight = height + ((26 + 10) * 5);
+		expandedheight = height + ((26 + 10) * world.maxteams);
 		Map::width = width;
 		Map::height = height;
 		/*if(parallax > 3){
@@ -345,14 +355,14 @@ bool Map::LoadFile(const char * filename, World & world, Team * team, Uint8 secu
 			}break;
 			case 36:{
 				// Player start location
-				xy xy;
+				XY xy;
 				xy.x = actorx;
 				xy.y = actory;
 				playerstartlocations.push_back(xy);
 			}break;
 			case 37:{
 				// surveillance camera
-				xy xy;
+				XY xy;
 				xy.x = actorx;
 				xy.y = actory;
 				surveillancecameras.push_back(xy);
@@ -564,6 +574,14 @@ bool Map::LoadFile(const char * filename, World & world, Team * team, Uint8 secu
 			}break;
 			case 65:{
 				// base exit?
+				BaseExit * baseexit = (BaseExit *)world.CreateObject(ObjectTypes::BASEEXIT);
+				if(baseexit){
+					baseexit->x = actorx;
+					baseexit->y = actory;
+					if(team){
+						baseexit->teamid = team->id;
+					}
+				}
 			}break;
 			case 66:{
 				TechStation * techstation = (TechStation *)world.CreateObject(ObjectTypes::TECHSTATION);
@@ -705,9 +723,6 @@ bool Map::LoadFile(const char * filename, World & world, Team * team, Uint8 secu
 	}
 	//fclose(fileo);
 	
-	CalculateAdjacentPlatforms();
-	CalculateRainPuddleLocations();
-	
 	delete[] levelcompressed;
 	delete[] level;
 	
@@ -751,6 +766,14 @@ void Map::Unload(void){
 		delete (*i);
 	}
 	platforms.clear();
+	for(std::vector<PlatformSet *>::iterator i = platformsets.begin(); i != platformsets.end(); i++){
+		delete (*i);
+	}
+	platformsets.clear();
+	if(nodetypes){
+		delete nodetypes;
+		nodetypes = 0;
+	}
 }
 
 void Map::MiniMapCoords(int * x, int * y){
@@ -764,9 +787,9 @@ void Map::RandomPlayerStartLocation(Sint16 * x, Sint16 * y){
 	}
 	int index = rand() % playerstartlocations.size();
 	int i = 0;
-	for(std::vector<xy>::iterator it = playerstartlocations.begin(); it != playerstartlocations.end(); it++){
+	for(std::vector<XY>::iterator it = playerstartlocations.begin(); it != playerstartlocations.end(); it++){
 		if(i == index){
-			xy xy = (*it);
+			XY xy = (*it);
 			*x = xy.x;
 			*y = xy.y;
 			return;
@@ -779,10 +802,10 @@ void Map::CalculateRainPuddleLocations(void){
 	for(unsigned int i = 0 ; i < platforms.size(); i++){
 		Platform * platform = platforms[i];
 		if(platform->type == Platform::RECTANGLE){
-			for(int x = platform->x1 + 1; x < platform->x2 - 32; x += 32){
+			for(int x = platform->x1 + 8; x < platform->x2 - 32; x += 32){
 				if(TestAABB(x, platform->y1, x + 32, platform->y1, Platform::OUTSIDEROOM)){
 					if(!TestAABB(x, platform->y1, x + 32, platform->y1, Platform::RECTANGLE | Platform::STAIRSUP | Platform::STAIRSDOWN, platform)){
-						xy xy;
+						XY xy;
 						xy.x = x;
 						xy.y = platform->y1 - 4;
 						rainpuddlelocations.push_back(xy);
@@ -906,6 +929,73 @@ void Map::CalculateAdjacentPlatforms(void){
 	}
 }
 
+void Map::CalculatePlatformSets(void){
+	for(unsigned int i = 0 ; i < platforms.size(); i++){
+		switch(platforms[i]->type){
+			case Platform::RECTANGLE:
+			case Platform::STAIRSUP:
+			case Platform::STAIRSDOWN:
+				Platform & leftmost = GetLeftmostPlatform(*platforms[i]);
+				if(!leftmost.set){
+					PlatformSet * platformset = new PlatformSet;
+					Platform * platform = &leftmost;
+					do{
+						if(platform->set){
+							break;
+						}
+						platformset->platforms.push_back(platform);
+						platformset->length += platform->GetLength();
+						platform->set = platformset;
+						platform = platform->adjacentr;
+					}while(platform);
+					platformsets.push_back(platformset);
+				}
+			break;
+		}
+	}
+	for(unsigned int i = 0 ; i < platforms.size(); i++){
+		if(platforms[i]->type == Platform::LADDER){
+			Platform * ladder = platforms[i];
+			Sint16 center = abs(ladder->x2 - ladder->x1) + ladder->x1;
+			Platform * top = TestAABB(center, ladder->y1, center, ladder->y1, Platform::RECTANGLE);
+			if(top){
+				PlatformSet * set = top->set;
+				if(set){
+					set->ladders.push_back(ladder);
+				}
+			}
+			Platform * bottom = TestAABB(center, ladder->y2, center, ladder->y2, Platform::RECTANGLE);
+			if(bottom){
+				PlatformSet * set = bottom->set;
+				if(set){
+					set->ladders.push_back(ladder);
+				}
+			}
+		}
+	}
+}
+
+void Map::CalculatePlatformSetConnections(void){
+	
+}
+
+void Map::CalculateNodes(void){
+	if(nodetypes){
+		delete nodetypes;
+	}
+	nodetypes = new Uint8[expandedwidth * expandedheight];
+	for(int y = 0; y < expandedheight; y++){
+		for(int x = 0; x < expandedwidth; x++){
+			Platform * platform = TestAABB((x * 64) + 16, (y * 64) + 16, (x * 64) + 48, (y * 64) + 48, Platform::RECTANGLE | Platform::STAIRSDOWN | Platform::STAIRSUP | Platform::LADDER);
+			if(platform){
+				nodetypes[(y * expandedwidth) + x] = platform->type;
+			}else{
+				nodetypes[(y * expandedwidth) + x] = 0;
+			}
+		}
+	}
+}
+
 int Map::AdjacentPlatformsLength(Platform & platform){
 	Platform * leftmost = &GetLeftmostPlatform(platform);
 	int length = 0;
@@ -930,6 +1020,18 @@ Platform & Map::GetRightmostPlatform(Platform & platform){
 		rightmost = rightmost->adjacentr;
 	}
 	return *rightmost;
+}
+
+std::vector<Platform *> Map::LaddersToPlatform(PlatformSet & from, PlatformSet & to){
+	std::vector<Platform *> ladders;
+	for(std::vector<Platform *>::iterator it = from.ladders.begin(); it != from.ladders.end(); it++){
+		Platform * ladder = *it;
+		std::vector<Platform *>::iterator found = std::find(to.ladders.begin(), to.ladders.end(), ladder);
+		if(found != to.ladders.end()){
+			ladders.push_back(ladder);
+		}
+	}
+	return ladders;
 }
 
 Platform * Map::TestAABB(int x1, int y1, int x2, int y2, Uint8 type, Platform * except, bool ignorethin){
@@ -1246,4 +1348,11 @@ bool Map::LineSegmentIntersection(float Ax, float Ay, float Bx, float By, float 
 
 	// Success.
 	return true;
+}
+
+bool Map::CompareType(Platform * a, Platform * b){
+	if(a->type == Platform::STAIRSDOWN || a->type == Platform::STAIRSUP){
+		return true;
+	}
+	return false;
 }

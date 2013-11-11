@@ -55,7 +55,7 @@ public:
 	void DrawMirrored(SDL_Surface * src, SDL_Rect * srcrect, SDL_Surface * dst, SDL_Rect * dstrect);
 	void ApplyLighting(SDL_Surface * surface, SDL_Surface * src, SDL_Rect * SDL_Rect, Uint8 * lightmap);
 	void ApplyAmbience(SDL_Surface * surface, Uint8 * lightmap);
-	void DrawTile(SDL_Surface * surface, SDL_Surface * tile, SDL_Rect * SDL_Rect, Uint8 * lightmap = 0);
+	void DrawTile(SDL_Surface * surface, SDL_Surface * tile, SDL_Rect * SDL_Rect);
 	void DrawParallax(SDL_Surface * surface, Camera & camera);
 	void DrawBackground(SDL_Surface * surface, Camera & camera, Uint8 * lightmap);
 	void DrawForeground(SDL_Surface * surface, Camera & camera, Uint8 * lightmap);

@@ -8,6 +8,7 @@
 #include "input.h"
 #include "peer.h"
 #include "pickup.h"
+#include "playerai.h"
 
 class Player : public Object
 {
@@ -18,6 +19,7 @@ public:
 	void HandleHit(class World & world, Uint8 x, Uint8 y, Object & projectile);
 	void HandleInput(Input & input);
 	void HandleDisconnect(World & world, Uint8 peerid);
+	void OnDestroy(World & world);
 	bool InBase(World & world);
 	bool InOwnBase(World & world);
 	bool IsDisguised(void);
@@ -71,6 +73,7 @@ public:
 	int buyifacelastitem;
 	int buyifacelastscrolled;
 	Uint8 disguised;
+	class PlayerAI * ai;
 
 	friend class Renderer;
 	friend class World;
@@ -79,6 +82,7 @@ public:
 	friend class Warper;
 	friend class PickUp;
 	friend class Game;
+	friend class PlayerAI;
 
 private:
 	bool CheckForBaseExit(World & world);
@@ -96,7 +100,7 @@ private:
 	bool ProcessLadderState(World & world);
 	bool OnGround(void);
 	void Warp(World & world, Sint16 x, Sint16 y);
-	void PickUpItem(World & world, PickUp & pickup);
+	bool PickUpItem(World & world, PickUp & pickup);
 	enum {STANDING, RUNNING, WALKIN, WALKOUT, FALLING, LADDER, CROUCHING, UNCROUCHING, CROUCHED,
 		CROUCHEDSHOOT, CROUCHEDTHROWING, ROLLING, JUMPING, CLIMBINGLEDGE, JETPACK, HACKING, STANDINGSHOOT,
 		FALLINGSHOOT, LADDERSHOOT, JETPACKSHOOT, DYING, DEAD, RESPAWNING, THROWING, DEPLOYING, UNDEPLOYING,

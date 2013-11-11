@@ -13,6 +13,7 @@ Peer::Peer(){
 	isready = false;
 	techchoices = 0;
 	wantedtechchoices = 0;
+	isbot = false;
 }
 
 void Peer::Serialize(bool write, Serializer & data){

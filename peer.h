@@ -32,6 +32,7 @@ public:
 	Uint32 lastpacket;
 	Stats stats;
 	Uint32 wantedtechchoices;
+	bool isbot;
 };
 
 #endif

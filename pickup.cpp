@@ -87,6 +87,7 @@ void PickUp::Tick(World & world){
 	}else{
 		if(quantity == 0){
 			draw = true;
+			collidable = true;
 			CheckForPickedUp(world);
 			Uint8 indexes = 1;
 			switch(type){
@@ -132,7 +133,16 @@ void PickUp::CheckForPickedUp(World & world){
 		switch(object->type){
 			case ObjectTypes::PLAYER:{
 				Player * player = static_cast<Player *>(object);
-				player->PickUpItem(world, *this);
+				if(player->PickUpItem(world, *this)){
+					draw = false;
+					collidable = false;
+					if(powerup){
+						quantity = poweruprespawntime;
+					}else{
+						world.MarkDestroyObject(id);
+					}
+					return;
+				}
 			}break;
 		}
 	}

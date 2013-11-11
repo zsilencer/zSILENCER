@@ -102,6 +102,8 @@ void Plume::Tick(World & world){
 }
 
 void Plume::SetPosition(Uint32 x, Uint32 y){
+	oldx = x;
+	oldy = y;
 	x2 = x * 8;
 	y2 = y * 8;
 }

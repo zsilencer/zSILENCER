@@ -39,6 +39,7 @@
 #include "fixedcannon.h"
 #include "grenade.h"
 #include "walldefense.h"
+#include "baseexit.h"
 
 ObjectTypes::ObjectTypes(){
 	memset(serializedsize, 0, sizeof(serializedsize));
@@ -165,6 +166,9 @@ Object * ObjectTypes::CreateFromType(Uint8 type){
 		break;
 		case WALLDEFENSE:
 			return (Object *)new WallDefense();
+		break;
+		case BASEEXIT:
+			return (Object *)new BaseExit();
 		break;
 	}
 	return 0;

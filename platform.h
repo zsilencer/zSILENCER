@@ -2,6 +2,7 @@
 #define PLATFORM_H
 
 #include "shared.h"
+#include "platformset.h"
 
 class Platform
 {
@@ -10,6 +11,7 @@ public:
 	void GetTopSegment(int & x1, int & y1, int & x2, int & y2);
 	int XtoY(int x);
 	void GetNormal(int x, int y, float * xn, float * yn);
+	int GetLength(void);
 
 	static const Uint8 RECTANGLE = 1 << 0;
 	static const Uint8 STAIRSUP = 1 << 1;
@@ -23,6 +25,7 @@ public:
 	Uint16 id;
 	Platform * adjacentl;
 	Platform * adjacentr;
+	class PlatformSet * set;
 };
 
 #endif
