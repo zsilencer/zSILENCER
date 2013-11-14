@@ -118,7 +118,7 @@ void Guard::Tick(World & world){
 				if(world.tickcount - lastspoke > 24 * 10){
 					lastspoke = world.tickcount;
 					const char * sounds[5] = {"theres3.wav", "stop4.wav", "freeze3.wav", "freezrt1.wav", "drop4.wav"};
-					Audio::GetInstance().EmitSound(id, world.resources.soundbank[sounds[rand() % 5]], 128);
+					EmitSound(world, world.resources.soundbank[sounds[rand() % 5]], 128);
 				}
 			}
 		}else{
@@ -212,7 +212,7 @@ void Guard::Tick(World & world){
 			res_index = state_i % 19;
 			xv = mirrored ? -speed : speed;
 			FollowGround(*this, world, xv);
-			if(DistanceToEnd(*this, world) <= world.minwalldistrance){
+			if(DistanceToEnd(*this, world) <= world.minwalldistance){
 				mirrored = !mirrored;
 			}
 			if(state_i == 240){
@@ -396,13 +396,13 @@ void Guard::Tick(World & world){
 			if(state_i == 0){
 				switch(rand() % 3){
 					case 0:
-						Audio::GetInstance().EmitSound(id, world.resources.soundbank["groan2.wav"], 128);
+						EmitSound(world, world.resources.soundbank["groan2.wav"], 128);
 						break;
 					case 1:
-						Audio::GetInstance().EmitSound(id, world.resources.soundbank["groan2a.wav"], 128);
+						EmitSound(world, world.resources.soundbank["groan2a.wav"], 128);
 						break;
 					case 2:
-						Audio::GetInstance().EmitSound(id, world.resources.soundbank["grunt2a.wav"], 128);
+						EmitSound(world, world.resources.soundbank["grunt2a.wav"], 128);
 						break;
 				}
 			}
@@ -535,9 +535,9 @@ void Guard::HandleHit(World & world, Uint8 x, Uint8 y, Object & projectile){
 		case ObjectTypes::BLASTERPROJECTILE:
 		case ObjectTypes::LASERPROJECTILE:{
 			if(rand() % 2 == 0){
-				Audio::GetInstance().EmitSound(id, world.resources.soundbank["strike03.wav"], 96);
+				EmitSound(world, world.resources.soundbank["strike03.wav"], 96);
 			}else{
-				Audio::GetInstance().EmitSound(id, world.resources.soundbank["strike04.wav"], 96);
+				EmitSound(world, world.resources.soundbank["strike04.wav"], 96);
 			}
 		}break;
 		case ObjectTypes::ROCKETPROJECTILE:{

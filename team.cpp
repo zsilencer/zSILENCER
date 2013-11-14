@@ -66,7 +66,7 @@ void Team::Tick(World & world){
 		for(int i = 0; i < numpeers; i++){
 			Player * player = world.GetPeerPlayer(peers[i]);
 			if(player){
-				player->credits += 1000;
+				player->AddCredits(1000);
 			}
 		}
 		world.Illuminate();
@@ -336,16 +336,16 @@ Uint8 Team::GetColor(void){
 			basecolor = 13;
 		break;
 		case 3:
+			basecolor = 9;
+			shade = 8;
+		break;
+		case 4:
 			basecolor = 15;
 			shade = 11;
 		break;
-		case 4:
+		case 5:
 			basecolor = 12;
 			shade = 10;
-		break;
-		case 5:
-			basecolor = 10;
-			shade = 4;
 		break;
 	}
 	if(agency == BLACKROSE){

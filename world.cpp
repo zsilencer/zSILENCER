@@ -892,17 +892,17 @@ void World::SwitchToMode(bool newmode){
 			}
 		}
 	}else
-		if(newmode == AUTHORITY && mode == REPLICA){
-			mode = AUTHORITY;
-			authoritypeer = localpeerid;
-			for(unsigned int i = 0; i < maxpeers; i++){
-				if(peerlist[i]){
-					peerlist[i]->lastpacket = SDL_GetTicks();
-				}
+	if(newmode == AUTHORITY && mode == REPLICA){
+		mode = AUTHORITY;
+		authoritypeer = localpeerid;
+		for(unsigned int i = 0; i < maxpeers; i++){
+			if(peerlist[i]){
+				peerlist[i]->lastpacket = SDL_GetTicks();
 			}
-			Listen(GetAuthorityPeer()->port);
-			SendPeerList();
 		}
+		Listen(GetAuthorityPeer()->port);
+		SendPeerList();
+	}
 }
 
 void World::DeleteOldSnapshots(Uint8 peerid){
@@ -1010,10 +1010,11 @@ bool World::RelevantToPlayer(Player * player, Object * object){
 				}
 			}
 		}*/
-		for(std::list<Object *>::iterator it = objectlist.begin(); it != objectlist.end(); it++){
-			if((*it)->type == ObjectTypes::SURVEILLANCEMONITOR){
-				if(abs(player->x - (*it)->x) <= 500 && abs(player->y - (*it)->y) <= 500){
-					SurveillanceMonitor * surveillancemonitor = static_cast<SurveillanceMonitor *>(*it);
+		for(std::vector<Uint16>::iterator it = objectsbytype[ObjectTypes::SURVEILLANCEMONITOR].begin(); it != objectsbytype[ObjectTypes::SURVEILLANCEMONITOR].end(); it++){
+			Object * obj = GetObjectFromId((*it));
+			if(obj){
+				if(abs(player->x - obj->x) <= 500 && abs(player->y - obj->y) <= 500){
+					SurveillanceMonitor * surveillancemonitor = static_cast<SurveillanceMonitor *>(obj);
 					if(surveillancemonitor->camera.IsVisible(*this, *object)){
 						return true;
 					}
@@ -1176,6 +1177,18 @@ void World::SendStats(Peer & peer){
 
 void World::UserInfoReceived(Peer & peer){
 	ApplyWantedTech(peer);
+}
+
+bool World::IsCollidable(Uint8 type){
+	switch(type){
+		case ObjectTypes::SHRAPNEL:
+		case ObjectTypes::PLUME:
+			return false;
+		break;
+		default:
+			return true;
+		break;
+	}
 }
 
 void World::ApplyWantedTech(Peer & peer){
@@ -1345,14 +1358,11 @@ Player * World::GetPeerPlayer(Uint8 peerid){
 
 Team * World::GetPeerTeam(Uint8 peerid){
 	if(peerlist[peerid]){
-		for(std::list<Object *>::iterator it = objectlist.begin(); it != objectlist.end(); it++){
-			Object * object = *it;
-			if(object->type == ObjectTypes::TEAM){
-				Team * team = static_cast<Team *>(object);
-				for(int i = 0; i < team->numpeers; i++){
-					if(team->peers[i] == peerid){
-						return team;
-					}
+		for(std::vector<Uint16>::iterator it = objectsbytype[ObjectTypes::TEAM].begin(); it != objectsbytype[ObjectTypes::TEAM].end(); it++){
+			Team * team = static_cast<Team *>(GetObjectFromId((*it)));
+			for(int i = 0; i < team->numpeers; i++){
+				if(team->peers[i] == peerid){
+					return team;
 				}
 			}
 		}
@@ -1419,7 +1429,7 @@ bool World::FindTeamForPeer(Peer & peer, Uint8 agency, int start){
 void World::SendSnapshots(void){
 	for(unsigned int i = 0; i < maxpeers; i++){
 		Peer * peer = peerlist[i];
-		if(peer && i != localpeerid){
+		if(peer && i != localpeerid && !peer->isbot){
 			Serializer data;
 			Uint8 code = MSG_SNAPSHOT;
 			data.Put(code);
@@ -1654,7 +1664,7 @@ void World::KillByGovt(Peer & peer){
 		msg[1] = peer.id;
 		for(unsigned int i = 0; i < maxpeers; i++){
 			Peer * ipeer = peerlist[i];
-			if(ipeer && i != localpeerid){
+			if(ipeer){
 				SendPacket(ipeer, msg, 2);
 				if(ipeer->id == peer.id){
 					Player * player = GetPeerPlayer(ipeer->id);
@@ -1905,6 +1915,10 @@ Object * World::CreateObject(Uint8 type, Uint16 id){
 		object->id = id;
 	}
 	objectlist.push_back(object);
+	if(IsCollidable(type)){
+		tobjectlist.push_back(object);
+	}
+	objectsbytype[type].push_back(object->id);
 	objectidlookup[object->id] = object;
 	return object;
 }
@@ -1922,7 +1936,8 @@ void World::MarkDestroyObject(Uint16 id){
 
 void World::DestroyMarkedObjects(void){
 	for(std::list<Uint16>::iterator i = objectdestroylist.begin(); i != objectdestroylist.end(); i++){
-		for(std::list<Object *>::iterator j = objectlist.begin(); j != objectlist.end(); j++){
+		DestroyObject((*i));
+		/*for(std::list<Object *>::iterator j = objectlist.begin(); j != objectlist.end(); j++){
 			if((*j)->id == (*i)){
 				objectidlookup.erase((*j)->id);
 				(*j)->OnDestroy(*this);
@@ -1930,13 +1945,22 @@ void World::DestroyMarkedObjects(void){
 				objectlist.erase(j);
 				break;
 			}
-		}
+		}*/
 	}
 	objectdestroylist.clear();
 }
 
 void World::DestroyObject(Uint16 id){
-	for(std::list<Object *>::iterator i = objectlist.begin(); i != objectlist.end(); i++){
+	Object * object = GetObjectFromId(id);
+	if(object){
+		objectidlookup.erase(object->id);
+		object->OnDestroy(*this);
+		delete object;
+		objectlist.remove(object);
+		tobjectlist.remove(object);
+		objectsbytype[object->type].erase(std::find(objectsbytype[object->type].begin(), objectsbytype[object->type].end(), id));
+	}
+	/*for(std::list<Object *>::iterator i = objectlist.begin(); i != objectlist.end(); i++){
 		if((*i)->id == id){
 			objectidlookup.erase((*i)->id);
 			(*i)->OnDestroy(*this);
@@ -1944,7 +1968,7 @@ void World::DestroyObject(Uint16 id){
 			objectlist.erase(i);
 			break;
 		}
-	}
+	}*/
 }
 
 void World::DestroyAllObjects(void){
@@ -1953,8 +1977,12 @@ void World::DestroyAllObjects(void){
 		delete (*j);
 	}
 	objectlist.clear();
+	tobjectlist.clear();
 	objectidlookup.clear();
 	objectdestroylist.clear();
+	for(int i = 0; i < ObjectTypes::MAX_OBJECT_TYPE; i++){
+		objectsbytype[i].clear();
+	}
 }
 
 bool World::TestAABB(int x1, int y1, int x2, int y2, Object * object, std::vector<Uint8> & types, bool onlycollidable){
@@ -1973,7 +2001,7 @@ bool World::TestAABB(int x1, int y1, int x2, int y2, Object * object, std::vecto
 
 std::vector<Object *> World::TestAABB(int x1, int y1, int x2, int y2, std::vector<Uint8> & types, Uint16 except, Uint16 teamid, bool onlycollidable){
 	std::vector<Object *> objects;
-	for(std::list<Object *>::iterator i = objectlist.begin(); i != objectlist.end(); i++){
+	for(std::list<Object *>::iterator i = tobjectlist.begin(); i != tobjectlist.end(); i++){
 		Object * object = (*i);
 		if(object->issprite){
 			if(object->id != except){

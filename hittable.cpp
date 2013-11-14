@@ -83,13 +83,13 @@ void Hittable::HandleHit(Object & object, World & world, Uint8 x, Uint8 y, Objec
 		}break;
 		case ObjectTypes::FLAMERPROJECTILE:{
 			if(world.tickcount % 4 == 0){
-				Audio::GetInstance().EmitSound(object.id, world.resources.soundbank["s_flmc01.wav"], 128);
+				object.EmitSound(world, world.resources.soundbank["s_flmc01.wav"], 128);
 			}
 		}break;
 	}
 	Uint8 hit_type = state_hit / 32;
 	if(hit_type == 1 && health > 0){
-		Audio::GetInstance().EmitSound(object.id, world.resources.soundbank["shlddn1.wav"]);
+		object.EmitSound(world, world.resources.soundbank["shlddn1.wav"]);
 	}
 	hitx = x;
 	hity = y;

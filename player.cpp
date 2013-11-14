@@ -344,7 +344,7 @@ void Player::Tick(World & world){
 		}else{
 			if(state != JETPACK && state != DEPLOYING){
 				disguised = 112;
-				Audio::GetInstance().EmitSound(id, world.resources.soundbank["disguise.wav"], 64);
+				EmitSound(world, world.resources.soundbank["disguise.wav"], 64);
 				if(OnGround()){
 					state = RUNNING;
 					state_i = 25;
@@ -362,7 +362,7 @@ void Player::Tick(World & world){
 	}
 	if(state != HACKING || state_i >= 17){
 		if(!world.replaying && hacksoundchannel != -1){
-			Audio::GetInstance().EmitSound(id, world.resources.soundbank["jackout.wav"], 20);
+			EmitSound(world, world.resources.soundbank["jackout.wav"], 20);
 			Audio::GetInstance().Stop(hacksoundchannel, 700);
 			hacksoundchannel = -1;
 		}
@@ -371,7 +371,7 @@ void Player::Tick(World & world){
 		if(state != JETPACK && state != JETPACKSHOOT){
 			if(!world.replaying){
 				//GetTeam(*world)->secretdelivered = true;
-				Audio::GetInstance().EmitSound(id, world.resources.soundbank["jetpak2a.wav"], 64);
+				EmitSound(world, world.resources.soundbank["jetpak2a.wav"], 64);
 				Audio::GetInstance().Stop(jetpacksoundchannel, 200);
 				jetpacksoundchannel = -1;
 			}
@@ -1037,7 +1037,7 @@ void Player::Tick(World & world){
 		case UNDEPLOYING:{
 			collidable = false;
 			if(state_i == 0 && !world.winningteamid){
-				Audio::GetInstance().EmitSound(id, world.resources.soundbank["transrev.wav"], 96);
+				EmitSound(world, world.resources.soundbank["transrev.wav"], 96);
 			}
 			res_bank = 68;
 			res_index = (8 - state_i);
@@ -1052,7 +1052,7 @@ void Player::Tick(World & world){
 			xv = 0;
 			yv = 0;
 			if(state_i == 12 && world.map.TestAABB(x, y, x, y, Platform::OUTSIDEROOM)){
-				Audio::GetInstance().EmitSound(id, world.resources.soundbank["breath2.wav"], 16);
+				EmitSound(world, world.resources.soundbank["breath2.wav"], 16);
 				Plume * plume = static_cast<Plume *>(world.CreateObject(ObjectTypes::PLUME));
 				if(plume){
 					plume->type = 8;
@@ -1260,7 +1260,7 @@ void Player::Tick(World & world){
 					break;
 				}
 			}
-			if(IsDisguised() && state_i >= 25 && DistanceToEnd(*this, world) <= world.minwalldistrance){
+			if(IsDisguised() && state_i >= 25 && DistanceToEnd(*this, world) <= world.minwalldistance){
 				mirrored = !mirrored;
 			}
 			if(state_i >= 0 && state_i <= 5){
@@ -1270,7 +1270,7 @@ void Player::Tick(World & world){
 					res_bank = 66;
 					res_index = state_i;
 					if(res_index == 3){
-						Audio::GetInstance().EmitSound(id, world.resources.soundbank["futstonl.wav"], 24);
+						EmitSound(world, world.resources.soundbank["futstonl.wav"], 24);
 					}
 				}
 			}
@@ -1284,17 +1284,17 @@ void Player::Tick(World & world){
 					res_bank = 123;
 				}
 				if(res_index == 4){
-					Audio::GetInstance().EmitSound(id, world.resources.soundbank["futstonl.wav"], 24);
+					EmitSound(world, world.resources.soundbank["futstonl.wav"], 24);
 				}
 				if(res_index == 11){
-					Audio::GetInstance().EmitSound(id, world.resources.soundbank["futstonr.wav"], 24);
+					EmitSound(world, world.resources.soundbank["futstonr.wav"], 24);
 				}
 			}
 			if(state_i >= 21 && state_i < 25){
 				res_bank = 67;
 				res_index = state_i - 21;
 				if(res_index == 3){
-					Audio::GetInstance().EmitSound(id, world.resources.soundbank["futstonl.wav"], 24);
+					EmitSound(world, world.resources.soundbank["futstonl.wav"], 24);
 				}
 				if(input.keymoveleft || input.keymoveright){
 					state_i = -1;
@@ -1316,10 +1316,10 @@ void Player::Tick(World & world){
 					state_i = 25 - 1;
 				}
 				if(res_index == 5){
-					Audio::GetInstance().EmitSound(id, world.resources.soundbank["stostep1.wav"], 16);
+					EmitSound(world, world.resources.soundbank["stostep1.wav"], 16);
 				}
 				if(res_index == 15){
-					Audio::GetInstance().EmitSound(id, world.resources.soundbank["stostepr.wav"], 16);
+					EmitSound(world, world.resources.soundbank["stostepr.wav"], 16);
 				}
 			}
 			//printf("bank: %d  index: %d\n", res_bank, res_index);
@@ -1357,7 +1357,7 @@ void Player::Tick(World & world){
 			res_bank = 19;
 			res_index = state_i;
 			if(state_i == 1){
-				Audio::GetInstance().EmitSound(id, world.resources.soundbank["portpas2.wav"], 32);
+				EmitSound(world, world.resources.soundbank["portpas2.wav"], 32);
 			}
 			if(state_i >= 15){
 				collidable = true;
@@ -1391,7 +1391,7 @@ void Player::Tick(World & world){
 			collidable = false;
 			xv = 0;
 			if(state_i == 0){
-				Audio::GetInstance().EmitSound(id, world.resources.soundbank["portpas2.wav"], 32);
+				EmitSound(world, world.resources.soundbank["portpas2.wav"], 32);
 			}
 			res_bank = 19;
 			res_index = 15 - state_i;
@@ -1431,7 +1431,7 @@ void Player::Tick(World & world){
 		}break;
 		case CROUCHED:{
 			if(state_i == 12 && world.map.TestAABB(x, y, x, y, Platform::OUTSIDEROOM)){
-				Audio::GetInstance().EmitSound(id, world.resources.soundbank["breath2.wav"], 16);
+				EmitSound(world, world.resources.soundbank["breath2.wav"], 16);
 				Plume * plume = static_cast<Plume *>(world.CreateObject(ObjectTypes::PLUME));
 				if(plume){
 					plume->type = 8;
@@ -1553,7 +1553,7 @@ void Player::Tick(World & world){
 			res_bank = 88;
 			res_index = state_i;
 			if(res_index == 0){
-				Audio::GetInstance().EmitSound(id, world.resources.soundbank["roll2.wav"], 32);
+				EmitSound(world, world.resources.soundbank["roll2.wav"], 32);
 			}
 			if(state_i >= 8){
 				xv = 0;
@@ -1621,7 +1621,7 @@ void Player::Tick(World & world){
 			}
 			////
 			
-			Audio::GetInstance().EmitSound(id, world.resources.soundbank["juunewne.wav"], 96);
+			EmitSound(world, world.resources.soundbank["juunewne.wav"], 96);
 			yv = v;
 			xv2 = xv;
 			yv2 = yv;
@@ -1789,11 +1789,11 @@ void Player::Tick(World & world){
 			}
 			if(hackable && terminal){
 				if(state_i == 14){
-					Audio::GetInstance().EmitSound(id, world.resources.soundbank["jackin.wav"], 30);
+					EmitSound(world, world.resources.soundbank["jackin.wav"], 30);
 				}
 				if(state_i >= 14 && state_i <= 16){
 					if(hacksoundchannel == -1){
-						hacksoundchannel = Audio::GetInstance().EmitSound(id, world.resources.soundbank["ambloop5.wav"], 50, true);
+						hacksoundchannel = EmitSound(world, world.resources.soundbank["ambloop5.wav"], 50, true);
 					}
 				}
 			}
@@ -2063,7 +2063,7 @@ void Player::Tick(World & world){
 						SetToRespawnPosition(world);
 						health = maxhealth;
 						shield = maxshield;
-						Audio::GetInstance().EmitSound(id, world.resources.soundbank["transrev.wav"], 64);
+						EmitSound(world, world.resources.soundbank["transrev.wav"], 64);
 						state_i = -1;
 						break;
 					}else{
@@ -2106,7 +2106,7 @@ void Player::Tick(World & world){
 			res_bank = 199;
 			res_index = state_i;
 			if(state_i == 2){
-				Audio::GetInstance().EmitSound(id, world.resources.soundbank["repair.wav"], 128);
+				EmitSound(world, world.resources.soundbank["repair.wav"], 128);
 			}
 			if(state_i >= 27){
 				health = maxhealth;
@@ -2195,11 +2195,7 @@ void Player::Tick(World & world){
 									files = maxfiles;
 								}
 								Uint16 creditamount = files * (1 + creditsbonus);
-								if(int(credits) + creditamount > 0xFFFF){
-									credits = 0xFFFF;
-								}else{
-									credits += creditamount;
-								}
+								AddCredits(creditamount);
 								Peer * peer = GetPeer(world);
 								if(peer){
 									peer->stats.filesreturned += files;
@@ -2286,9 +2282,9 @@ void Player::HandleHit(World & world, Uint8 x, Uint8 y, Object & projectile){
 	UnDisguise(world);
 	if(world.tickcount - hitsoundplaytick > 10){
 		if(rand() % 2 == 0){
-			Audio::GetInstance().EmitSound(id, world.resources.soundbank["s_hita01.wav"]);
+			EmitSound(world, world.resources.soundbank["s_hita01.wav"]);
 		}else{
-			Audio::GetInstance().EmitSound(id, world.resources.soundbank["s_hitb01.wav"]);
+			EmitSound(world, world.resources.soundbank["s_hitb01.wav"]);
 		}
 		hitsoundplaytick = world.tickcount;
 	}
@@ -2398,7 +2394,7 @@ void Player::HandleHit(World & world, Uint8 x, Uint8 y, Object & projectile){
 		}
 		state = DYING;
 		state_i = 0;
-		Audio::GetInstance().EmitSound(id, world.resources.soundbank["grunt2a.wav"]);
+		EmitSound(world, world.resources.soundbank["grunt2a.wav"]);
 	}
 }
 
@@ -2471,7 +2467,7 @@ bool Player::IsDisguised(void){
 void Player::UnDisguise(World & world){
 	if(IsDisguised()){
 		disguised = 12;
-		Audio::GetInstance().EmitSound(id, world.resources.soundbank["disguise.wav"], 64);
+		EmitSound(world, world.resources.soundbank["disguise.wav"], 64);
 	}
 }
 
@@ -2521,8 +2517,8 @@ bool Player::CheckForGround(World & world, Platform & platform){
 	justjumpedfromladder = false;
 	Uint32 yt = platform.XtoY(x);
 	if(y <= yt || ((platform.type == Platform::STAIRSUP || platform.type == Platform::STAIRSDOWN) && y <= yt + 1)){
-		Audio::GetInstance().EmitSound(id, world.resources.soundbank["futstonr.wav"], 32);
-		Audio::GetInstance().EmitSound(id, world.resources.soundbank["land11.wav"], 96);
+		EmitSound(world, world.resources.soundbank["futstonr.wav"], 32);
+		EmitSound(world, world.resources.soundbank["land11.wav"], 96);
 		yv = 0;
 		currentplatformid = platform.id;
 		y = yt;
@@ -2628,11 +2624,9 @@ Team * Player::GetTeam(World & world){
 		}
 	}
 	std::vector<Team *> teams;
-	for(std::list<Object *>::iterator it = world.objectlist.begin(); it != world.objectlist.end(); it++){
-		Object * object = *it;
-		if(object->type == ObjectTypes::TEAM){
-			teams.push_back(static_cast<Team *>(object));
-		}
+	for(std::vector<Uint16>::iterator it = world.objectsbytype[ObjectTypes::TEAM].begin(); it != world.objectsbytype[ObjectTypes::TEAM].end(); it++){
+		Object * object = world.GetObjectFromId((*it));
+		teams.push_back(static_cast<Team *>(object));
 	}
 	for(std::vector<Team *>::iterator it = teams.begin(); it != teams.end(); it++){
 		Team * team = *it;
@@ -2872,7 +2866,7 @@ bool Player::BuyItem(World & world, Uint8 id){
 					if(team->peers[0]){
 						Player * player = world.GetPeerPlayer(team->peers[0]);
 						if(player){
-							player->credits += 100;
+							player->AddCredits(100);
 							bought = true;
 						}
 					}
@@ -2884,7 +2878,7 @@ bool Player::BuyItem(World & world, Uint8 id){
 					if(team->peers[1]){
 						Player * player = world.GetPeerPlayer(team->peers[1]);
 						if(player){
-							player->credits += 100;
+							player->AddCredits(100);
 							bought = true;
 						}
 					}
@@ -2896,7 +2890,7 @@ bool Player::BuyItem(World & world, Uint8 id){
 					if(team->peers[2]){
 						Player * player = world.GetPeerPlayer(team->peers[2]);
 						if(player){
-							player->credits += 100;
+							player->AddCredits(100);
 							bought = true;
 						}
 					}
@@ -2908,7 +2902,7 @@ bool Player::BuyItem(World & world, Uint8 id){
 					if(team->peers[3]){
 						Player * player = world.GetPeerPlayer(team->peers[3]);
 						if(player){
-							player->credits += 100;
+							player->AddCredits(100);
 							bought = true;
 						}
 					}
@@ -2916,7 +2910,7 @@ bool Player::BuyItem(World & world, Uint8 id){
 			}break;
 		}
 		if(bought){
-			world.audio.EmitSound(Player::id, world.resources.soundbank["reload2.wav"], 96);
+			EmitSound(world, world.resources.soundbank["reload2.wav"], 96);
 			world.BuyItem(id);
 			credits -= buyableitem->price;
 			return true;
@@ -2945,7 +2939,7 @@ bool Player::RepairItem(World & world, Uint8 id){
 			}
 			
 			team->disabledtech &= ~(buyableitem->techchoice);
-			world.audio.EmitSound(Player::id, world.resources.soundbank["reload2.wav"], 96);
+			EmitSound(world, world.resources.soundbank["reload2.wav"], 96);
 			world.RepairItem(id);
 			credits -= buyableitem->repairprice;
 			return true;
@@ -2976,7 +2970,7 @@ bool Player::VirusItem(World & world, Uint8 id){
 				}
 				
 				team->disabledtech |= buyableitem->techchoice;
-				world.audio.EmitSound(Player::id, world.resources.soundbank["reload2.wav"], 96);
+				EmitSound(world, world.resources.soundbank["reload2.wav"], 96);
 				world.VirusItem(id);
 				RemoveInventoryItem(INV_VIRUS);
 				return true;
@@ -3016,8 +3010,7 @@ void Player::KillByGovt(World & world){
 		govtprojectile.shielddamage = 0xFFFF;
 		govtprojectile.ownerid = team->id;
 		HandleHit(world, 50, 50, govtprojectile);
-		HandleHit(world, 50, 50, govtprojectile);
-		for(int i = 0; i < 16; i++){
+		for(int i = 0; i < 8; i++){
 			PlasmaProjectile * plasmaprojectile = static_cast<PlasmaProjectile *>(world.CreateObject(ObjectTypes::PLASMAPROJECTILE));
 			if(plasmaprojectile){
 				plasmaprojectile->x = x;
@@ -3027,6 +3020,14 @@ void Player::KillByGovt(World & world){
 				plasmaprojectile->ownerid = govtprojectile.ownerid;
 			}
 		}
+	}
+}
+
+void Player::AddCredits(int amount){
+	if(credits + amount > 0xFFFF){
+		credits = 0xFFFF;
+	}else{
+		credits += amount;
 	}
 }
 
@@ -3078,7 +3079,7 @@ Projectile * Player::Fire(World & world, Uint8 direction){
 				}else{
 					projectile = world.CreateObject(ObjectTypes::FLAMERPROJECTILE);
 					if(flamersoundchannel == -1){
-						flamersoundchannel = world.audio.EmitSound(id, world.resources.soundbank["flamebg2.wav"], 128, true);
+						flamersoundchannel = EmitSound(world, world.resources.soundbank["flamebg2.wav"], 128, true);
 					}
 					flamerammo--;
 				}
@@ -3276,7 +3277,7 @@ bool Player::ProcessJetpackState(World & world){
 		fuel--;
 	}
 	if(jetpacksoundchannel == -1){
-		jetpacksoundchannel = world.audio.EmitSound(id, world.resources.soundbank["jetpak1.wav"], 64, true);
+		jetpacksoundchannel = EmitSound(world, world.resources.soundbank["jetpak1.wav"], 64, true);
 	}
 	/*if(currentplatformid){
 		y--;
@@ -3371,7 +3372,7 @@ bool Player::ProcessJetpackState(World & world){
 			xv /= 2;
 			yv /= 2;
 			if(abs(xv) >= 2 || abs(yv) >= 2){
-				world.audio.EmitSound(id, world.resources.soundbank["land1.wav"], 96);
+				EmitSound(world, world.resources.soundbank["land1.wav"], 96);
 			}
 		}
 	}
@@ -3440,7 +3441,7 @@ bool Player::ProcessFallingState(World & world){
 			xv = (xn * abs(xv)) / 2;
 			yv = (yn * abs(yv)) / 2;
 			if(abs(xv) >= 2 || abs(yv) >= 2){
-				world.audio.EmitSound(id, world.resources.soundbank["fall2b.wav"], 96);
+				EmitSound(world, world.resources.soundbank["fall2b.wav"], 96);
 			}
 		}
 	}else{
@@ -3638,10 +3639,10 @@ bool Player::ProcessLadderState(World &world){
 	}
 	res_index = state_i;
 	if(res_index == 4){
-		world.audio.EmitSound(id, world.resources.soundbank["ladder1.wav"], 24);
+		EmitSound(world, world.resources.soundbank["ladder1.wav"], 24);
 	}
 	if(res_index == 15){
-		world.audio.EmitSound(id, world.resources.soundbank["ladder2.wav"], 24);
+		EmitSound(world, world.resources.soundbank["ladder2.wav"], 24);
 	}
 	return false;
 }
@@ -3670,7 +3671,7 @@ void Player::Warp(World & world, Sint16 x, Sint16 y){
 		warpx = x;
 		warpy = y;
 		state_warp = 1;
-		world.audio.EmitSound(id, world.resources.soundbank["transrev.wav"], 96);
+		EmitSound(world, world.resources.soundbank["transrev.wav"], 96);
 	}
 }
 
@@ -3716,7 +3717,7 @@ bool Player::PickUpItem(World & world, PickUp & pickup){
 			}
 			effecthacking = true;
 			effecthackingcontinue = 5;
-			world.audio.EmitSound(id, world.resources.soundbank["power11.wav"], 64);
+			EmitSound(world, world.resources.soundbank["power11.wav"], 64);
 		}break;
 		case PickUp::LASERAMMO:{
 			laserammo += pickup.quantity;
@@ -3728,7 +3729,7 @@ bool Player::PickUpItem(World & world, PickUp & pickup){
 				sprintf(temp, "Picked up %d Laser ammo", pickup.quantity);
 				world.ShowStatus(temp);
 			}
-			world.audio.EmitSound(id, world.resources.soundbank["reload2.wav"], 96);
+			EmitSound(world, world.resources.soundbank["reload2.wav"], 96);
 		}break;
 		case PickUp::ROCKETAMMO:{
 			rocketammo += pickup.quantity;
@@ -3740,7 +3741,7 @@ bool Player::PickUpItem(World & world, PickUp & pickup){
 				sprintf(temp, "Picked up %d Rocket ammo", pickup.quantity);
 				world.ShowStatus(temp);
 			}
-			world.audio.EmitSound(id, world.resources.soundbank["reload2.wav"], 96);
+			EmitSound(world, world.resources.soundbank["reload2.wav"], 96);
 		}break;
 		case PickUp::FLAMERAMMO:{
 			flamerammo += pickup.quantity;
@@ -3752,7 +3753,7 @@ bool Player::PickUpItem(World & world, PickUp & pickup){
 				sprintf(temp, "Picked up %d Flamer ammo", pickup.quantity);
 				world.ShowStatus(temp);
 			}
-			world.audio.EmitSound(id, world.resources.soundbank["reload2.wav"], 96);
+			EmitSound(world, world.resources.soundbank["reload2.wav"], 96);
 		}break;
 		case PickUp::NEUTRONBOMB:{
 			if(!pickup.powerup){
@@ -3797,7 +3798,7 @@ bool Player::PickUpItem(World & world, PickUp & pickup){
 			}
 		}
 		if(added){
-			world.audio.EmitSound(id, world.resources.soundbank["reload2.wav"], 96);
+			EmitSound(world, world.resources.soundbank["reload2.wav"], 96);
 			if(islocalplayer){
 				char temp[256];
 				sprintf(temp, "Picked up %d %s", pickup.quantity, invname);
@@ -3842,7 +3843,7 @@ bool Player::PickUpItem(World & world, PickUp & pickup){
 				char temp[256];
 				sprintf(temp, "%s", powerupname);
 				world.ShowStatus(temp);
-				Audio::GetInstance().EmitSound(id, world.resources.soundbank["power11.wav"], 128);
+				EmitSound(world, world.resources.soundbank["power11.wav"], 128);
 			}
 		}
 		/*	pickup.draw = false;

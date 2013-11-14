@@ -62,7 +62,7 @@ void RocketProjectile::Tick(World & world){
 		oldyv = yv;
 		xv = ceil(float(xv) * 0.2);
 		yv = ceil(float(yv) * 0.2);
-		soundchannel = Audio::GetInstance().EmitSound(id, world.resources.soundbank["rocket9.wav"], 128);
+		soundchannel = EmitSound(world, world.resources.soundbank["rocket9.wav"], 128);
 	}
 	if(state_i == 3){
 		res_bank = 87;
@@ -128,7 +128,7 @@ void RocketProjectile::Tick(World & world){
 			if(soundchannel){
 				Audio::GetInstance().Stop(soundchannel, 100);
 			}
-			Audio::GetInstance().EmitSound(id, world.resources.soundbank["seekexp1.wav"], 128);
+			EmitSound(world, world.resources.soundbank["seekexp1.wav"], 128);
 		}
 		for(int i = 0; i < 2; i++){
 			int xv2 = (signed(oldx) - x) * (1.25 * i);

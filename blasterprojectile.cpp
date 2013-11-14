@@ -48,7 +48,7 @@ void BlasterProjectile::Tick(World & world){
 	}
 	Uint8 life = 3;
 	if(state_i == 4){
-		Audio::GetInstance().EmitSound(id, world.resources.soundbank["!laserme.wav"], 128);
+		EmitSound(world, world.resources.soundbank["!laserme.wav"], 128);
 	}
 	if(state_i < 7){
 		res_index = state_i;
@@ -75,9 +75,9 @@ void BlasterProjectile::Tick(World & world){
 				overlay->x = x;
 				overlay->y = y;
 				if(rand() % 2 == 0){
-					Audio::GetInstance().EmitSound(overlay->id, world.resources.soundbank["rico1.wav"], 32);
+					overlay->EmitSound(world, world.resources.soundbank["rico1.wav"], 32);
 				}else{
-					Audio::GetInstance().EmitSound(overlay->id, world.resources.soundbank["rico2.wav"], 32);
+					overlay->EmitSound(world, world.resources.soundbank["rico2.wav"], 32);
 				}
 			}
 			float xn = 0, yn = 0;

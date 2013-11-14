@@ -66,3 +66,7 @@ void Object::HandleInput(Input & input){
 void Object::HandleDisconnect(World & world, Uint8 peerid){
 	
 }
+
+int Object::EmitSound(class World & world, Mix_Chunk * chunk, Uint8 volume, bool loop){
+	return Audio::GetInstance().EmitSound(world, id, chunk, volume, loop);
+}

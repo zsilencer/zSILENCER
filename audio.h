@@ -19,7 +19,7 @@ public:
 	void Pause(int channel);
 	void Resume(int channel);
 	bool Paused(int channel);
-	int EmitSound(Uint16 objectid, Mix_Chunk * chunk, Uint8 volume = 128, bool loop = false);
+	int EmitSound(class World & world, Uint16 objectid, Mix_Chunk * chunk, Uint8 volume = 128, bool loop = false);
 	void UpdateVolume(class World & world, int channel, Sint16 x, Sint16 y, int radius);
 	void UpdateAllVolumes(class World & world, Sint16 x, Sint16 y, int radius);
 	void SetVolume(int channel, Uint8 volume);
@@ -39,6 +39,7 @@ private:
 	int channelobject[maxchannels];
 	int channelvolume[maxchannels];
 	float effectvolume;
+	Sint16 lastx, lasty;
 };
 
 #endif

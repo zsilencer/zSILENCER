@@ -97,8 +97,8 @@ private:
 	Uint32 chatlinesprinted;
 	char localusername[16 + 1];
 	State * sharedstate;
-	int bgchannel[4];
-	enum {BG_AMBIENT = 0, BG_BASE, BG_TERMINAL, BG_OUTSIDE};
+	int bgchannel[3];
+	enum {BG_AMBIENT = 0, BG_BASE, BG_OUTSIDE};
 	int oldselecteditem;
 	Uint8 singleplayermessage;
 	bool updatetitle;

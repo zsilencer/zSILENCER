@@ -25,7 +25,7 @@ void Detonator::Serialize(bool write, Serializer & data, Serializer * old){
 void Detonator::Tick(World & world){
 	// 182:0-3 det/camera
 	if(state_i == 0){
-		Audio::GetInstance().EmitSound(id, world.resources.soundbank["shield2.wav"], 96);
+		EmitSound(world, world.resources.soundbank["shield2.wav"], 96);
 	}
 	res_index = (state_i / 4) % 4;
 	if(state_i == 4 * 4){
@@ -37,7 +37,7 @@ void Detonator::Tick(World & world){
 				// explode
 				if(iscamera){
 					draw = false;
-					Audio::GetInstance().EmitSound(id, world.resources.soundbank["q_expl02.wav"], 64);
+					EmitSound(world, world.resources.soundbank["q_expl02.wav"], 64);
 					for(int i = 0; i < 8; i++){
 						Plume * plume = (Plume *)world.CreateObject(ObjectTypes::PLUME);
 						if(plume){
@@ -46,7 +46,7 @@ void Detonator::Tick(World & world){
 						}
 					}
 				}else{
-					Audio::GetInstance().EmitSound(id, world.resources.soundbank["seekexp1.wav"], 128);
+					EmitSound(world, world.resources.soundbank["seekexp1.wav"], 128);
 					Sint8 xvs[] = {-14, 14, -10, 10, -10, 10};
 					Sint8 yvs[] = {-25, -25, 0, 0, 5, 5};
 					Sint8 ys[] = {0, 0, 0, 0, 0, 0, 0, 0};

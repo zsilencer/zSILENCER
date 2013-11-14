@@ -80,11 +80,12 @@ bool Audio::Paused(int channel){
 	return Mix_Paused(channel);
 }
 
-int Audio::EmitSound(Uint16 objectid, Mix_Chunk * chunk, Uint8 volume, bool loop){
+int Audio::EmitSound(World & world, Uint16 objectid, Mix_Chunk * chunk, Uint8 volume, bool loop){
 	int channel = Play(chunk, volume * effectvolume, loop);
 	if(channel != -1){
-		Mix_Volume(channel, 0);
+		//Mix_Volume(channel, 0);
 		channelobject[channel] = objectid;
+		UpdateVolume(world, channel, lastx, lasty, 500);
 	}
 	return channel;
 }
@@ -106,6 +107,8 @@ void Audio::UpdateVolume(World & world, int channel, Sint16 x, Sint16 y, int rad
 			}
 			int oldvolume = channelvolume[channel];
 			Mix_Volume(channel, (oldvolume * volume) * effectvolume);
+			lastx = x;
+			lasty = y;
 		}
 	}
 }

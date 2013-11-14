@@ -74,7 +74,7 @@ public:
 	unsigned int totalsnapshots;
 	unsigned int totalinputpackets;
 	Uint8 gravity;
-	static const int minwalldistrance = 35;
+	static const int minwalldistance = 35;
 	Uint8 maxyvelocity;
 	bool replaying;
 	Uint8 quitstate;
@@ -104,12 +104,14 @@ public:
 	
 protected:
 	std::list<class Object *> objectlist;
+	std::list<class Object *> tobjectlist;
 	void SaveSnapshot(Serializer & data, Uint8 peerid);
 	void LoadSnapshot(Serializer & data, bool create = true, Serializer * delta = 0, Uint16 objectid = 0);
 	Peer * AddPeer(char * address, unsigned short port, Uint8 agency, Uint32 accountid);
 	Peer * AddBot(Uint8 agency);
 	char mapname[256];
 	std::vector<Uint32> ingameusers;
+	std::vector<Uint16> objectsbytype[ObjectTypes::MAX_OBJECT_TYPE];
 
 private:
 	void DoNetwork_Authority(void);
@@ -142,6 +144,7 @@ private:
 	void SendStats(Peer & peer);
 	void UserInfoReceived(Peer & peer);
 	void ApplyWantedTech(Peer & peer);
+	bool IsCollidable(Uint8 type);
 	static bool CompareTeamByNumber(Team * team1, Team * team2);
 	std::map<Uint16, class Object *> objectidlookup;
 	std::list<Uint16> objectdestroylist;
@@ -153,7 +156,7 @@ private:
 	static const unsigned int maxpeers = 25;
 	static const unsigned int maxoldsnapshots = 36;
 	static const unsigned int maxlocalinputhistory = maxoldsnapshots + 1;
-	static const unsigned int peertimeout = 5000;
+	static const unsigned int peertimeout = 10000;
 	static const unsigned int maxteams = 6;
 	Peer * peerlist[maxpeers];
 	unsigned int authoritypeer;

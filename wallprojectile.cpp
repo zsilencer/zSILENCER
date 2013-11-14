@@ -26,7 +26,7 @@ void WallProjectile::Serialize(bool write, Serializer & data, Serializer * old){
 void WallProjectile::Tick(World & world){
 	Uint8 life = 20;
 	if(state_i == 1){
-		Audio::GetInstance().EmitSound(id, world.resources.soundbank["!laserel.wav"], 128);
+		EmitSound(world, world.resources.soundbank["!laserel.wav"], 128);
 	}
 	if(state_i < 7){
 		res_index = state_i;
@@ -54,9 +54,9 @@ void WallProjectile::Tick(World & world){
 				overlay->y = y;
 				if(platform){
 					if(rand() % 2 == 0){
-						Audio::GetInstance().EmitSound(overlay->id, world.resources.soundbank["strike03.wav"], 96);
+						overlay->EmitSound(world, world.resources.soundbank["strike03.wav"], 96);
 					}else{
-						Audio::GetInstance().EmitSound(overlay->id, world.resources.soundbank["strike04.wav"], 96);
+						overlay->EmitSound(world, world.resources.soundbank["strike04.wav"], 96);
 					}
 				}
 			}

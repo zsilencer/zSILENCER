@@ -36,7 +36,7 @@ void FixedCannon::Tick(World & world){
 	Hittable::Tick(*this, world);
 	switch(state){
 		case NEW:{
-			Audio::GetInstance().EmitSound(id, world.resources.soundbank["shield2.wav"], 96);
+			EmitSound(world, world.resources.soundbank["shield2.wav"], 96);
 			state = UP;
 		}break;
 		case UP:{
@@ -92,7 +92,7 @@ void FixedCannon::Tick(World & world){
 		}break;
 		case SHOOTING_UP:{
 			if(state_i == 0){
-				Audio::GetInstance().EmitSound(id, world.resources.soundbank["!laserew.wav"], 64);
+				EmitSound(world, world.resources.soundbank["!laserew.wav"], 64);
 				LaserProjectile * laserprojectile = (LaserProjectile *)world.CreateObject(ObjectTypes::LASERPROJECTILE);
 				if(laserprojectile){
 					laserprojectile->x = x + ((mirrored ? -1 : 1) * (45 + laserprojectile->emitoffset));
@@ -112,7 +112,7 @@ void FixedCannon::Tick(World & world){
 		}break;
 		case SHOOTING_DOWN:{
 			if(state_i == 0){
-				Audio::GetInstance().EmitSound(id, world.resources.soundbank["!laserew.wav"], 64);
+				EmitSound(world, world.resources.soundbank["!laserew.wav"], 64);
 				LaserProjectile * laserprojectile = (LaserProjectile *)world.CreateObject(ObjectTypes::LASERPROJECTILE);
 				if(laserprojectile){
 					laserprojectile->x = x + ((mirrored ? -1 : 1) * (45 + laserprojectile->emitoffset));
@@ -132,7 +132,7 @@ void FixedCannon::Tick(World & world){
 		}break;
 		case DYING:{
 			if(state_i == 0){
-				Audio::GetInstance().EmitSound(id, world.resources.soundbank["q_expl02.wav"], 128);
+				EmitSound(world, world.resources.soundbank["q_expl02.wav"], 128);
 				for(int i = 0; i < 6; i++){
 					Plume * plume = (Plume *)world.CreateObject(ObjectTypes::PLUME);
 					if(plume){

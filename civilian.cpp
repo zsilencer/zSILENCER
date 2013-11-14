@@ -74,12 +74,12 @@ void Civilian::Tick(World & world){
 			res_bank = 122;
 			res_index = state_i;
 			if(res_index == 5){
-				Audio::GetInstance().EmitSound(id, world.resources.soundbank["stostep1.wav"], 16);
+				EmitSound(world, world.resources.soundbank["stostep1.wav"], 16);
 			}
 			if(res_index == 15){
-				Audio::GetInstance().EmitSound(id, world.resources.soundbank["stostepr.wav"], 16);
+				EmitSound(world, world.resources.soundbank["stostepr.wav"], 16);
 			}
-			if(DistanceToEnd(*this, world) <= world.minwalldistrance){
+			if(DistanceToEnd(*this, world) <= world.minwalldistance){
 				mirrored = mirrored ? false : true;
 			}
 			xv = mirrored ? -speed : speed;
@@ -101,12 +101,12 @@ void Civilian::Tick(World & world){
 			res_bank = 123;
 			res_index = state_i % 15;
 			if(res_index == 6){
-				Audio::GetInstance().EmitSound(id, world.resources.soundbank["futstonl.wav"], 16);
+				EmitSound(world, world.resources.soundbank["futstonl.wav"], 16);
 			}
 			if(res_index == 14){
-				Audio::GetInstance().EmitSound(id, world.resources.soundbank["futstonr.wav"], 16);
+				EmitSound(world, world.resources.soundbank["futstonr.wav"], 16);
 			}
-			if(DistanceToEnd(*this, world) <= world.minwalldistrance){
+			if(DistanceToEnd(*this, world) <= world.minwalldistance){
 				mirrored = mirrored ? false : true;
 			}
 			FollowGround(*this, world, xv);
@@ -119,13 +119,13 @@ void Civilian::Tick(World & world){
 			if(state_i == 0){
 				switch(rand() % 3){
 					case 0:
-						Audio::GetInstance().EmitSound(id, world.resources.soundbank["groan2.wav"], 128);
+						EmitSound(world, world.resources.soundbank["groan2.wav"], 128);
 					break;
 					case 1:
-						Audio::GetInstance().EmitSound(id, world.resources.soundbank["groan2a.wav"], 128);
+						EmitSound(world, world.resources.soundbank["groan2a.wav"], 128);
 					break;
 					case 2:
-						Audio::GetInstance().EmitSound(id, world.resources.soundbank["grunt2a.wav"], 128);
+						EmitSound(world, world.resources.soundbank["grunt2a.wav"], 128);
 					break;
 				}
 			}
@@ -144,13 +144,13 @@ void Civilian::Tick(World & world){
 			if(state_i == 0){
 				switch(rand() % 3){
 					case 0:
-						Audio::GetInstance().EmitSound(id, world.resources.soundbank["groan2.wav"], 128);
+						EmitSound(world, world.resources.soundbank["groan2.wav"], 128);
 						break;
 					case 1:
-						Audio::GetInstance().EmitSound(id, world.resources.soundbank["groan2a.wav"], 128);
+						EmitSound(world, world.resources.soundbank["groan2a.wav"], 128);
 						break;
 					case 2:
-						Audio::GetInstance().EmitSound(id, world.resources.soundbank["grunt2a.wav"], 128);
+						EmitSound(world, world.resources.soundbank["grunt2a.wav"], 128);
 						break;
 				}
 			}
@@ -209,9 +209,9 @@ void Civilian::HandleHit(World & world, Uint8 x, Uint8 y, Object & projectile){
 		case ObjectTypes::BLASTERPROJECTILE:
 		case ObjectTypes::LASERPROJECTILE:{
 			if(rand() % 2 == 0){
-				Audio::GetInstance().EmitSound(id, world.resources.soundbank["strike03.wav"], 96);
+				EmitSound(world, world.resources.soundbank["strike03.wav"], 96);
 			}else{
-				Audio::GetInstance().EmitSound(id, world.resources.soundbank["strike04.wav"], 96);
+				EmitSound(world, world.resources.soundbank["strike04.wav"], 96);
 			}
 		}break;
 		case ObjectTypes::ROCKETPROJECTILE:{
@@ -296,7 +296,7 @@ bool Civilian::CheckTractVictim(World & world){
 				}
 			}
 			state = DYINGEXPLODE;
-			Audio::GetInstance().EmitSound(id, world.resources.soundbank["seekexp1.wav"], 128);
+			EmitSound(world, world.resources.soundbank["seekexp1.wav"], 128);
 			Object tractprojectile(ObjectTypes::PLASMAPROJECTILE);
 			tractprojectile.healthdamage = 80;
 			tractprojectile.shielddamage = 80;

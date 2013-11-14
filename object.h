@@ -22,6 +22,7 @@ public:
 	virtual void HandleHit(class World & world, Uint8 x, Uint8 y, class Object & projectile);
 	virtual void HandleInput(Input & input);
 	virtual void HandleDisconnect(World & world, Uint8 peerid);
+	int EmitSound(class World & world, Mix_Chunk * chunk, Uint8 volume = 128, bool loop = false);
 	bool requiresauthority;
 	bool requiresmaptobeloaded;
 	Uint8 type;

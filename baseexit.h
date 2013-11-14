@@ -8,7 +8,6 @@ class BaseExit : public Object
 {
 public:
 	BaseExit();
-	void Serialize(bool write, Serializer & data, Serializer * old = 0);
 	void Tick(World & world);
 	Uint16 teamid;
 	

@@ -47,7 +47,7 @@ void TechStation::HandleHit(World & world, Uint8 x, Uint8 y, Object & projectile
 	Hittable::HandleHit(*this, world, x, y, projectile);
 	if(health == 0 && projectile.healthdamage > 0){
 		collidable = false;
-		Audio::GetInstance().EmitSound(id, world.resources.soundbank["q_expl02.wav"], 128);
+		EmitSound(world, world.resources.soundbank["q_expl02.wav"], 128);
 		Team * team = static_cast<Team *>(world.GetObjectFromId(teamid));
 		if(team){
 			Uint32 tech = team->GetAvailableTech(world);

@@ -28,7 +28,7 @@ void BaseDoor::Serialize(bool write, Serializer & data, Serializer * old){
 
 void BaseDoor::Tick(World & world){
 	if(state_i == 0){
-		Audio::GetInstance().EmitSound(id, world.resources.soundbank["portal1.wav"], 64);
+		EmitSound(world, world.resources.soundbank["portal1.wav"], 64);
 	}
 	if(state_i < 41){
 		CheckForPlayersInView(world);

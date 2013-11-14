@@ -35,6 +35,7 @@ public:
 	bool VirusItem(World & world, Uint8 id);
 	void LoadAbilities(World & world);
 	void KillByGovt(World & world);
+	void AddCredits(int amount);
 	void UnDeploy(void);
 	Peer * GetPeer(World & world);
 	enum {INV_NONE, INV_HEALTHPACK, INV_LAZARUSTRACT, INV_SECURITYPASS, INV_VIRUS,

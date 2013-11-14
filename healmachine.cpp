@@ -21,7 +21,7 @@ void HealMachine::Tick(World & world){
 		}
 		if(state_i > 0){
 			if(state_i == 2){
-				Audio::GetInstance().EmitSound(id, world.resources.soundbank["if15.wav"], 96);
+				EmitSound(world, world.resources.soundbank["if15.wav"], 96);
 			}
 			state_i++;
 			if(state_i >= 10){

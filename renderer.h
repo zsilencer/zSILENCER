@@ -44,6 +44,7 @@ public:
 	SDL_Surface * CreateSameSizeSurface(SDL_Surface * src);
 	void EffectHacking(SDL_Surface * dst, SDL_Rect * dstrect, Uint8 color);
 	void EffectTeamColor(SDL_Surface * dst, SDL_Rect * dstrect, Uint8 values);
+	Uint8 TeamColorToIndex(Uint8 values);
 	void EffectBrightness(SDL_Surface * dst, SDL_Rect * dstrect, Uint8 brightness);
 	void EffectColor(SDL_Surface * dst, SDL_Rect * dstrect, Uint8 color);
 	void EffectRampColor(SDL_Surface * dst, SDL_Rect * dstrect, Uint8 color);
@@ -79,6 +80,8 @@ public:
 	int raindropsy[raindropscount];
 	int raindropsoldx[raindropscount];
 	int raindropsoldy[raindropscount];
+	static const Uint8 enemycolor = (8 << 4) + 10;
+	static const Uint8 teamcolor = (8 << 4) + 13;
 };
 
 #endif

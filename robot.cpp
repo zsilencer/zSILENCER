@@ -38,7 +38,7 @@ void Robot::Tick(World & world){
 	Bipedal::Tick(*this, world);
 	if(rand() % (24 * 15) == 0 && state != DEAD){
 		StopAmbience();
-		Audio::GetInstance().EmitSound(id, world.resources.soundbank["airlokj.wav"], 64);
+		EmitSound(world, world.resources.soundbank["airlokj.wav"], 64);
 	}
 	switch(state){
 		case NEW:{
@@ -76,7 +76,7 @@ void Robot::Tick(World & world){
 		}break;
 		case ASLEEP:{
 			if(soundchannel == -1){
-				soundchannel = Audio::GetInstance().EmitSound(id, world.resources.soundbank["wndloope.wav"], 32, true);
+				soundchannel = EmitSound(world, world.resources.soundbank["wndloope.wav"], 32, true);
 			}
 			res_bank = 47;
 			res_index = 0;
@@ -89,7 +89,7 @@ void Robot::Tick(World & world){
 		case AWAKENING:{
 			if(state_i == 0){
 				StopAmbience();
-				Audio::GetInstance().EmitSound(id, world.resources.soundbank["robotarm.wav"], 128);
+				EmitSound(world, world.resources.soundbank["robotarm.wav"], 128);
 			}
 			if(state_i >= 15){
 				state = WALKING;
@@ -105,11 +105,11 @@ void Robot::Tick(World & world){
 			}
 			if(state_i % 20 == 1){
 				StopAmbience();
-				Audio::GetInstance().EmitSound(id, world.resources.soundbank["robot3r.wav"], 48);
+				EmitSound(world, world.resources.soundbank["robot3r.wav"], 48);
 			}
 			if(state_i % 20 == 10){
 				StopAmbience();
-				Audio::GetInstance().EmitSound(id, world.resources.soundbank["robot3l.wav"], 48);
+				EmitSound(world, world.resources.soundbank["robot3l.wav"], 48);
 			}
 			if(state_i >= 100 && !patrol){
 				state = SLEEPING;
@@ -144,7 +144,7 @@ void Robot::Tick(World & world){
 						damageprojectile.ownerid = id;
 						player->HandleHit(world, 50, 50, damageprojectile);
 						StopAmbience();
-						Audio::GetInstance().EmitSound(id, world.resources.soundbank["!laserew.wav"], 64);
+						EmitSound(world, world.resources.soundbank["!laserew.wav"], 64);
 					}
 				}
 			}
@@ -152,7 +152,7 @@ void Robot::Tick(World & world){
 			res_index = state_i % 20;
 			xv = mirrored ? -4 : 4;
 			FollowGround(*this, world, xv);
-			if(DistanceToEnd(*this, world) <= world.minwalldistrance){
+			if(DistanceToEnd(*this, world) <= world.minwalldistance){
 				mirrored = mirrored ? false : true;
 			}
 		}break;
@@ -189,7 +189,7 @@ void Robot::Tick(World & world){
 		case DYING:{
 			if(state_i == 4 * 4){
 				StopAmbience();
-				Audio::GetInstance().EmitSound(id, world.resources.soundbank["seekexp1.wav"], 128);
+				EmitSound(world, world.resources.soundbank["seekexp1.wav"], 128);
 			}
 			collidable = false;
 			if(state_i >= 16 * 4){

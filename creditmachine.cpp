@@ -17,7 +17,7 @@ void CreditMachine::Tick(World & world){
 		res_index = state_i;
 		if(state_i > 0){
 			if(state_i == 4){
-				Audio::GetInstance().EmitSound(id, world.resources.soundbank["pwrcon1.wav"], 96);
+				EmitSound(world, world.resources.soundbank["pwrcon1.wav"], 96);
 			}
 			state_i++;
 			if(state_i >= 18){

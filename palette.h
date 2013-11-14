@@ -13,16 +13,16 @@ public:
 	bool SetPalette(Uint8 palette);
 	SDL_Color * GetColors(void);
 	Uint8 ClosestMatch(SDL_Color color, bool upperonly = false);
-	inline Uint8 Mix(Uint8 a, Uint8 b){
+	inline Uint8 Mix(int a, int b){
 		return currentmixedpalette[(a * 256) + b];
 	}
-	inline Uint8 Brightness(Uint8 a, Uint8 i){
+	inline Uint8 Brightness(int a, int i){
 		return currentbrightnesspalette[(a * 256) + i];
 	}
-	inline Uint8 Color(Uint8 a, Uint8 b){
+	inline Uint8 Color(int a, int b){
 		return currentcoloredpalette[(a * 256) + b];
 	}
-	inline Uint8 Alpha(Uint8 a, Uint8 b){
+	inline Uint8 Alpha(int a, int b){
 		return currentalphaedpalette[(a * 256) + b];
 	}
 	Uint8 RampColor(Uint8 a, Uint8 b);

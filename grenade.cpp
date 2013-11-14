@@ -33,7 +33,7 @@ void Grenade::Serialize(bool write, Serializer & data, Serializer * old){
 void Grenade::Tick(World & world){
 	if(state_i <= 4){
 		if(state_i == 4){
-			Audio::GetInstance().EmitSound(id, world.resources.soundbank["grenthro.wav"], 64);
+			EmitSound(world, world.resources.soundbank["grenthro.wav"], 64);
 		}
 		/*Player * player = (Player *)world->GetObjectFromId(ownerid);
 		if(player){
@@ -81,7 +81,7 @@ void Grenade::Tick(World & world){
 			draw = false;
 			switch(type){
 				case EMP:{
-					Audio::GetInstance().EmitSound(id, world.resources.soundbank["q_expl02.wav"], 128);
+					EmitSound(world, world.resources.soundbank["q_expl02.wav"], 128);
 					for(int i = 0; i < 8; i++){
 						Plume * plume = (Plume *)world.CreateObject(ObjectTypes::PLUME);
 						if(plume){
@@ -105,7 +105,7 @@ void Grenade::Tick(World & world){
 					}
 				}break;
 				case SHAPED:{
-					Audio::GetInstance().EmitSound(id, world.resources.soundbank["seekexp1.wav"], 128);
+					EmitSound(world, world.resources.soundbank["seekexp1.wav"], 128);
 					Sint8 xvs[] = {-10, -5, 0, 5, 10};
 					Sint8 yvs[] = {-33, -34, -35, -34, -33};
 					Sint8 ys[] = {0, 0, 0, 0, 0};
@@ -122,7 +122,7 @@ void Grenade::Tick(World & world){
 					}
 				}break;
 				case PLASMA:{
-					Audio::GetInstance().EmitSound(id, world.resources.soundbank["seekexp1.wav"], 128);
+					EmitSound(world, world.resources.soundbank["seekexp1.wav"], 128);
 					Sint8 xvs[] = {-14, 14, -10, 10, -10, 10};
 					Sint8 yvs[] = {-25, -25, -10, -10, -5, -5};
 					Sint8 ys[] = {0, 0, 0, 0, 0, 0, 0, 0};
@@ -140,7 +140,7 @@ void Grenade::Tick(World & world){
 				}break;
 				case NEUTRON:{
 					world.SendSound("grenade1.wav");
-					Audio::GetInstance().EmitSound(id, world.resources.soundbank["q_expl02.wav"], 128);
+					EmitSound(world, world.resources.soundbank["q_expl02.wav"], 128);
 					for(int i = 0; i < 8; i++){
 						Plume * plume = (Plume *)world.CreateObject(ObjectTypes::PLUME);
 						if(plume){
@@ -152,7 +152,7 @@ void Grenade::Tick(World & world){
 				case POISONFLARE:
 				case FLARE:{
 					draw = true;
-					Audio::GetInstance().EmitSound(id, world.resources.soundbank["rocket1.wav"], 128);
+					EmitSound(world, world.resources.soundbank["rocket1.wav"], 128);
 				}break;
 			}
 		}else
@@ -207,7 +207,6 @@ void Grenade::Tick(World & world){
 					neutronprojectile.healthdamage = 0xFFFF;
 					neutronprojectile.shielddamage = 0xFFFF;
 					neutronprojectile.ownerid = ownerid;
-					object->HandleHit(world, 50, 50, neutronprojectile);
 					object->HandleHit(world, 50, 50, neutronprojectile);
 				}
 			}

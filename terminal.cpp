@@ -41,7 +41,7 @@ void Terminal::Tick(World & world){
 		SetSize(isbig);
 	}
 	if(soundchannel == -1){
-		soundchannel = Audio::GetInstance().EmitSound(id, world.resources.soundbank["ambloop4.wav"], isbig ? 45 : 32, true);
+		soundchannel = EmitSound(world, world.resources.soundbank["ambloop4.wav"], isbig ? 45 : 32, true);
 	}
 	if(hackerid){
 		Player * player = (Player *)world.GetObjectFromId(hackerid);

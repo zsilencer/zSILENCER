@@ -31,6 +31,7 @@
 #include "grenade.h"
 #include "walldefense.h"
 #include "wallprojectile.h"
+#include "config.h"
 #include <math.h>
 #include "sdl_internal.h"
 
@@ -75,10 +76,8 @@ void Renderer::Draw(SDL_Surface * surface, float frametime){
 	
 	localplayer = world.GetPeerPlayer(world.localpeerid);
 	if(!localplayer && world.IsAuthority()){
-		for(std::list<Object *>::iterator it = world.objectlist.begin(); it != world.objectlist.end(); it++){
-			if((*it)->type == ObjectTypes::PLAYER){
-				localplayer = (Player *)(*it);
-			}
+		for(std::vector<Uint16>::iterator it = world.objectsbytype[ObjectTypes::PLAYER].begin(); it != world.objectsbytype[ObjectTypes::PLAYER].end(); it++){
+			localplayer = static_cast<Player *>(world.GetObjectFromId((*it)));
 		}
 	}
 	if(localplayer){
@@ -443,7 +442,19 @@ void Renderer::DrawWorld(SDL_Surface * surface, Camera & camera, Uint8 * lightma
 									dstrect.y = surveillancemonitor->renderyoffset + object->y - world.resources.spriteoffsety[object->res_bank][object->res_index] + camera.GetYOffset();
 									SDL_Surface * newsurface = CreateSurface(dstrect.w, dstrect.h);
 									//memset(newsurface->pixels, 1, newsurface->w * newsurface->h);
+									Object * objectfollowing = 0;
+									if(surveillancemonitor->objectfollowing){
+										objectfollowing = world.GetObjectFromId(surveillancemonitor->objectfollowing);
+									}
+									if(objectfollowing){
+										surveillancemonitor->camera.x += (objectfollowing->oldx - objectfollowing->x) * frametime;
+										surveillancemonitor->camera.x += (objectfollowing->oldy - objectfollowing->y) * frametime;
+									}
 									DrawWorldScaled(newsurface, surveillancemonitor->camera, recursion, frametime, surveillancemonitor->scalefactor);
+									if(objectfollowing){
+										surveillancemonitor->camera.x -= (objectfollowing->oldx - objectfollowing->x) * frametime;
+										surveillancemonitor->camera.x -= (objectfollowing->oldy - objectfollowing->y) * frametime;
+									}
 									EffectRampColor(newsurface, 0, 198);
 									BlitSurface(newsurface, 0, surface, &dstrect);
 									//SDL_FillSDL_Rect(surface, &dstrect, 212);
@@ -839,31 +850,51 @@ void Renderer::DrawMiniMap(Object * object){
 			if(terminal->state != Terminal::INACTIVE){
 				if(terminal->isbig){
 					if(terminal->state == Terminal::SECRETREADY){
-						Uint8 color = 160;
-						if(localplayer){
-							Team * team = localplayer->GetTeam(world);
-							if(team && team->beamingterminalid == terminal->id){
-								color = 208;
+						Uint8 color = enemycolor;
+						if(Config::GetInstance().teamcolors){
+							if(localplayer){
+								Team * team = localplayer->GetTeam(world);
+								if(team && team->beamingterminalid == terminal->id){
+									color = teamcolor;
+								}
+							}
+						}else{
+							for(std::vector<Uint16>::iterator it = world.objectsbytype[ObjectTypes::TEAM].begin(); it != world.objectsbytype[ObjectTypes::TEAM].end(); it++){
+								Team * team = static_cast<Team*>(world.GetObjectFromId((*it)));
+								if(team && team->beamingterminalid == terminal->id){
+									color = team->GetColor();
+									break;
+								}
 							}
 						}
-						MiniMapCircle(terminal->x, terminal->y, color);
+						MiniMapCircle(terminal->x, terminal->y, TeamColorToIndex(color));
 					}else
 					if(terminal->state == Terminal::SECRETBEAMING){
 						int x1 = terminal->x;
 						int y1 = terminal->y;
 						world.map.MiniMapCoords(&x1, &y1);
 						int radius = terminal->beamingtime * 2;
-						Uint8 color = 154;
-						Player * player = world.GetPeerPlayer(world.localpeerid);
-						if(player){
-							Team * team = player->GetTeam(world);
-							if(team){
-								if(team->beamingterminalid == terminal->id){
-									color = 202;
+						Uint8 color = enemycolor;
+						if(Config::GetInstance().teamcolors){
+							Player * player = world.GetPeerPlayer(world.localpeerid);
+							if(player){
+								Team * team = player->GetTeam(world);
+								if(team){
+									if(team->beamingterminalid == terminal->id){
+										color = teamcolor;
+									}
+								}
+							}
+						}else{
+							for(std::vector<Uint16>::iterator it = world.objectsbytype[ObjectTypes::TEAM].begin(); it != world.objectsbytype[ObjectTypes::TEAM].end(); it++){
+								Team * team = static_cast<Team *>(world.GetObjectFromId((*it)));
+								if(team && team->beamingterminalid == terminal->id){
+									color = team->GetColor();
+									break;
 								}
 							}
 						}
-						DrawCircle(world.map.minimap.surface, x1, y1, radius, color);
+						DrawCircle(world.map.minimap.surface, x1, y1, radius, TeamColorToIndex(color));
 					}else
 					if(terminal->state == Terminal::READY || terminal->state == Terminal::HACKING || terminal->state == Terminal::HACKERGONE || (terminal->state == Terminal::BEAMING && state_i % 2)){
 						MiniMapBlit(104, 28, terminal->x, terminal->y);
@@ -920,7 +951,15 @@ void Renderer::DrawMiniMap(Object * object){
 						Team * team = (Team *)world.GetObjectFromId(basedoor->teamid);
 						if(team){
 							if(team/* && localplayer && localplayer->teamid != team->id*/){
-								color = team->GetColor();
+								if(Config::GetInstance().teamcolors){
+									if(localplayer && localplayer->teamid != team->id){
+										color = enemycolor;
+									}else{
+										color = teamcolor;
+									}
+								}else{
+									color = team->GetColor();
+								}
 							}
 							MiniMapBlit(104, 5, basedoor->x, basedoor->y, false, color);
 						}
@@ -961,30 +1000,59 @@ void Renderer::DrawMiniMap(Object * object){
 				}
 			}
 			if(player->hassecret){
-				Uint8 color = 160;
+				Team * team = player->GetTeam(world);
+				Uint8 color;
+				if(Config::GetInstance().teamcolors){
+					if(localplayer && player->GetTeam(world) != localplayer->GetTeam(world)){
+						color = enemycolor;
+					}else{
+						color = teamcolor;
+					}
+				}else{
+					color = team->GetColor();
+				}
+				/*Uint8 color = 160;
 				if(localplayer && player->GetTeam(world) == localplayer->GetTeam(world)){
 					color = 208;
-				}
-				MiniMapCircle(player->x, player->y, color);
+				}*/
+				MiniMapCircle(player->x, player->y, TeamColorToIndex(color));
 			}
-			Uint8 index = 3;
+			/*Uint8 index = 3;
 			if(localplayer && player != localplayer && player->GetTeam(world) == localplayer->GetTeam(world)){
 				index = 2;
 			}
 			if(player == localplayer){
 				index = 0;
+			}*/
+			bool onteam = false;
+			if(localplayer && player != localplayer && player->GetTeam(world) == localplayer->GetTeam(world)){
+				onteam = true;
 			}
 			bool satelliteability = false;
 			if(localplayer){
 				Team * team = localplayer->GetTeam(world);
+				Uint8 color = 0;
+				if(Config::GetInstance().teamcolors){
+					if(localplayer && player->GetTeam(world) != localplayer->GetTeam(world)){
+						color = enemycolor;
+					}else{
+						color = teamcolor;
+					}
+				}else{
+					Team * playerteam = player->GetTeam(world);
+					if(playerteam){
+						color = playerteam->GetColor();
+					}
+				}
 				if(team && team->agency == Team::STATIC && state_i % 64 < 32){
 					satelliteability = true;
 				}
 				if(localplayer->radarbonustime > world.tickcount){
 					satelliteability = true;
 				}
-				if((satelliteability && !player->IsDisguised()) || player == localplayer || index == 2){
-					MiniMapBlit(104, index, player->x, player->y, true);
+				satelliteability = true;
+				if((satelliteability && !player->IsDisguised()) || player == localplayer || onteam){
+					MiniMapBlit(104, 0, player->x, player->y, false, color);
 				}
 			}
 		}
@@ -1574,8 +1642,10 @@ void Renderer::EffectHacking(SDL_Surface * dst, SDL_Rect * dstrect, Uint8 color)
 		ex = (rand() % 64);
 		ey = (rand() % 64);
 	}
-	for(int y = 0; y < dst->h; y++){
-		for(int x = 0; x < dst->w; x++){
+	int dstw = dst->w;
+	int dsth = dst->h;
+	for(int y = 0; y < dsth; y++){
+		for(int x = 0; x < dstw; x++){
 			Uint8 overlay = GetPixel(world.resources.spritebank[178][index], x + ex, y + ey);
 			Uint8 pixel = GetPixel(dst, x, y);
 			if(overlay && pixel){
@@ -1588,9 +1658,11 @@ void Renderer::EffectHacking(SDL_Surface * dst, SDL_Rect * dstrect, Uint8 color)
 void Renderer::EffectTeamColor(SDL_Surface * dst, SDL_Rect * dstrect, Uint8 values){
 	Uint8 brightness = (values >> 4) * 16;
 	Uint8 color = (values & 0x0F) * 16;
-    for(Uint32 x = 0; x < dst->w; x++){
-        for(Uint32 y = 0; y < dst->h; y++){
-			Uint8 * pixel = &((Uint8 *)dst->pixels)[x + (y * dst->w)];
+	int dstw = dst->w;
+	int dsth = dst->h;
+	for(int y = 0; y < dsth; y++){
+		for(int x = 0; x < dstw; x++){
+			Uint8 * pixel = &((Uint8 *)dst->pixels)[x + (y * dstw)];
 			if(*pixel >= 195 && *pixel <= 208){
 				*pixel = palette.Color(*pixel/* - 195 + 114*/, color);
 				*pixel = palette.Brightness(*pixel/* - 195 + 114*/, brightness);
@@ -1601,6 +1673,14 @@ void Renderer::EffectTeamColor(SDL_Surface * dst, SDL_Rect * dstrect, Uint8 valu
             }
         }
     }
+}
+
+Uint8 Renderer::TeamColorToIndex(Uint8 values){
+	Uint8 brightness = (values >> 4) * 16;
+	Uint8 color = (values & 0x0F) * 16;
+	Uint8 index = palette.Color(204, color);
+	index = palette.Brightness(index, brightness);
+	return index;
 }
 
 void Renderer::EffectBrightness(SDL_Surface * dst, SDL_Rect * dstrect, Uint8 brightness){
@@ -1736,17 +1816,19 @@ void Renderer::MiniMapBlit(Uint8 res_bank, Uint8 res_index, int x, int y, bool a
 	world.map.MiniMapCoords(&xm, &ym);
 	dstrect.x = xm - world.resources.spriteoffsetx[res_bank][res_index];
 	dstrect.y = ym - world.resources.spriteoffsety[res_bank][res_index];
-	if(alpha){
-		DrawAlphaed(world.resources.spritebank[res_bank][res_index], 0, world.map.minimap.surface, &dstrect);
-	}else{
+	if(teamcolor || alpha){
+		SDL_Surface * newsurface = CreateSurfaceCopy(world.resources.spritebank[res_bank][res_index]);
 		if(teamcolor){
-			SDL_Surface * newsurface = CreateSurfaceCopy(world.resources.spritebank[res_bank][res_index]);
 			EffectTeamColor(newsurface, 0, teamcolor);
-			BlitSurface(newsurface, 0, world.map.minimap.surface, &dstrect);
-			SDL_FreeSurface(newsurface);
-		}else{
-			BlitSurface(world.resources.spritebank[res_bank][res_index], 0, world.map.minimap.surface, &dstrect);
 		}
+		if(alpha){
+			DrawAlphaed(newsurface, 0, world.map.minimap.surface, &dstrect);
+		}else{
+			BlitSurface(newsurface, 0, world.map.minimap.surface, &dstrect);
+		}
+		SDL_FreeSurface(newsurface);
+	}else{
+		BlitSurface(world.resources.spritebank[res_bank][res_index], 0, world.map.minimap.surface, &dstrect);
 	}
 }
 
@@ -1755,7 +1837,16 @@ void Renderer::MiniMapCircle(int x, int y, Uint8 color){
 	int y1 = y;
 	world.map.MiniMapCoords(&x1, &y1);
 	int radius = ((state_i % 16) / 2) + 3;
-	DrawCircle(world.map.minimap.surface, x1, y1, radius, color - ((state_i % 16) / 2));
+	Uint8 newcolor = color - ((state_i % 16) / 2) + 4;
+	Uint8 oldramp = (color - 2) / 16;
+	Uint8 newramp = (newcolor - 2) / 16;
+	if(newramp < oldramp){
+		newcolor = (oldramp * 16) + 2;
+	}else
+	if(newramp > oldramp){
+		newcolor = (oldramp * 16) + 2 + 15;
+	}
+	DrawCircle(world.map.minimap.surface, x1, y1, radius, newcolor);
 }
 
 void Renderer::DrawMirrored(SDL_Surface * src, SDL_Rect * srcrect, SDL_Surface * dst, SDL_Rect * dstrect){
@@ -1820,8 +1911,8 @@ void Renderer::ApplyAmbience(SDL_Surface * surface, Uint8 * lightmap){
 	int surfacew = surface->w;
 	int surfaceh = surface->h;
 	Uint8 * pixels = (Uint8 *)surface->pixels;
-	for(int x = 0; x < surfacew; x++){
-		for(int y = 0; y < surfaceh; y++){
+	for(int y = 0; y < surfaceh; y++){
+		for(int x = 0; x < surfacew; x++){
 			Uint8 pixel = pixels[i/*(y * surface->w) + x*/];
 			if(pixel < 114){
 				Uint8 ambience_l = ambiencelevel;
@@ -2228,11 +2319,8 @@ void Renderer::DrawHUD(SDL_Surface * surface, float frametime){
 			// Draw teams
 			
 			std::vector<Team *> teams;
-			for(std::list<Object *>::iterator it = world.objectlist.begin(); it != world.objectlist.end(); it++){
-				Object * object = *it;
-				if(object->type == ObjectTypes::TEAM){
-					teams.push_back(static_cast<Team *>(object));
-				}
+			for(std::vector<Uint16>::iterator it = world.objectsbytype[ObjectTypes::TEAM].begin(); it != world.objectsbytype[ObjectTypes::TEAM].end(); it++){
+				teams.push_back(static_cast<Team *>(world.GetObjectFromId((*it))));
 			}
 			if(teams.size() == 1){
 				dstrect.x = -world.resources.spriteoffsetx[94][1];
