@@ -102,10 +102,6 @@ Player::Player() : Object(ObjectTypes::PLAYER){
 	isbipedal = true;
 	isphysical = true;
 	iscontrollable = true;
-	basealarmplaytick = 0;
-	basealarmplayed = false;
-	intrudealarmplaytick = 0;
-	intrudealarmplayed = false;
 	disguised = false;
 	snapshotinterval = 24;
 	jumpimpulse = 0;
@@ -383,24 +379,6 @@ void Player::Tick(World & world){
 				Audio::GetInstance().Stop(flamersoundchannel, 200);
 				flamersoundchannel = -1;
 			}
-		}
-	}
-	if(!basealarmplayed && basealarmplaytick && basealarmplaytick < world.tickcount){
-		Audio::GetInstance().Play(world.resources.soundbank["alarm3a.wav"], 64);
-		basealarmplayed = true;
-	}else{
-		if(basealarmplaytick + 24 < world.tickcount){
-			basealarmplayed = false;
-			basealarmplaytick = 0;
-		}
-	}
-	if(!intrudealarmplayed && intrudealarmplaytick && intrudealarmplaytick < world.tickcount){
-		Audio::GetInstance().Play(world.resources.soundbank["intrude.wav"], 96);
-		intrudealarmplayed = true;
-	}else{
-		if(intrudealarmplaytick + 24 < world.tickcount){
-			intrudealarmplayed = false;
-			intrudealarmplaytick = 0;
 		}
 	}
 	if(state != HACKING){
@@ -1339,8 +1317,26 @@ void Player::Tick(World & world){
 			//UnDisguise(world);
 			BaseDoor * basedoor = (BaseDoor *)world.GetObjectFromId(basedoorentering);
 			if(basedoor){
-				if(state_i >= 5 && !basealarmplayed){
-					Player * localplayer = world.GetPeerPlayer(world.localpeerid);
+				if(state_i == 0){
+					Team * team = static_cast<Team *>(world.GetObjectFromId(basedoor->teamid));
+					Team * localteam = GetTeam(world);
+					if(team && localteam && basedoor->teamid != localteam->id){
+						bool discovered = false;
+						if(!basedoor->enteredby[team->number]){
+							basedoor->enteredby[team->number] = true;
+							discovered = true;
+						}
+						for(int i = 0; i < 4; i++){
+							Peer * peer = world.peerlist[team->peers[i]];
+							if(peer){
+								world.SendSound("alarm3a.wav", peer);
+								if(discovered){
+									world.SendSound("intrude.wav", peer);
+								}
+							}
+						}
+					}
+					/*Player * localplayer = world.GetPeerPlayer(world.localpeerid);
 					if(localplayer && id != localplayer->id && basedoor->teamid != teamid){
 						basealarmplaytick = world.tickcount;
 						Team * team = localplayer->GetTeam(world);
@@ -1348,7 +1344,7 @@ void Player::Tick(World & world){
 							intrudealarmplaytick = world.tickcount + 24;
 							basedoor->enteredby[team->number] = true;
 						}
-					}
+					}*/
 				}
 				basedoor->CheckForPlayersInView(world);
 			}

@@ -1619,16 +1619,24 @@ void World::SendChat(bool toteam, char * message){
 	SendPacket(GetAuthorityPeer(), msg, sizeof(msg));
 }
 
-void World::SendSound(const char * name){
+void World::SendSound(const char * name, Peer * peer){
 	if(IsAuthority()){
-		Audio::GetInstance().Play(resources.soundbank[name]);
+		if(!peer || (peer && peer->id == localpeerid)){
+			Audio::GetInstance().Play(resources.soundbank[name]);
+		}
 		char msg[1 + 255];
 		msg[0] = MSG_SOUND;
 		strcpy(&msg[1], name);
 		msg[1 + strlen(name)] = 0;
-		for(unsigned int i = 0; i < maxpeers; i++){
-			Peer * peer = peerlist[i];
-			if(peer && i != localpeerid){
+		if(!peer){
+			for(unsigned int i = 0; i < maxpeers; i++){
+				Peer * peer = peerlist[i];
+				if(peer && i != localpeerid){
+					SendPacket(peer, msg, 1 + strlen(name) + 1);
+				}
+			}
+		}else{
+			if(peer->id != localpeerid){
 				SendPacket(peer, msg, 1 + strlen(name) + 1);
 			}
 		}

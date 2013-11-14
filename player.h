@@ -127,10 +127,6 @@ private:
 	bool justjumpedfromladder;
 	bool justlandedfromair;
 	Uint16 currentprojectileid;
-	Uint32 basealarmplaytick;
-	bool basealarmplayed;
-	Uint32 intrudealarmplaytick;
-	bool intrudealarmplayed;
 	int jumpimpulse;
 	float hackingbonus;
 	float creditsbonus;

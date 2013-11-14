@@ -49,7 +49,7 @@ public:
 	void ShowMessage(const char * message, Uint8 time = 255, Uint8 type = 0, bool networked = false, Peer * peer = 0);
 	void ShowStatus(const char * status, Uint8 color = 0, bool networked = false, Peer * peer = 0);
 	void SendChat(bool toteam, char * message);
-	void SendSound(const char * name);
+	void SendSound(const char * name, Peer * peer = 0);
 	void ChangeTeam(void);
 	void KillByGovt(Peer & peer);
 	void SetTech(Uint32 techchoices);

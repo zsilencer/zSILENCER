@@ -448,12 +448,12 @@ void Renderer::DrawWorld(SDL_Surface * surface, Camera & camera, Uint8 * lightma
 									}
 									if(objectfollowing){
 										surveillancemonitor->camera.x += (objectfollowing->oldx - objectfollowing->x) * frametime;
-										surveillancemonitor->camera.x += (objectfollowing->oldy - objectfollowing->y) * frametime;
+										surveillancemonitor->camera.y += (objectfollowing->oldy - objectfollowing->y) * frametime;
 									}
 									DrawWorldScaled(newsurface, surveillancemonitor->camera, recursion, frametime, surveillancemonitor->scalefactor);
 									if(objectfollowing){
 										surveillancemonitor->camera.x -= (objectfollowing->oldx - objectfollowing->x) * frametime;
-										surveillancemonitor->camera.x -= (objectfollowing->oldy - objectfollowing->y) * frametime;
+										surveillancemonitor->camera.y -= (objectfollowing->oldy - objectfollowing->y) * frametime;
 									}
 									EffectRampColor(newsurface, 0, 198);
 									BlitSurface(newsurface, 0, surface, &dstrect);
@@ -1050,7 +1050,6 @@ void Renderer::DrawMiniMap(Object * object){
 				if(localplayer->radarbonustime > world.tickcount){
 					satelliteability = true;
 				}
-				satelliteability = true;
 				if((satelliteability && !player->IsDisguised()) || player == localplayer || onteam){
 					MiniMapBlit(104, 0, player->x, player->y, false, color);
 				}
