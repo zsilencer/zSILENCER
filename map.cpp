@@ -98,7 +98,7 @@ bool Map::LoadFile(const char * filename, World & world, Team * team, Uint8 secu
 	Uint8 minimapcompressed[172 * 62];
 	Uint32 levelsize = 0;
 	Uint8 * levelcompressed = new Uint8[20000];
-	const unsigned int maxlevelsize = 200000;
+	const unsigned int maxlevelsize = 300000;
 	Uint8 * level = new Uint8[maxlevelsize];
 	Uint32 numactors = 0;
 	Uint32 numplatforms = 0;
@@ -821,6 +821,9 @@ void Map::CalculateAdjacentPlatforms(void){
 		switch(platforms[i]->type){
 			case Platform::RECTANGLE:
 				for(unsigned int j = 0; j < platforms.size(); j++){
+					if(platforms[i] == platforms[j]){
+						continue;
+					}
 					switch(platforms[j]->type){
 						case Platform::RECTANGLE:
 							if(!platforms[i]->adjacentl){
@@ -1351,7 +1354,7 @@ bool Map::LineSegmentIntersection(float Ax, float Ay, float Bx, float By, float 
 }
 
 bool Map::CompareType(Platform * a, Platform * b){
-	if(a->type == Platform::STAIRSDOWN || a->type == Platform::STAIRSUP){
+	if((a->type == Platform::STAIRSDOWN || a->type == Platform::STAIRSUP) && (b->type != Platform::STAIRSDOWN && b->type != Platform::STAIRSUP)){
 		return true;
 	}
 	return false;

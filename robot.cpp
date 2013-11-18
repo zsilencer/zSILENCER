@@ -1,6 +1,7 @@
 #include "robot.h"
 #include "rocketprojectile.h"
 #include "player.h"
+#include "plume.h"
 
 Robot::Robot() : Object(ObjectTypes::ROBOT){
 	requiresauthority = true;
@@ -133,6 +134,7 @@ void Robot::Tick(World & world){
 				std::vector<Uint8> types;
 				types.push_back(ObjectTypes::PLAYER);
 				std::vector<Object *> players = world.TestAABB(x1, y1, x2, y2, types);
+				bool meleed = false;
 				for(std::vector<Object *>::iterator it = players.begin(); it != players.end(); it++){
 					Player * player = static_cast<Player *>(*it);
 					Team * team = player->GetTeam(world);
@@ -143,9 +145,12 @@ void Robot::Tick(World & world){
 						damageprojectile.shielddamage = 60;
 						damageprojectile.ownerid = id;
 						player->HandleHit(world, 50, 50, damageprojectile);
-						StopAmbience();
-						EmitSound(world, world.resources.soundbank["!laserew.wav"], 64);
+						meleed = true;
 					}
+				}
+				if(meleed){
+					StopAmbience();
+					EmitSound(world, world.resources.soundbank["!laserew.wav"], 64);
 				}
 			}
 			res_bank = 45;
@@ -171,6 +176,7 @@ void Robot::Tick(World & world){
 			if(state_i == 11){
 				RocketProjectile * rocketprojectile = (RocketProjectile *)world.CreateObject(ObjectTypes::ROCKETPROJECTILE);
 				if(rocketprojectile){
+					rocketprojectile->FromSecurity();
 					rocketprojectile->ownerid = id;
 					rocketprojectile->y = y - 60;
 					if(mirrored){
@@ -187,6 +193,16 @@ void Robot::Tick(World & world){
 			}*/
 		}break;
 		case DYING:{
+			if(state_i % 2 == 0 && state_i >= 5){
+				Plume * plume = (Plume *)world.CreateObject(ObjectTypes::PLUME);
+				if(plume){
+					plume->type = 4;
+					plume->xv = (rand() % 17) - 8 + (xv * 8);
+					plume->yv = (rand() % 17) - 8 + (yv * 8);
+					plume->SetPosition(x + (rand() % 39) - 19, y - 5);
+					plume->state_i = 0;
+				}
+			}
 			if(state_i == 4 * 4){
 				StopAmbience();
 				EmitSound(world, world.resources.soundbank["seekexp1.wav"], 128);

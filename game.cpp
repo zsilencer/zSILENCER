@@ -55,6 +55,10 @@ Game::Game() : renderer(world){
 	currentinterface = 0;
 	lastchannel[0] = 0;
 	minimized = false;
+	window = 0;
+	screenbuffer = 0;
+	windowrenderer = 0;
+	lasttick = 0;
 }
 
 Game::~Game(){
@@ -109,10 +113,12 @@ bool Game::Load(char * cmdline){
 		}while((cmdline = strtok(0, " ")));
 	}
 	Config::GetInstance().Load();
-	if(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_TIMER) == -1){
+	if(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_TIMER | SDL_INIT_JOYSTICK) == -1){
 		printf("Could not init SDL\n");
 		return false;
 	}
+	SDL_JoystickEventState(SDL_ENABLE);
+	SDL_GameControllerEventState(SDL_ENABLE);
 	if(Mix_Init(MIX_INIT_MP3) == -1){
 		printf("Could not init SDL_mixer\n");
 		return false;
@@ -124,12 +130,6 @@ bool Game::Load(char * cmdline){
 	if(!renderer.palette.SetPalette(0)){
 		return false;
 	}
-	printf("Loading resources...\n");
-	if(!world.resources.Load(world.dedicatedserver.active)){
-		printf("Could not load resources\n");
-		return false;
-	}
-	printf("Resources loaded\n");
 	SDL_AddTimer(1000, TimerCallback, this);
 	SDL_EventState(SDL_TEXTINPUT, SDL_TRUE); //SDL_EnableUNICODE(true);
 	//SDL_EnableKeyRepeat(SDL_DEFAULT_REPEAT_DELAY, SDL_DEFAULT_REPEAT_INTERVAL);
@@ -140,8 +140,28 @@ bool Game::Load(char * cmdline){
 	SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "2");
 	SetColors(renderer.palette.GetColors());
 	//SDL_Flip(screen);
+	printf("Loading resources...\n");
+	if(!world.resources.Load(*this, world.dedicatedserver.active)){
+		printf("Could not load resources\n");
+		return false;
+	}
+	printf("Resources loaded\n");
 	lasttick = SDL_GetTicks();
 	return true;
+}
+
+void Game::LoadProgressCallback(int progress, int totalprogressitems){
+	HandleSDLEvents();
+	if(SDL_GetTicks() - lasttick >= 42){
+		int width = 500;
+		int widthp = (float(progress) / totalprogressitems) * width;
+		renderer.DrawFilledRectangle(screenbuffer, (640 - (width)) / 2, (480 - 20) / 2, (640 + (widthp)) / 2, (480 + 20) / 2, 123);
+		SDL_Texture * texture = SDL_CreateTextureFromSurface(windowrenderer, screenbuffer);
+		SDL_RenderCopy(windowrenderer, texture, 0, 0);
+		SDL_DestroyTexture(texture);
+		SDL_RenderPresent(windowrenderer);
+		lasttick = SDL_GetTicks();
+	}
 }
 
 void Game::SetColors(SDL_Color * colors){
@@ -1363,7 +1383,19 @@ bool Game::Tick(void){
 }
 
 void Game::UpdateInputState(Input & input){
-	const Uint8 * keystate = SDL_GetKeyboardState(NULL);
+	const Uint8 * keystateconst = SDL_GetKeyboardState(NULL);
+	Uint8 keystate[SDL_NUM_SCANCODES];
+	memcpy(keystate, keystateconst, sizeof(keystate));
+	SDL_Joystick * joystick = SDL_JoystickOpen(0);
+	if(joystick){
+		SetOUYAMappings(keystate, joystick);
+		//printf("name: %s buttons: %d, axes: %d, balls: %d\n", SDL_JoystickName(joystick), SDL_JoystickNumButtons(joystick), SDL_JoystickNumAxes(joystick), SDL_JoystickNumBalls(joystick));
+	}
+	/*SDL_GameController * controller = SDL_GameControllerOpen(0);
+	if(controller){
+		SetOUYAMappings(keystate, controller);
+		SDL_GameControllerClose(0);
+	}*/
 	int mousex;
 	int mousey;
 	Uint8 mousestate = SDL_GetMouseState(&mousex, &mousey);
@@ -3781,6 +3813,15 @@ void Game::IndexToConfigKey(int index, SDL_Scancode ** key1, SDL_Scancode ** key
 }
 
 const char * Game::GetKeyName(SDL_Scancode sym){
+	int symint = sym;
+	if(symint >= 300){ // Custom scancodes for game controller mappings
+		switch(symint){
+			case 300: return "LStick"; break;
+			case 301: return "RStick"; break;
+			case 302: return "LShoulder"; break;
+			case 303: return "RShoulder"; break;
+		}
+	}
 	switch(sym){
 		case SDL_SCANCODE_UNKNOWN: return ""; break;
 		case SDL_SCANCODE_UP: return "Up"; break;
@@ -3891,6 +3932,28 @@ const char * Game::GetKeyName(SDL_Scancode sym){
 	}
 }
 
+SDL_Scancode Game::OUYAMapping(int button){
+	switch(button){
+		case SDL_CONTROLLER_BUTTON_A: return SDL_SCANCODE_A; break;
+		case SDL_CONTROLLER_BUTTON_B: return SDL_SCANCODE_O; break;
+		case SDL_CONTROLLER_BUTTON_X: return SDL_SCANCODE_U; break;
+		case SDL_CONTROLLER_BUTTON_LEFTSTICK: return (SDL_Scancode)300; break;
+		case SDL_CONTROLLER_BUTTON_RIGHTSTICK: return (SDL_Scancode)301; break;
+		case SDL_CONTROLLER_BUTTON_LEFTSHOULDER: return (SDL_Scancode)302; break;
+		case SDL_CONTROLLER_BUTTON_RIGHTSHOULDER: return (SDL_Scancode)303; break;
+		default: return SDL_SCANCODE_UNKNOWN; break;
+	}
+}
+
+void Game::SetOUYAMappings(Uint8 * keystate, SDL_Joystick * joystick){
+	for(int i = 0; i < SDL_CONTROLLER_BUTTON_MAX; i++){
+		SDL_Scancode scancode = OUYAMapping((SDL_GameControllerButton)i);
+		if(scancode != SDL_SCANCODE_UNKNOWN){
+			keystate[scancode] = SDL_JoystickGetButton(joystick, i) ? 1 : 0;
+		}
+	}
+}
+
 void Game::GetGameChannelName(LobbyGame & lobbygame, char * name){
 	sprintf(name, "#%s-%d", lobbygame.name, lobbygame.accountid);
 }
@@ -3934,8 +3997,8 @@ void Game::UpdateAmbienceChannels(void){
 			Audio::GetInstance().SetVolume(bgchannel[BG_OUTSIDE], 0);
 		}else{
 			Audio::GetInstance().SetVolume(bgchannel[BG_BASE], 0);
-			Audio::GetInstance().SetVolume(bgchannel[BG_AMBIENT], 32 * (1 - (outsideamount / float(maxamount))));
-			Audio::GetInstance().SetVolume(bgchannel[BG_OUTSIDE], 32 * (outsideamount / float(maxamount)));
+			Audio::GetInstance().SetVolume(bgchannel[BG_AMBIENT], 24 * (1 - (outsideamount / float(maxamount))));
+			Audio::GetInstance().SetVolume(bgchannel[BG_OUTSIDE], 24 * (outsideamount / float(maxamount)));
 		}
 	}
 }
@@ -4039,6 +4102,17 @@ bool Game::HandleSDLEvents(void){
 					}
 				}
 			}break;
+			/*case SDL_CONTROLLERBUTTONDOWN:{
+				printf("controller button down %d\n", event.cbutton.button);
+				Interface * iface = (Interface *)world.GetObjectFromId(currentinterface);
+				if(iface){
+					SDL_Scancode scancode = OUYAMapping((SDL_GameControllerButton)event.cbutton.button);
+					iface->lastsym = scancode;
+				}
+			}break;
+			case SDL_JOYBUTTONDOWN:{
+				printf("joybutton down %d\n", event.jbutton.button);
+			}break;*/
 			/*case SDL_KEYDOWN:{
 				char ascii = event.key.keysym.unicode & 0x7F;
 				bool skip = true;

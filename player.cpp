@@ -77,6 +77,7 @@ Player::Player() : Object(ObjectTypes::PLAYER){
 	fallingnudge = 0;
 	oldfiles = 0;
 	effecthackingcontinue = 0;
+	effectshieldcontinue = 0;
 	for(int i = 0; i < 4; i++){
 		inventoryitems[i] = INV_NONE;
 		inventoryitemsnum[i] = 0;
@@ -389,6 +390,9 @@ void Player::Tick(World & world){
 		effecthacking = true;
 	}else{
 		effecthacking = false;
+	}
+	if(effectshieldcontinue > 0){
+		effectshieldcontinue--;
 	}
 	if(input.keymoveleft || input.keymoveright){
 		if(isbuying){
@@ -1245,6 +1249,9 @@ void Player::Tick(World & world){
 				if(IsDisguised()){
 					state_i = 6;
 				}else{
+					if(state_i <= 1 && abs(xv) >= 4){
+						state_i = 1;
+					}
 					res_bank = 66;
 					res_index = state_i;
 					if(res_index == 3){
@@ -1401,7 +1408,22 @@ void Player::Tick(World & world){
 			}
 		}break;
 		case CROUCHING:{
-			xv = 0;
+			//xv = 0;
+			if(xv >= 2){
+				xv -= 2;
+			}else
+			if(xv <= -2){
+				xv += 2;
+			}else{
+				xv = 0;
+			}
+			if(!FollowGround(*this, world, xv)){
+				x += (xv - (x - oldx)) + (xv > 0 ? 1 : -1);
+				state = FALLING;
+				fallingnudge = 0;
+				state_i = 4 * 2;
+				break;
+			}
 			res_bank = 17;
 			res_index = state_i;
 			if(state_i >= 4){
@@ -1561,9 +1583,9 @@ void Player::Tick(World & world){
 					break;
 				}
 			}
-			if(state_i >= 14){
+			if(state_i >= 12){
 				state = CROUCHED;
-				state_i = state_i - 8;
+				state_i = state_i - 6;
 			}
 			Sint16 oldx = x;
 			if(!FollowGround(*this, world, xv)){
@@ -2275,6 +2297,9 @@ void Player::Tick(World & world){
 void Player::HandleHit(World & world, Uint8 x, Uint8 y, Object & projectile){
 	//printf("hit at %d, %d\n", x, y);
 	Hittable::HandleHit(*this, world, x, y, projectile);
+	if(state_hit == 1 + (1 * 32)){
+		effectshieldcontinue = 48;
+	}
 	UnDisguise(world);
 	if(world.tickcount - hitsoundplaytick > 10){
 		if(rand() % 2 == 0){
@@ -3550,7 +3575,7 @@ bool Player::ProcessLadderState(World &world){
 	Platform * currentladder = world.map.TestAABB(x, y, x, y, Platform::LADDER);
 	bool forceclimbup = false;
 	bool forceclimbdown = false;
-	if(currentladder){
+	if(currentladder && !input.keymoveup && !input.keymovedown){
 		if((input.keymoveright || input.keymoveleft) && y - currentladder->y1 < 20){
 			forceclimbup = true;
 		}

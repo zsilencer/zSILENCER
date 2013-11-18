@@ -12,6 +12,7 @@ public:
 	void Serialize(bool write, Serializer & data, Serializer * old);
 	void Tick(World & world);
 	bool JustHit(void);
+	void FromSecurity(void);
 
 private:
 	Uint8 state_i;

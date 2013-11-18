@@ -54,29 +54,36 @@ void Hittable::HandleHit(Object & object, World & world, Uint8 x, Uint8 y, Objec
 			shield -= projectile.shielddamage;
 			state_hit = 1 + (2 * 32);
 		}
+		if(shield <= 60){
+			switch(projectile.type){
+				case ObjectTypes::BLASTERPROJECTILE:
+				case ObjectTypes::LASERPROJECTILE:
+				case ObjectTypes::ROCKETPROJECTILE:
+					for(int i = 0; i < 8; i++){
+						Shrapnel * shrapnel = (Shrapnel *)world.CreateObject(ObjectTypes::SHRAPNEL);
+						if(shrapnel){
+							shrapnel->x = projectile.x;
+							shrapnel->y = projectile.y;
+							shrapnel->res_index = rand() % 9;
+							shrapnel->res_bank = 110;
+							float angle = (i / float(8)) * (2 * 3.14);
+							angle += (rand() % 10) / float(10);
+							shrapnel->xv = (sin(angle)) * 4;
+							shrapnel->yv = (cos(angle)) * 4;
+						}
+					}
+				break;
+				default:
+				break;
+			}
+		}
 	}
 	switch(projectile.type){
 		case ObjectTypes::BLASTERPROJECTILE:{
 			
 		}break;
 		case ObjectTypes::LASERPROJECTILE:{
-			if(damagedshield){
-				for(int i = 0; i < 8; i++){
-					Shrapnel * shrapnel = (Shrapnel *)world.CreateObject(ObjectTypes::SHRAPNEL);
-					if(shrapnel){
-						shrapnel->x = projectile.x;
-						shrapnel->y = projectile.y;
-						shrapnel->res_index = rand() % 9;
-						shrapnel->res_bank = 110;
-						float angle = (i / float(8)) * (2 * 3.14);
-						angle += (rand() % 10) / float(10);
-						shrapnel->xv = (sin(angle)) * 4;
-						shrapnel->yv = (cos(angle)) * 4;
-					}
-				}
-			}else{
-				
-			}
+			
 		}break;
 		case ObjectTypes::ROCKETPROJECTILE:{
 			

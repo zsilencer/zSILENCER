@@ -127,7 +127,7 @@
 				AdditionalIncludeDirectories="&quot;$(VCInstallDir)include\SDL2&quot;"
 				PreprocessorDefinitions="WIN32;NDEBUG;_WINDOWS;_CRT_SECURE_NO_WARNINGS"
 				StringPooling="true"
-				ExceptionHandling="1"
+				ExceptionHandling="0"
 				RuntimeLibrary="0"
 				BufferSecurityCheck="false"
 				EnableFunctionLevelLinking="true"

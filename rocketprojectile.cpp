@@ -57,6 +57,14 @@ void RocketProjectile::Tick(World & world){
 		res_index = 3;
 		mirrored = true;
 	}
+	if(state_i == 100){
+		oldxv = xv;
+		oldyv = yv;
+		xv = ceil(float(xv) * 0.3);
+		yv = ceil(float(yv) * 0.3);
+		soundchannel = EmitSound(world, world.resources.soundbank["rocket4.wav"], 128);
+		state_i = 11;
+	}
 	if(state_i == 0){
 		oldxv = xv;
 		oldyv = yv;
@@ -162,4 +170,8 @@ bool RocketProjectile::JustHit(void){
 		return true;
 	}
 	return false;
+}
+
+void RocketProjectile::FromSecurity(void){
+	state_i = 100;
 }

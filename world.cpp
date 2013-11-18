@@ -1963,10 +1963,10 @@ void World::DestroyObject(Uint16 id){
 	if(object){
 		objectidlookup.erase(object->id);
 		object->OnDestroy(*this);
-		delete object;
 		objectlist.remove(object);
 		tobjectlist.remove(object);
 		objectsbytype[object->type].erase(std::find(objectsbytype[object->type].begin(), objectsbytype[object->type].end(), id));
+		delete object;
 	}
 	/*for(std::list<Object *>::iterator i = objectlist.begin(); i != objectlist.end(); i++){
 		if((*i)->id == id){

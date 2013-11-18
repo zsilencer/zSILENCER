@@ -1,4 +1,5 @@
 #include "playerai.h"
+#include <algorithm>
 #include "basedoor.h"
 
 PlayerAI::PlayerAI(Player & player) : player(player){

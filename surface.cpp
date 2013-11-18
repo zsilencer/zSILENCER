@@ -1,6 +1,6 @@
 #include "surface.h"
 
-Surface::Surface(unsigned int w, unsigned int h){
+Surface::Surface(int w, int h){
 	pixels = new Uint8[w * h];
 }
 

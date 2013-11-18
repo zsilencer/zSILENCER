@@ -28,6 +28,8 @@ Guard::Guard() : Object(ObjectTypes::GUARD){
 	respawnseconds = 30;
 	patrol = false;
 	lastspoke = 0;
+	lastshot = 0;
+	cooldowntime = 48;
 }
 
 void Guard::Serialize(bool write, Serializer & data, Serializer * old){
@@ -57,8 +59,10 @@ void Guard::Tick(World & world){
 		do{
 			if((found = Look(world, 0))){
 				if(state == WALKING || state == STANDING || state == LOOKING){
-					state = SHOOTSTANDING;
-					state_i = 0;
+					if(CooledDown(world)){
+						state = SHOOTSTANDING;
+						state_i = 0;
+					}
 				}else
 				if(state == CROUCHED){
 					state = UNCROUCHING;
@@ -68,8 +72,10 @@ void Guard::Tick(World & world){
 			}
 			if((found = Look(world, 1))){
 				if(state == CROUCHED){
-					state = SHOOTCROUCHED;
-					state_i = 0;
+					if(CooledDown(world)){
+						state = SHOOTCROUCHED;
+						state_i = 0;
+					}
 				}else
 				if(state == WALKING || state == STANDING || state == LOOKING){
 					state = CROUCHING;
@@ -79,22 +85,28 @@ void Guard::Tick(World & world){
 			}
 			if((found = Look(world, 2))){
 				if(state == WALKING || state == STANDING || state == LOOKING){
-					state = SHOOTUP;
-					state_i = 0;
+					if(CooledDown(world)){
+						state = SHOOTUP;
+						state_i = 0;
+					}
 				}
 				break;
 			}
 			if((found = Look(world, 3))){
 				if(state == WALKING || state == STANDING || state == LOOKING){
-					state = SHOOTDOWN;
-					state_i = 0;
+					if(CooledDown(world)){
+						state = SHOOTDOWN;
+						state_i = 0;
+					}
 				}
 				break;
 			}
 			if((found = Look(world, 4))){
 				if(state == WALKING || state == STANDING || state == LOOKING){
-					state = SHOOTUPANGLE;
-					state_i = 0;
+					if(CooledDown(world)){
+						state = SHOOTUPANGLE;
+						state_i = 0;
+					}
 				}
 				break;
 			}
@@ -106,8 +118,10 @@ void Guard::Tick(World & world){
 					}
 				}
 				if(state == WALKING || state == STANDING || state == LOOKING){
-					state = SHOOTDOWNANGLE;
-					state_i = 0;
+					if(CooledDown(world)){
+						state = SHOOTDOWNANGLE;
+						state_i = 0;
+					}
 				}
 				break;
 			}
@@ -165,22 +179,22 @@ void Guard::Tick(World & world){
 			res_index = 9;
 		}break;
 		case SHOOTCROUCHED:{
-			if(state_i == 12){
+			if(state_i == 6){
 				Fire(world, 1);
 			}
-			if((state_i / 2) == 9){
-				state_i = 13 * 2;
+			if((state_i) == 9){
+				state_i = 13;
 			}
-			if(state_i / 2 >= 16){
+			if(state_i >= 16){
 				state = CROUCHED;
 				state_i = -1;
 				break;
 			}
 			res_bank = 159;
-			if(state_i / 2 > 8){
-				res_index = 8 - ((state_i / 2) - 8);
+			if(state_i > 8){
+				res_index = 8 - ((state_i) - 8);
 			}else{
-				res_index = state_i / 2;
+				res_index = state_i;
 			}
 		}break;
 		case UNCROUCHING:{
@@ -222,98 +236,98 @@ void Guard::Tick(World & world){
 			}
 		}break;
 		case SHOOTSTANDING:{
-			if(state_i == 14){
+			if(state_i == 7){
 				Fire(world, 0);
 			}
-			if((state_i / 2) == 10){
-				state_i = 13 * 2;
+			if((state_i) == 10){
+				state_i = 13;
 			}
-			if(state_i / 2 >= 18){
+			if(state_i >= 18){
 				state = STANDING;
 				state_i = -1;
 				break;
 			}
 			res_bank = 61;
-			if(state_i / 2 > 9){
-				res_index = 9 - ((state_i / 2) - 9);
+			if(state_i > 9){
+				res_index = 9 - ((state_i) - 9);
 			}else{
-				res_index = state_i / 2;
+				res_index = state_i;
 			}
 		}break;
 		case SHOOTUP:{
-			if(state_i == 14){
+			if(state_i == 7){
 				Fire(world, 2);
 			}
-			if((state_i / 2) == 10){
-				state_i = 13 * 2;
+			if((state_i) == 10){
+				state_i = 13;
 			}
-			if(state_i / 2 >= 18){
+			if(state_i >= 18){
 				state = STANDING;
 				state_i = -1;
 				break;
 			}
 			res_bank = 154;
-			if(state_i / 2 > 9){
-				res_index = 9 - ((state_i / 2) - 9);
+			if(state_i > 9){
+				res_index = 9 - ((state_i) - 9);
 			}else{
-				res_index = state_i / 2;
+				res_index = state_i;
 			}
 		}break;
 		case SHOOTDOWN:{
-			if(state_i == 12){
+			if(state_i == 6){
 				Fire(world, 3);
 			}
-			if((state_i / 2) == 9){
-				state_i = 13 * 2;
+			if((state_i) == 9){
+				state_i = 13;
 			}
-			if(state_i / 2 >= 16){
+			if(state_i >= 16){
 				state = STANDING;
 				state_i = -1;
 				break;
 			}
 			res_bank = 155;
-			if(state_i / 2 > 8){
-				res_index = 8 - ((state_i / 2) - 8);
+			if(state_i > 8){
+				res_index = 8 - ((state_i) - 8);
 			}else{
-				res_index = state_i / 2;
+				res_index = state_i;
 			}
 		}break;
 		case SHOOTUPANGLE:{
-			if(state_i == 12){
+			if(state_i == 6){
 				Fire(world, 4);
 			}
-			if((state_i / 2) == 9){
-				state_i = 13 * 2;
+			if((state_i) == 9){
+				state_i = 13;
 			}
-			if(state_i / 2 >= 16){
+			if(state_i >= 16){
 				state = STANDING;
 				state_i = -1;
 				break;
 			}
 			res_bank = 156;
-			if(state_i / 2 > 8){
-				res_index = 8 - ((state_i / 2) - 8);
+			if(state_i > 8){
+				res_index = 8 - ((state_i) - 8);
 			}else{
-				res_index = state_i / 2;
+				res_index = state_i;
 			}
 		}break;
 		case SHOOTDOWNANGLE:{
-			if(state_i == 12){
+			if(state_i == 6){
 				Fire(world, 5);
 			}
-			if((state_i / 2) == 9){
-				state_i = 13 * 2;
+			if((state_i) == 9){
+				state_i = 13;
 			}
-			if(state_i / 2 >= 16){
+			if(state_i >= 16){
 				state = STANDING;
 				state_i = -1;
 				break;
 			}
 			res_bank = 157;
-			if(state_i / 2 > 8){
-				res_index = 8 - ((state_i / 2) - 8);
+			if(state_i > 8){
+				res_index = 8 - ((state_i) - 8);
 			}else{
-				res_index = state_i / 2;
+				res_index = state_i;
 			}
 		}break;
 		case LADDER:{
@@ -333,12 +347,12 @@ void Guard::Tick(World & world){
 					yv = -yv;
 				}
 			}
-			if(Look(world, 6)){
+			if(Look(world, 6) && CooledDown(world)){
 				state = SHOOTLADDERUP;
 				state_i = -1;
 				break;
 			}
-			if(Look(world, 7)){
+			if(Look(world, 7) && CooledDown(world)){
 				state = SHOOTLADDERDOWN;
 				state_i = -1;
 				break;
@@ -352,44 +366,44 @@ void Guard::Tick(World & world){
 		}break;
 		case SHOOTLADDERUP:{
 			yv = 0;
-			if(state_i == 12){
+			if(state_i == 6){
 				Fire(world, 6);
 			}
-			if((state_i / 2) == 9){
-				state_i = 13 * 2;
+			if((state_i) == 9){
+				state_i = 13;
 			}
-			if(state_i / 2 >= 16){
+			if(state_i >= 16){
 				state = LADDER;
 				yv = -5;
 				state_i = -1;
 				break;
 			}
 			res_bank = 196;
-			if(state_i / 2 > 8){
-				res_index = 8 - ((state_i / 2) - 8);
+			if(state_i > 8){
+				res_index = 8 - ((state_i) - 8);
 			}else{
-				res_index = state_i / 2;
+				res_index = state_i;
 			}
 		}break;
 		case SHOOTLADDERDOWN:{
 			yv = 0;
-			if(state_i == 12){
+			if(state_i == 6){
 				Fire(world, 7);
 			}
-			if((state_i / 2) == 9){
-				state_i = 13 * 2;
+			if((state_i) == 9){
+				state_i = 13;
 			}
-			if(state_i / 2 >= 16){
+			if(state_i >= 16){
 				state = LADDER;
 				yv = 5;
 				state_i = -1;
 				break;
 			}
 			res_bank = 197;
-			if(state_i / 2 > 8){
-				res_index = 8 - ((state_i / 2) - 8);
+			if(state_i > 8){
+				res_index = 8 - ((state_i) - 8);
 			}else{
-				res_index = state_i / 2;
+				res_index = state_i;
 			}
 		}break;
 		case DYING:{
@@ -694,6 +708,10 @@ void Guard::Fire(World & world, Uint8 direction){
 		}break;
 		case 2:{
 			projectile = world.CreateObject(ObjectTypes::ROCKETPROJECTILE);
+			if(projectile){
+				RocketProjectile * rocketprojectile = static_cast<RocketProjectile *>(projectile);
+				rocketprojectile->FromSecurity();
+			}
 		}break;
 		case 3:{
 			projectile = world.CreateObject(ObjectTypes::FLAMERPROJECTILE);
@@ -747,4 +765,12 @@ void Guard::Fire(World & world, Uint8 direction){
 			}break;
 		}
 	}
+}
+
+bool Guard::CooledDown(World & world){
+	if(world.tickcount - lastshot >= cooldowntime){
+		lastshot = world.tickcount;
+		return true;
+	}
+	return false;
 }

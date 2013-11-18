@@ -6,10 +6,10 @@
 class Surface
 {
 public:
-	Surface(unsigned int w, unsigned int h);
+	Surface(int w, int h);
 	~Surface();
-	unsigned int w;
-	unsigned int h;
+	int w;
+	int h;
 	Uint8 * pixels;
 };
 

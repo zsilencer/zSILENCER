@@ -1,5 +1,6 @@
 #include "resources.h"
 #include <vector>
+#include "game.h"
 #include "sdl_internal.h"
 
 Resources::Resources(){
@@ -61,36 +62,42 @@ Resources::~Resources(){
 	delete[] spriteheight;
 }
 
-bool Resources::Load(bool dedicatedserver){
-	if(!LoadSprites(dedicatedserver)){
+bool Resources::Load(Game & game, bool dedicatedserver){
+	progress = 0;
+	totalprogressitems = 621;
+	if(!LoadSprites(game, dedicatedserver)){
 		return false;
 	}
-	if(!LoadTiles(dedicatedserver)){
+	if(!LoadTiles(game, dedicatedserver)){
 		return false;
 	}
-	if(!LoadSounds(dedicatedserver)){
+	if(!LoadSounds(game, dedicatedserver)){
 		//return false;
 	}
 	return true;
 }
 
-bool Resources::LoadSprites(bool dedicatedserver){
+bool Resources::LoadSprites(Game & game, bool dedicatedserver){
 	char FileName[256];
 	SDL_RWops * file = SDL_RWFromFile("BIN_SPR.DAT", "rb");
 	if(!file){
 		printf("Could not open BIN_SPR.DAT\n");
 		return false;
 	}
+	Uint8 headers[256][64];
+	SDL_RWread(file, headers, 64, 256);
 	for(unsigned int i = 0; i < 256; i++){
-		Uint8 header[64];
-		SDL_RWread(file, header, sizeof(header), 1);
-		if(header[2]){
+		progress++;
+		game.LoadProgressCallback(progress, totalprogressitems);
+		//Uint8 header[64];
+		//SDL_RWread(file, header, sizeof(header), 1);
+		if(headers[i][2]){
 			sprintf(FileName, "bin_spr/SPR_%.3d.BIN", i);
 			SDL_RWops * file2 = SDL_RWFromFile(FileName, "rb");
 			if(file2){
 				Uint8 header2[(344 * 256) + 4];
-				SDL_RWread(file2, header2, (344 * header[2]) + 4, 1);
-				for(unsigned int j = 0; j < header[2]; j++){
+				SDL_RWread(file2, header2, (344 * headers[i][2]) + 4, 1);
+				for(unsigned int j = 0; j < headers[i][2]; j++){
 					Uint16 width = SDL_SwapLE16(((Uint16 *)header2)[(j * 172)]);
 					Uint16 height = SDL_SwapLE16(((Uint16 *)header2)[(j * 172) + 1]);
 					Sint16 offsetx = SDL_SwapLE16(((Sint16 *)header2)[(j * 172) + 2]);
@@ -208,8 +215,9 @@ bool Resources::LoadSprites(bool dedicatedserver){
 	return true;
 }
 
-bool Resources::LoadTiles(bool dedicatedserver){
+bool Resources::LoadTiles(Game & game, bool dedicatedserver){
 	if(dedicatedserver){
+		progress += 255;
 		return true;
 	}
 	char filename[256];
@@ -218,15 +226,19 @@ bool Resources::LoadTiles(bool dedicatedserver){
 		printf("Could not open BIN_TIL.DAT\n");
 		return false;
 	}
+	Uint8 headers[256][64];
+	SDL_RWread(file, headers, 64, 256);
 	for(unsigned int i = 0; i < 256; i++){
-		Uint8 header[64];
-		SDL_RWread(file, header, sizeof(header), 1);
-		if(header[2]){
+		progress++;
+		game.LoadProgressCallback(progress, totalprogressitems);
+		//Uint8 header[64];
+		//SDL_RWread(file, header, sizeof(header), 1);
+		if(headers[i][2]){
 			sprintf(filename, "bin_til/TIL_%.3d.BIN", i);
 			SDL_RWops * file2 = SDL_RWFromFile(filename, "rb");
 			if(file2){
 				Uint8 header2[(12 * 256) + 4];
-				SDL_RWread(file2, header2, (12 * header[2]) + 4, 1);
+				SDL_RWread(file2, header2, (12 * headers[i][2]) + 4, 1);
 				Uint8 * data = new Uint8[64 * 64 * 256];
 				size_t datasize = SDL_RWread(file2, data, 1, 64 * 64 * 256);
 				Uint8 * decompressed = new Uint8[64 * 64 * 256];
@@ -247,7 +259,7 @@ bool Resources::LoadTiles(bool dedicatedserver){
 						((Uint32 *)decompressed)[k] = SDL_SwapLE32(tempvalue);
 					}
 				}
-				for(unsigned int j = 0; j < header[2]; j++){
+				for(unsigned int j = 0; j < headers[i][2]; j++){
 					Uint8 tile[64 * 64];
 					memcpy(tile, decompressed + (j * 64 * 64), sizeof(tile));
 					SDL_Surface * surface = SDL_CreateRGBSurface(SDL_SWSURFACE, 64, 64, 8, 0, 0, 0, 0);
@@ -278,8 +290,9 @@ bool Resources::LoadTiles(bool dedicatedserver){
 	return true;
 }
 
-bool Resources::LoadSounds(bool dedicatedserver){
+bool Resources::LoadSounds(Game & game, bool dedicatedserver){
 	if(dedicatedserver){
+		progress += 101;
 		return true;
 	}
 	SDL_RWops * file = SDL_RWFromFile("sound.bin", "rb");
@@ -298,6 +311,8 @@ bool Resources::LoadSounds(bool dedicatedserver){
 	SDL_RWread(file, &numsounds, sizeof(numsounds), 1);
 	SDL_RWread(file, &soundssize, sizeof(soundssize), 1);
 	for(unsigned int i = 0; i < numsounds; i++){
+		progress++;
+		game.LoadProgressCallback(progress, totalprogressitems);
 		SDL_RWseek(file, sizeof(numsounds) + sizeof(soundssize) + (i * sizeof(soundheader)), RW_SEEK_SET);
 		SDL_RWread(file, &soundheader, sizeof(soundheader), 1);
 		memcpy(&name, &soundheader[4], 0x10);

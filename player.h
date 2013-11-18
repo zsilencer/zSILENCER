@@ -56,6 +56,7 @@ public:
 	Uint16 credits;
 	bool effecthacking;
 	int effecthackingcontinue;
+	int effectshieldcontinue;
 	bool hassecret;
 	bool oldhassecret;
 	Uint16 secretteamid;

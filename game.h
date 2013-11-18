@@ -20,6 +20,7 @@ public:
 	bool Load(char * cmdline);
 	bool Loop(void);
 	bool HandleSDLEvents(void);
+	void LoadProgressCallback(int progress, int totalprogressitems);
 
 private:
 	bool Tick(void);
@@ -72,6 +73,8 @@ private:
 	Uint8 GetSelectedAgency(void);
 	void IndexToConfigKey(int index, SDL_Scancode ** key1, SDL_Scancode ** key2, bool ** keyop);
 	const char * GetKeyName(SDL_Scancode sym);
+	SDL_Scancode OUYAMapping(int button);
+	void SetOUYAMappings(Uint8 * keystate, SDL_Joystick * joystick);
 	void GetGameChannelName(LobbyGame & lobbygame, char * name);
 	void CreateAmbienceChannels(void);
 	void UpdateAmbienceChannels(void);

@@ -35,7 +35,7 @@ private:
 	static void ChannelFinished(int channel);
 	static void MixingFunction(void * udata, Uint8 * stream, int len);
 	
-	static const int maxchannels = 1024;
+	static const int maxchannels = 128;
 	int channelobject[maxchannels];
 	int channelvolume[maxchannels];
 	float effectvolume;

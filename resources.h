@@ -11,10 +11,10 @@ class Resources
 public:
 	Resources();
 	~Resources();
-	bool Load(bool dedicatedserver = false);
-	bool LoadSprites(bool dedicatedserver = false);
-	bool LoadTiles(bool dedicatedserver = false);
-	bool LoadSounds(bool dedicatedserver = false);
+	bool Load(class Game & game, bool dedicatedserver = false);
+	bool LoadSprites(class Game & game, bool dedicatedserver = false);
+	bool LoadTiles(class Game & game, bool dedicatedserver = false);
+	bool LoadSounds(class Game & game, bool dedicatedserver = false);
 	void UnloadSounds(void);
 	SDL_Surface *** spritebank;
 	SDL_Surface *** tilebank;
@@ -29,6 +29,8 @@ public:
 private:
 	void MirrorY(SDL_Surface * surface);
 	void RLESurface(SDL_Surface * surface);
+	int progress;
+	int totalprogressitems;
 };
 
 #endif

@@ -4,8 +4,8 @@
 Shrapnel::Shrapnel() : Object(ObjectTypes::SHRAPNEL){
 	requiresauthority = false;
 	renderpass = 1;
-	res_bank = 108;
-	res_index = 0;
+	res_bank = 107;
+	res_index = rand() % 5;
 	state_i = 0;
 	drawalpha = true;
 	isphysical = true;
@@ -23,7 +23,7 @@ void Shrapnel::Tick(World & world){
 			world.MarkDestroyObject(id);
 		}
 	}else{
-		if((yv != 0 && abs(xv / yv) == 1)){
+		/*if((yv != 0 && abs(xv / yv) == 1)){
 			res_bank = 107;
 		}else{
 			res_bank = state_i < 5 ? 108 : 109;
@@ -49,6 +49,10 @@ void Shrapnel::Tick(World & world){
 			if(yv < 0){
 				res_index = 5;
 			}
+		}*/
+		res_index++;
+		if(res_index > 4){
+			res_index = 0;
 		}
 		int xe = xv;
 		int ye = yv;
@@ -73,5 +77,9 @@ void Shrapnel::Tick(World & world){
 }
 
 Uint8 Shrapnel::GetBrightness(void){
-	return 128 - (state_i * 6);
+	if(state_i > 2){
+		return 128 - ((state_i - 2) * 6);
+	}else{
+		return 128;
+	}
 }
