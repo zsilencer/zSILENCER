@@ -46,6 +46,7 @@ void Config::Save(void){
 		WriteKey(file, "keyfire", keyfirebinding, keyfireoperator);
 		WriteKey(file, "keychat", keychatbinding, keychatoperator);
 		WriteKey(file, "keydisguise", keydisguisebinding, keydisguiseoperator);
+		WriteKey(file, "keynextweapon", keynextweaponbinding, keynextweaponoperator);
 		SDL_RWclose(file);
 	}
 }
@@ -86,6 +87,7 @@ bool Config::Load(void){
 				if(CompareString(variable, "keyfire")){ ReadKey(data, &keyfirebinding, &keyfireoperator); }
 				if(CompareString(variable, "keychat")){ ReadKey(data, &keychatbinding, &keychatoperator); }
 				if(CompareString(variable, "keydisguise")){ ReadKey(data, &keydisguisebinding, &keydisguiseoperator); }
+				if(CompareString(variable, "keynextweapon")){ ReadKey(data, &keynextweaponbinding, &keynextweaponoperator); }
 			}
 		}
 		SDL_RWclose(file);
@@ -127,6 +129,7 @@ void Config::LoadDefaults(void){
 	keyfirebinding[0] = SDL_SCANCODE_E; keyfirebinding[1] = SDL_SCANCODE_UNKNOWN; keyfireoperator = OR;
 	keychatbinding[0] = SDL_SCANCODE_T; keychatbinding[1] = SDL_SCANCODE_UNKNOWN; keychatoperator = OR;
 	keydisguisebinding[0] = SDL_SCANCODE_C; keydisguisebinding[1] = SDL_SCANCODE_UNKNOWN; keydisguiseoperator = OR;
+	keynextweaponbinding[0] = SDL_SCANCODE_UNKNOWN; keynextweaponbinding[1] = SDL_SCANCODE_UNKNOWN; keynextweaponoperator = OR;
 }
 
 bool Config::KeyIsPressed(const Uint8 * keyboardstate, SDL_Scancode keybindings[2], bool keyoperator){

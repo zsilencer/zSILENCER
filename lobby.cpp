@@ -100,11 +100,13 @@ void Lobby::DoNetwork(void){
 		result = 0;
 		FD_ZERO(&readset);
 		FD_ZERO(&writeset);
-		FD_SET(sockethandle, &readset);
+		if(sockethandle){
+			FD_SET(sockethandle, &readset);
+		}
 		if(state == CONNECTING || sendbufferoffset > 0){
 			FD_SET(sockethandle, &writeset);
 		}
-		if(state != DISCONNECTED){
+		if(state != DISCONNECTED && state != RESOLVEFAILED){
 			result = select(sockethandle + 1, &readset, &writeset, NULL, &timeout);
 			if(FD_ISSET(sockethandle, &writeset)){
 				if(sendbuffersize > 0){
@@ -136,8 +138,10 @@ void Lobby::DoNetwork(void){
 						printf("errno: %d\n", errno);
 						if(errno == ECONNREFUSED){
 							state = CONNECTIONFAILED;
+							Disconnect();
+						}else{
+							Disconnect();
 						}
-						Disconnect();
 					}
 				}else{
 					int ret = recv(sockethandle, &msg[msgoffset], msgsize - msgoffset, 0);
@@ -554,6 +558,7 @@ int Lobby::ResolveThreadFunc(void * param){
 			((Lobby *)param)->state = RESOLVED;
 			strcpy(((Lobby *)param)->serverip, inet_ntoa(*(in_addr *)(he->h_addr)));
 		}else{
+			printf("RESOLVE FAILED: %d\n", errno);
 			((Lobby *)param)->state = RESOLVEFAILED;
 		}
 		((Lobby *)param)->resolvethreadrunning = false;

@@ -23,6 +23,7 @@ Input::Input(){
 	keyweapon[1] = false;
 	keyweapon[2] = false;
 	keyweapon[3] = false;
+	keynextweapon = false;
 	keyup = false;
 	keydown = false;
 	keyleft = false;

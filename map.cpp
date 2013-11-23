@@ -148,7 +148,6 @@ bool Map::LoadFile(const char * filename, World & world, Team * team, Uint8 secu
 		Map::ambience = ambience;
 		uncompress(minimap.pixels, &minimapsizeuncompressed, minimapcompressed, minimapcompressedsize);
 		minimap.Recolor(16 * 4);
-		minimap.CreateSurface();
 		strcpy(Map::description, description);
 		for(unsigned int i = 0; i < 4; i++){
 			fg[i] = new Uint16[expandedwidth * expandedheight];

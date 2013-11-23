@@ -25,7 +25,14 @@ public:
 	inline Uint8 Alpha(int a, int b){
 		return currentalphaedpalette[(a * 256) + b];
 	}
-	Uint8 RampColor(Uint8 a, Uint8 b);
+	inline Uint8 RampColor(Uint8 a, Uint8 b){if(a <= 1){
+		a = 5;
+		}
+		if(a >= 256 - 30){
+			return Color(a, b);
+		}
+		return ((a - 2) % 16) + (((b - 2) / 16) * 16) + 2;
+	}
 	SDL_Color * CopyWithBrightness(SDL_Color * palette, Uint8 brightness);
 	SDL_Color colors[11][256];
 

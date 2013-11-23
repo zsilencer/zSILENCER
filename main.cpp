@@ -4,6 +4,37 @@
 #include "CoreFoundation/CoreFoundation.h"
 #endif
 
+#ifdef __ANDROID__
+#include <jni.h>
+
+static Game * gameglobal = 0;
+static SDL_Event pushedevent;
+JNIEnv * env;
+JavaVM * jvm;
+
+extern "C" void Java_com_zSILENCER_game_zSILENCER_OuyaControllerKeyEvent(JNIEnv * env, jclass cls, jint player, jint type, jint keycode){
+    printf("native ouya key down %d\n", keycode);
+	if(type == 1){
+		pushedevent.type = SDL_KEYDOWN;
+	}else{
+		pushedevent.type = SDL_KEYUP;
+	}
+	int keycode2 = keycode;
+	switch(keycode){
+		case 19: keycode2 = SDL_SCANCODE_UP; break;
+		case 20: keycode2 = SDL_SCANCODE_DOWN; break;
+		case 21: keycode2 = SDL_SCANCODE_LEFT; break;
+		case 22: keycode2 = SDL_SCANCODE_RIGHT; break;
+		case 82: keycode2 = SDL_SCANCODE_HOME; break; // Menu
+		case 96: keycode2 = SDL_SCANCODE_RETURN; break; // O
+		case 97: keycode2 = SDL_SCANCODE_ESCAPE; break; // A
+	}
+	pushedevent.key.keysym.scancode = (SDL_Scancode)keycode2;
+	SDL_PushEvent(&pushedevent);
+}
+
+#endif
+
 #ifdef __APPLE__
 int SDL_main(int argc, char * argv[]){
 #elif defined(POSIX)
@@ -36,6 +67,10 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     char path[PATH_MAX];
     if(!CFURLGetFileSystemRepresentation(resourcesURL, TRUE, (UInt8 *)path, PATH_MAX)){
         // error!
+#ifdef __ANDROID__
+		exit(-1);
+#endif
+		return -1;
     }
     CFRelease(resourcesURL);
 	
@@ -43,20 +78,35 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 #endif
 	
 	Game game;
+#ifdef __ANDROID__
+	gameglobal = &game;
+#endif
 	if(!game.Load(cmdline)){
-		return false;
+#ifdef __ANDROID__
+		exit(-1);
+#endif
+		return -1;
 	}
+
 	int x, y;
 	SDL_GetMouseState(&x, &y);
 	srand(x + y + SDL_GetTicks());
 	while(1){
 		if(!game.HandleSDLEvents()){
-			return true;
+#ifdef __ANDROID__
+			exit(0);
+#endif
+			return 0;
 		}
 		if(!game.Loop()){
-			return true;
+#ifdef __ANDROID__
+			exit(0);
+#endif
+			return 0;
 		}
 	}
-	
-	return true;
+#ifdef __ANDROID__
+	exit(0);
+#endif
+	return 0;
 }

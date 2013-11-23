@@ -41,6 +41,7 @@ public:
 	SDL_Scancode keyfirebinding[2]; bool keyfireoperator;
 	SDL_Scancode keychatbinding[2]; bool keychatoperator;
 	SDL_Scancode keydisguisebinding[2]; bool keydisguiseoperator;
+	SDL_Scancode keynextweaponbinding[2]; bool keynextweaponoperator;
 	
 private:
 	bool CompareString(const char * str1, const char * str2);

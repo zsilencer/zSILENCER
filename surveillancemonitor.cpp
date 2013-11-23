@@ -122,7 +122,8 @@ void SurveillanceMonitor::Tick(World & world){
 		//}
 		Object * object = world.GetObjectFromId(objectfollowing);
 		if(object){
-			camera.SetPosition(object->x, object->y - (world.resources.spriteoffsety[object->res_bank][object->res_index] / 2));
+			camera.Follow(world, object->x, object->y - 40, 0, 0, 0, 0);
+			//camera.SetPosition(object->x, object->y - (world.resources.spriteoffsety[object->res_bank][object->res_index] / 2));
 		}else{
 			objectfollowing = 0;
 		}

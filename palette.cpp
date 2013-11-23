@@ -219,7 +219,7 @@ Uint8 Palette::Alpha(Uint8 a, Uint8 b){
 	return currentalphaedpalette[(a * 256) + b];
 }*/
 
-Uint8 Palette::RampColor(Uint8 a, Uint8 b){
+/*Uint8 Palette::RampColor(Uint8 a, Uint8 b){
 	if(a <= 1){
 		a = 5;
 	}
@@ -227,7 +227,7 @@ Uint8 Palette::RampColor(Uint8 a, Uint8 b){
 		return Color(a, b);
 	}
 	return ((a - 2) % 16) + (((b - 2) / 16) * 16) + 2;
-}
+}*/
 
 SDL_Color * Palette::CopyWithBrightness(SDL_Color * palette, Uint8 brightness){
 	for(int i = 0; i < 256; i++){

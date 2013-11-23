@@ -64,6 +64,7 @@ void RocketProjectile::Tick(World & world){
 		yv = ceil(float(yv) * 0.3);
 		soundchannel = EmitSound(world, world.resources.soundbank["rocket4.wav"], 128);
 		state_i = 11;
+		res_bank = 87;
 	}
 	if(state_i == 0){
 		oldxv = xv;

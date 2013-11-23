@@ -28,6 +28,7 @@ public:
 	bool keyfire;
 	bool keydisguise;
 	bool keyweapon[4];
+	bool keynextweapon;
 	// interface keys
 	bool keyup;
 	bool keydown;

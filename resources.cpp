@@ -4,17 +4,17 @@
 #include "sdl_internal.h"
 
 Resources::Resources(){
-	spritebank = new SDL_Surface**[256];
-	tilebank = new SDL_Surface**[256];
-	tileflippedbank = new SDL_Surface**[256];
+	spritebank = new Surface**[256];
+	tilebank = new Surface**[256];
+	tileflippedbank = new Surface**[256];
 	spriteoffsetx = new int*[256];
 	spriteoffsety = new int*[256];
 	spritewidth = new unsigned int*[256];
 	spriteheight = new unsigned int*[256];
 	for(int i = 0; i < 256; i++){
-		spritebank[i] = new SDL_Surface*[256];
-		tilebank[i] = new SDL_Surface*[256];
-		tileflippedbank[i] = new SDL_Surface*[256];
+		spritebank[i] = new Surface*[256];
+		tilebank[i] = new Surface*[256];
+		tileflippedbank[i] = new Surface*[256];
 		spriteoffsetx[i] = new int[256];
 		spriteoffsety[i] = new int[256];
 		spritewidth[i] = new unsigned int[256];
@@ -35,14 +35,17 @@ Resources::Resources(){
 Resources::~Resources(){
 	for(int i = 0; i < 256; i++){
 		for(int j = 0; j < 256; j++){
-			if(spritebank[i][j] && spritebank[i][j] != (SDL_Surface *)true){
-				SDL_FreeSurface(spritebank[i][j]);
+			if(spritebank[i][j] && spritebank[i][j] != (Surface *)true){
+				//SDL_FreeSurface(spritebank[i][j]);
+				delete spritebank[i][j];
 			}
 			if(tilebank[i][j]){
-				SDL_FreeSurface(tilebank[i][j]);
+				//SDL_FreeSurface(tilebank[i][j]);
+				delete tilebank[i][j];
 			}
 			if(tileflippedbank[i][j]){
-				SDL_FreeSurface(tileflippedbank[i][j]);
+				//SDL_FreeSurface(tileflippedbank[i][j]);
+				delete tileflippedbank[i][j];
 			}
 		}
 		delete[] spritebank[i];
@@ -107,7 +110,7 @@ bool Resources::LoadSprites(Game & game, bool dedicatedserver){
 					spritewidth[i][j] = width;
 					spriteheight[i][j] = height;
 					if(dedicatedserver){
-						spritebank[i][j] = (SDL_Surface *)true;
+						spritebank[i][j] = (Surface *)true;
 						continue;
 					}
 					Uint32 size = SDL_SwapLE32(((Uint32 *)header2)[(j * 86) + 3]);
@@ -169,7 +172,7 @@ bool Resources::LoadSprites(Game & game, bool dedicatedserver){
 					}
 					Uint8 * sprite = new Uint8[width * height];
 					memcpy(sprite, decompressed, width * height);
-					SDL_Surface * surface = SDL_CreateRGBSurface(SDL_SWSURFACE, width, height, 8, 0, 0, 0, 0);
+					Surface * surface = new Surface(width, height);//SDL_CreateRGBSurface(SDL_SWSURFACE, width, height, 8, 0, 0, 0, 0);
 					//SDL_SetColorKey(surface, SDL_TRUE, 0);
 					unsigned int paletteoffset = 0;
 					switch(i){
@@ -195,10 +198,10 @@ bool Resources::LoadSprites(Game & game, bool dedicatedserver){
 					//SDL_SetColors(surface, palette.colors[paletteoffset], 0, 256);
 					//SDL_SetPalette(surface,  SDL_LOGPAL, palette.colors[paletteoffset], 0, 256);
 					spritebank[i][j] = surface;
-					SDL_LockSurface(surface);
+					//SDL_LockSurface(surface);
 					memcpy(surface->pixels, sprite, width * height);
-					SDL_UnlockSurface(surface);
-					//RLESurface(surface);
+					//SDL_UnlockSurface(surface);
+					RLESurface(surface);
 					delete[] sprite;
 					delete[] data;
 					delete[] decompressed;
@@ -262,20 +265,22 @@ bool Resources::LoadTiles(Game & game, bool dedicatedserver){
 				for(unsigned int j = 0; j < headers[i][2]; j++){
 					Uint8 tile[64 * 64];
 					memcpy(tile, decompressed + (j * 64 * 64), sizeof(tile));
-					SDL_Surface * surface = SDL_CreateRGBSurface(SDL_SWSURFACE, 64, 64, 8, 0, 0, 0, 0);
+					Surface * surface = new Surface(64, 64);//SDL_CreateRGBSurface(SDL_SWSURFACE, 64, 64, 8, 0, 0, 0, 0);
 					//SDL_SetColorKey(surface, SDL_TRUE, 0);
 					//SDL_SetColors(surface, palette.colors[0], 0, 256);
 					tilebank[i][j] = surface;
-					SDL_LockSurface(surface);
+					//SDL_LockSurface(surface);
 					memcpy(surface->pixels, tile, 64 * 64);
-					SDL_UnlockSurface(surface);
-					tileflippedbank[i][j] = SDL_CreateRGBSurface(SDL_SWSURFACE, 64, 64, 8, 0, 0, 0, 0);
+					//SDL_UnlockSurface(surface);
+					tileflippedbank[i][j] = new Surface(64, 64);//SDL_CreateRGBSurface(SDL_SWSURFACE, 64, 64, 8, 0, 0, 0, 0);
 				    //SDL_SetColorKey(tileflippedbank[i][j], SDL_TRUE, 0);
 					//SDL_SetColors(tileflippedbank[i][j], palette.colors[0], 0, 256);
-					SDL_LockSurface(tileflippedbank[i][j]);
+					//SDL_LockSurface(tileflippedbank[i][j]);
 					memcpy(tileflippedbank[i][j]->pixels, surface->pixels, surface->w * surface->h);
-					SDL_UnlockSurface(tileflippedbank[i][j]);
+					//SDL_UnlockSurface(tileflippedbank[i][j]);
 					MirrorY(tileflippedbank[i][j]);
+					RLESurface(tilebank[i][j]);
+					RLESurface(tileflippedbank[i][j]);
 				}
 				delete[] data;
 				delete[] decompressed;
@@ -408,30 +413,31 @@ void Resources::UnloadSounds(void){
 	}
 }
 
-void Resources::MirrorY(SDL_Surface * surface){
-    SDL_Surface * newsurface = SDL_CreateRGBSurface(SDL_SWSURFACE, surface->w, surface->h, surface->format->BitsPerPixel, 0, 0, 0, 0);
+void Resources::MirrorY(Surface * surface){
+    Surface newsurface(surface->w, surface->h);//SDL_CreateRGBSurface(SDL_SWSURFACE, surface->w, surface->h, surface->format->BitsPerPixel, 0, 0, 0, 0);
     //SDL_SetColors(newsurface, palette.colors[0], 0, 256);
-    SDL_BlitSurface(surface, 0, newsurface, 0);
-    SDL_LockSurface(surface);
-    SDL_LockSurface(newsurface);
+    //SDL_BlitSurface(surface, 0, &newsurface, 0);
+	memcpy(newsurface.pixels, surface->pixels, surface->w * surface->h);
+    //SDL_LockSurface(surface);
+    //SDL_LockSurface(newsurface);
     for(int y = 0; y < surface->h; y++){
         for(int x = 0; x < surface->w; x++){
-            ((Uint8 *)surface->pixels)[x + (y * surface->w)] = ((Uint8 *)newsurface->pixels)[(y * surface->w) + (surface->w - (x + 1))];
+            ((Uint8 *)surface->pixels)[x + (y * surface->w)] = ((Uint8 *)newsurface.pixels)[(y * surface->w) + (surface->w - (x + 1))];
         }
     }
-    SDL_UnlockSurface(newsurface);
-    SDL_UnlockSurface(surface);
-    SDL_FreeSurface(newsurface);
+    //SDL_UnlockSurface(newsurface);
+    //SDL_UnlockSurface(surface);
+    //SDL_FreeSurface(newsurface);
 }
 
-void Resources::RLESurface(SDL_Surface * surface){
+void Resources::RLESurface(Surface * surface){
 	Uint8 *rlebuf, *dst;
     int maxn;
     int y;
     Uint8 *srcbuf, *curbuf, *lastline;
     int maxsize = 0;
     int skip, run;
-    int bpp = surface->format->BytesPerPixel;
+    int bpp = 1;//surface->format->BytesPerPixel;
     Uint32 ckey, rgbmask;
     int w, h;
 	
@@ -441,11 +447,7 @@ void Resources::RLESurface(SDL_Surface * surface){
 	 starting with an opaque pixel */
 	maxsize = surface->h * 3 * (surface->w / 2 + 1) + 2;
 	
-    rlebuf = (Uint8 *) SDL_malloc(maxsize);
-    if (rlebuf == NULL) {
-        SDL_OutOfMemory();
-        return;
-    }
+    rlebuf = new Uint8[maxsize];
 	
     /* Set up the conversion */
     srcbuf = (Uint8 *) surface->pixels;
@@ -453,7 +455,7 @@ void Resources::RLESurface(SDL_Surface * surface){
     maxn = 255;
     skip = run = 0;
     dst = rlebuf;
-    rgbmask = ~surface->format->Amask;
+    rgbmask = 0xFF;//~surface->format->Amask;
     ckey = 0;
     lastline = dst;
     w = surface->w;
@@ -512,7 +514,7 @@ dst += 2;				\
                 lastline = dst;
         } while (x < w);
 		
-        srcbuf += surface->pitch;
+        srcbuf += surface->w;//surface->pitch;
     }
     dst = lastline;             /* back up bast trailing blank lines */
     ADD_COUNTS(0, 0);
@@ -520,17 +522,22 @@ dst += 2;				\
 #undef ADD_COUNTS
 	
     /* Now that we have it encoded, release the original pixels */
-    if (!(surface->flags & SDL_PREALLOC)) {
+    /*if (!(surface->flags & SDL_PREALLOC)) {
         SDL_free(surface->pixels);
         surface->pixels = NULL;
-    }
+    }*/
 	
     /* realloc the buffer to release unused memory */
-    {
+	int newsize = dst - rlebuf;
+	Uint8 * newbuf = new Uint8[newsize];
+	memcpy(newbuf, rlebuf, newsize);
+	delete[] rlebuf;
+	surface->rlepixels = newbuf;
+    //{
         /* If realloc returns NULL, the original block is left intact */
-        Uint8 *p = (Uint8 *)SDL_realloc(rlebuf, dst - rlebuf);
+        /*Uint8 *p = (Uint8 *)SDL_realloc(rlebuf, dst - rlebuf);
         if (!p)
             p = rlebuf;
 		surface->map->sw_data->aux_data = p;
-    }
+    }*/
 }

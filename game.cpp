@@ -16,7 +16,7 @@
 #include "config.h"
 #include "cocoawrapper.h"
 
-Game::Game() : renderer(world){
+Game::Game() : renderer(world), screenbuffer(640, 480){
 	world.SetVersion("00020");
 	frames = 0;
 	fps = 0;
@@ -48,6 +48,8 @@ Game::Game() : renderer(world){
 	keynames[16] = "Previous Camera";
 	keynames[17] = "Detonate";
 	keynames[18] = "Disguise";
+	keynames[19] = "Next Weapon";
+	memset(keystate, 0, sizeof(keystate));
 	singleplayermessage = 0;
 	updatetitle = true;
 	oldselectedagency = -1;
@@ -56,13 +58,12 @@ Game::Game() : renderer(world){
 	lastchannel[0] = 0;
 	minimized = false;
 	window = 0;
-	screenbuffer = 0;
 	windowrenderer = 0;
 	lasttick = 0;
 }
 
 Game::~Game(){
-	SDL_FreeSurface(screenbuffer);
+	SDL_FreeSurface(sdlscreenbuffer);
 	SDL_DestroyRenderer(windowrenderer);
 	SDL_DestroyWindow(window);
 	world.resources.UnloadSounds();
@@ -113,12 +114,10 @@ bool Game::Load(char * cmdline){
 		}while((cmdline = strtok(0, " ")));
 	}
 	Config::GetInstance().Load();
-	if(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_TIMER | SDL_INIT_JOYSTICK) == -1){
+	if(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_TIMER) == -1){
 		printf("Could not init SDL\n");
 		return false;
 	}
-	SDL_JoystickEventState(SDL_ENABLE);
-	SDL_GameControllerEventState(SDL_ENABLE);
 	if(Mix_Init(MIX_INIT_MP3) == -1){
 		printf("Could not init SDL_mixer\n");
 		return false;
@@ -134,9 +133,9 @@ bool Game::Load(char * cmdline){
 	SDL_EventState(SDL_TEXTINPUT, SDL_TRUE); //SDL_EnableUNICODE(true);
 	//SDL_EnableKeyRepeat(SDL_DEFAULT_REPEAT_DELAY, SDL_DEFAULT_REPEAT_INTERVAL);
 	//screen = SDL_SetVideoMode(640, 480, 8, SDL_DOUBLEBUF | SDL_SWSURFACE);
-	window = SDL_CreateWindow("zSILENCER", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 640, 480, SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | (Config::GetInstance().fullscreen ? SDL_WINDOW_FULLSCREEN : 0));
+	window = SDL_CreateWindow("zSILENCER", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, screenbuffer.w, screenbuffer.h, SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | (Config::GetInstance().fullscreen ? SDL_WINDOW_FULLSCREEN : 0));
 	windowrenderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
-	screenbuffer = SDL_CreateRGBSurface(SDL_SWSURFACE, 640, 480, 8, 0, 0, 0, 0);
+	sdlscreenbuffer = SDL_CreateRGBSurface(SDL_SWSURFACE, screenbuffer.w, screenbuffer.h, 8, 0, 0, 0, 0);
 	SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "2");
 	SetColors(renderer.palette.GetColors());
 	//SDL_Flip(screen);
@@ -152,11 +151,14 @@ bool Game::Load(char * cmdline){
 
 void Game::LoadProgressCallback(int progress, int totalprogressitems){
 	HandleSDLEvents();
-	if(SDL_GetTicks() - lasttick >= 42){
+	if(SDL_GetTicks() - lasttick >= 100){
 		int width = 500;
 		int widthp = (float(progress) / totalprogressitems) * width;
-		renderer.DrawFilledRectangle(screenbuffer, (640 - (width)) / 2, (480 - 20) / 2, (640 + (widthp)) / 2, (480 + 20) / 2, 123);
-		SDL_Texture * texture = SDL_CreateTextureFromSurface(windowrenderer, screenbuffer);
+		renderer.DrawFilledRectangle(&screenbuffer, (640 - (width)) / 2, (480 - 20) / 2, (640 + (widthp)) / 2, (480 + 20) / 2, 123);
+		void * oldpixels = sdlscreenbuffer->pixels;
+		sdlscreenbuffer->pixels = screenbuffer.pixels;
+		SDL_Texture * texture = SDL_CreateTextureFromSurface(windowrenderer, sdlscreenbuffer);
+		sdlscreenbuffer->pixels = oldpixels;
 		SDL_RenderCopy(windowrenderer, texture, 0, 0);
 		SDL_DestroyTexture(texture);
 		SDL_RenderPresent(windowrenderer);
@@ -165,7 +167,7 @@ void Game::LoadProgressCallback(int progress, int totalprogressitems){
 }
 
 void Game::SetColors(SDL_Color * colors){
-	SDL_SetPaletteColors(screenbuffer->format->palette, colors, 0, 256);
+	SDL_SetPaletteColors(sdlscreenbuffer->format->palette, colors, 0, 256);
 	//SDL_SetColors(screen, colors, 0, 256);
 	//SDL_SetColors(screenbuffer, colors, 0, 256);
 }
@@ -217,14 +219,21 @@ bool Game::Loop(void){
 		/*SDL_FillRect(screen, 0, 0);
 		renderer.Draw(screen);
 		SDL_Flip(screen);*/
-		SDL_FillRect(screenbuffer, 0, 0);
+		//SDL_FillRect(screenbuffer, 0, 0);
+		screenbuffer.Clear(0);
 		world.DoNetwork();
-		renderer.Draw(screenbuffer, 1 - (float(tickcheck - lasttick) / wait));
+		renderer.Draw(&screenbuffer, 1 - (float(tickcheck - lasttick) / wait));
+		/*char fpstext[16];
+		sprintf(fpstext, "%d", fps);
+		renderer.DrawText(&screenbuffer, 10, 30, fpstext, 133, 7);*/
 		if(minimized){
 			SDL_Delay(wait);
 		}
 		world.DoNetwork();
-		SDL_Texture * texture = SDL_CreateTextureFromSurface(windowrenderer, screenbuffer);
+		void * oldpixels = sdlscreenbuffer->pixels;
+		sdlscreenbuffer->pixels = screenbuffer.pixels;
+		SDL_Texture * texture = SDL_CreateTextureFromSurface(windowrenderer, sdlscreenbuffer);
+		sdlscreenbuffer->pixels = oldpixels;
 		world.DoNetwork();
 		SDL_RenderCopy(windowrenderer, texture, 0, 0);
 		SDL_DestroyTexture(texture);
@@ -337,7 +346,8 @@ bool Game::Tick(void){
 				//palette.SetPalette(0);
 				//SDL_FillRect(screen, 0, 0);
 				//SDL_SetColors(screen, palette.GetColors(), 0, 256);
-				SDL_FillRect(screenbuffer, 0, 0);
+				//SDL_FillRect(screenbuffer, 0, 0);
+				screenbuffer.Clear(0);
 				//SDL_FillRect(screen, 0, 0);
 				//SDL_UpdateRect(screen, 0, 0, screen->w, screen->h);
 				SetColors(renderer.palette.GetColors());
@@ -364,7 +374,8 @@ bool Game::Tick(void){
 				motdprinted = false;
 				//SDL_FillRect(screen, 0, 0);
 				//SDL_SetColors(screen, palette.GetColors(), 0, 256);
-				SDL_FillRect(screenbuffer, 0, 0);
+				//SDL_FillRect(screenbuffer, 0, 0);
+				screenbuffer.Clear(0);
 				//SDL_FillRect(screen, 0, 0);
 				SetColors(renderer.palette.GetColors());
 				stateisnew = false;
@@ -398,7 +409,8 @@ bool Game::Tick(void){
 				renderer.palette.SetPalette(2);
 				//SDL_FillRect(screen, 0, 0);
 				//SDL_SetColors(screen, palette.GetColors(), 0, 256);
-				SDL_FillRect(screenbuffer, 0, 0);
+				//SDL_FillRect(screenbuffer, 0, 0);
+				screenbuffer.Clear(0);
 				//SDL_FillRect(screen, 0, 0);
 				SetColors(renderer.palette.GetColors());
 				stateisnew = false;
@@ -548,7 +560,8 @@ bool Game::Tick(void){
 				renderer.palette.SetParallaxColors(world.map.parallax);
 				//SDL_FillRect(screen, 0, 0);
 				//SDL_SetColors(screen, palette.GetColors(), 0, 256);
-				SDL_FillRect(screenbuffer, 0, 0);
+				//SDL_FillRect(screenbuffer, 0, 0);
+				screenbuffer.Clear(0);
 				//SDL_FillRect(screen, 0, 0);
 				SetColors(renderer.palette.GetColors());
 				stateisnew = false;
@@ -616,7 +629,8 @@ bool Game::Tick(void){
 				gamesummaryinterface = CreateGameSummaryInterface(user->statscopy, user->statsagency);
 				currentinterface = gamesummaryinterface->id;
 				renderer.palette.SetPalette(1);
-				SDL_FillRect(screenbuffer, 0, 0);
+				//SDL_FillRect(screenbuffer, 0, 0);
+				screenbuffer.Clear(0);
 				SetColors(renderer.palette.GetColors());
 				stateisnew = false;
 			}else{
@@ -655,7 +669,8 @@ bool Game::Tick(void){
 				renderer.palette.SetParallaxColors(world.map.parallax);
 				//SDL_FillRect(screen, 0, 0);
 				//SDL_SetColors(screen, palette.GetColors(), 0, 256);
-				SDL_FillRect(screenbuffer, 0, 0);
+				//SDL_FillRect(screenbuffer, 0, 0);
+				screenbuffer.Clear(0);
 				//SDL_FillRect(screen, 0, 0);
 				SetColors(renderer.palette.GetColors());
 				singleplayermessage = 0;
@@ -755,8 +770,13 @@ bool Game::Tick(void){
 					case 8:{
 						if(!world.message_i){
 							char text[256];
-							sprintf(text, "To change weapons, press the 1, 2, 3, or 4 keys.");
+#ifdef OUYA
+							sprintf(text, "To change weapons, press %s", GetKeyName(Config::GetInstance().keynextweaponbinding[0]));
+#else
+							sprintf(text, "To change weapons, press the 1, 2, 3, or 4 keys");
+#endif
 							world.ShowMessage(text, 128);
+							
 						}
 						if(player->laserammo == 0){
 							player->laserammo = 15;
@@ -816,7 +836,12 @@ bool Game::Tick(void){
 					case 13:{
 						if(!world.message_i){
 							char text[256];
-							sprintf(text, "Use the Up and Down keys to select Rocket ammo\nand press Enter to purchase.");
+#ifdef OUYA
+							const char * button = GetKeyName(Config::GetInstance().keyusebinding[0]);
+#else
+							const char * button = "Enter";
+#endif
+							sprintf(text, "Use the Up and Down keys to select Rocket ammo\nand press %s to purchase.", button);
 							world.ShowMessage(text, 255);
 						}
 						if(!player->InBase(world)){
@@ -1126,7 +1151,8 @@ bool Game::Tick(void){
 								}
 							}
 							if(button->uid >= 0 && button->uid < 150){
-								if(iface->disabled && iface->lastsym != SDL_SCANCODE_UNKNOWN && button->state == Button::ACTIVE){
+								const int timeout = 72;
+								if(iface->disabled && button->state == Button::ACTIVE && (iface->lastsym != SDL_SCANCODE_UNKNOWN || world.tickcount - optionscontrolstick > timeout)){
 									int index = button->uid + scrollbar->scrollposition;
 									if(button->uid >= 150){
 										index -= 150;
@@ -1135,9 +1161,14 @@ bool Game::Tick(void){
 										index -= 100;
 									}
 									SDL_Scancode sym = iface->lastsym;
+									if(world.tickcount - optionscontrolstick > timeout){
+										sym = SDL_SCANCODE_UNKNOWN;
+									}
+#ifndef OUYA
 									if(sym == SDL_SCANCODE_ESCAPE){
 										sym = SDL_SCANCODE_UNKNOWN;
 									}
+#endif
 									strcpy(button->text, GetKeyName(sym));
 									SDL_Scancode * key1 = 0;
 									SDL_Scancode * key2 = 0;
@@ -1157,6 +1188,7 @@ bool Game::Tick(void){
 								if(button->uid >= 0 && button->uid < 150){
 									strcpy(button->text, "-");
 									iface->disabled = true;
+									optionscontrolstick = world.tickcount;
 									iface->lastsym = SDL_SCANCODE_UNKNOWN;
 								}
 								if(button->uid >= 150 && button->uid < 200){
@@ -1219,7 +1251,8 @@ bool Game::Tick(void){
 				renderer.palette.SetParallaxColors(world.map.parallax);
 				//SDL_FillRect(screen, 0, 0);
 				//SDL_SetColors(screen, palette.GetColors(), 0, 256);
-				SDL_FillRect(screenbuffer, 0, 0);
+				//SDL_FillRect(screenbuffer, 0, 0);
+				screenbuffer.Clear(0);
 				//SDL_FillRect(screen, 0, 0);
 				SetColors(renderer.palette.GetColors());
 				sharedstate->state = 2;
@@ -1330,7 +1363,8 @@ bool Game::Tick(void){
 				ShowDeployMessage();
 				renderer.palette.SetPalette(0);
 				renderer.palette.SetParallaxColors(world.map.parallax);
-				SDL_FillRect(screenbuffer, 0, 0);
+				//SDL_FillRect(screenbuffer, 0, 0);
+				screenbuffer.Clear(0);
 				SetColors(renderer.palette.GetColors());
 				singleplayermessage = 0;
 				stateisnew = false;
@@ -1383,19 +1417,9 @@ bool Game::Tick(void){
 }
 
 void Game::UpdateInputState(Input & input){
-	const Uint8 * keystateconst = SDL_GetKeyboardState(NULL);
-	Uint8 keystate[SDL_NUM_SCANCODES];
-	memcpy(keystate, keystateconst, sizeof(keystate));
-	SDL_Joystick * joystick = SDL_JoystickOpen(0);
-	if(joystick){
-		SetOUYAMappings(keystate, joystick);
-		//printf("name: %s buttons: %d, axes: %d, balls: %d\n", SDL_JoystickName(joystick), SDL_JoystickNumButtons(joystick), SDL_JoystickNumAxes(joystick), SDL_JoystickNumBalls(joystick));
-	}
-	/*SDL_GameController * controller = SDL_GameControllerOpen(0);
-	if(controller){
-		SetOUYAMappings(keystate, controller);
-		SDL_GameControllerClose(0);
-	}*/
+	//const Uint8 * keystateconst = SDL_GetKeyboardState(NULL);
+	//Uint8 keystate[SDL_NUM_SCANCODES];
+	//memcpy(keystate, keystateconst, sizeof(keystate));
 	int mousex;
 	int mousey;
 	Uint8 mousestate = SDL_GetMouseState(&mousex, &mousey);
@@ -1426,12 +1450,48 @@ void Game::UpdateInputState(Input & input){
 	input.keyweapon[1] = keystate[SDL_SCANCODE_2] ? true : false;
 	input.keyweapon[2] = keystate[SDL_SCANCODE_3] ? true : false;
 	input.keyweapon[3] = keystate[SDL_SCANCODE_4] ? true : false;
+	input.keynextweapon = Config::GetInstance().KeyIsPressed(keystate, Config::GetInstance().keynextweaponbinding, Config::GetInstance().keynextweaponoperator);
 	input.mousex = (Uint16)mousex;
 	input.mousey = (Uint16)mousey;
 	input.mousedown = SDL_BUTTON_LEFT & mousestate ? true : false;
 	
 	Player * localplayer = world.GetPeerPlayer(world.localpeerid);
 	if(localplayer){
+		if(input.keynextweapon && !localplayer->input.keynextweapon){
+			switch(localplayer->currentweapon){
+				case 0:
+					if(localplayer->laserammo > 0){
+						input.keyweapon[1] = true;
+					}else
+					if(localplayer->rocketammo > 0){
+						input.keyweapon[2] = true;
+					}else
+					if(localplayer->flamerammo > 0){
+						input.keyweapon[3] = true;
+					}
+				break;
+				case 1:
+					if(localplayer->rocketammo > 0){
+						input.keyweapon[2] = true;
+					}else
+					if(localplayer->flamerammo > 0){
+						input.keyweapon[3] = true;
+					}else{
+						input.keyweapon[0] = true;
+					}
+				break;
+				case 2:
+					if(localplayer->flamerammo > 0){
+						input.keyweapon[3] = true;
+					}else{
+						input.keyweapon[0] = true;
+					}
+				break;
+				case 3:
+					input.keyweapon[0] = true;
+				break;
+			}
+		}
 		if(localplayer->chatinterfaceid){
 			Input zeroinput;
 			input = zeroinput;
@@ -1475,8 +1535,12 @@ void Game::UnloadGame(void){
 }
 
 bool Game::CheckForQuit(void){
-	const Uint8 * keystate = SDL_GetKeyboardState(NULL);
-	if(keystate[SDL_SCANCODE_ESCAPE]){
+#ifdef OUYA
+	int quitscancode = SDL_SCANCODE_HOME;
+#else
+	int quitscancode = SDL_SCANCODE_ESCAPE;
+#endif
+	if(keystate[quitscancode]){
 		if(world.quitstate == 0){
 			world.quitstate = 1;
 		}else
@@ -1484,10 +1548,10 @@ bool Game::CheckForQuit(void){
 			world.quitstate = 3;
 		}
 	}
-	if(world.quitstate == 1 && !keystate[SDL_SCANCODE_ESCAPE]){
+	if(world.quitstate == 1 && !keystate[quitscancode]){
 		world.quitstate = 2;
 	}
-	if(world.quitstate == 3 && !keystate[SDL_SCANCODE_ESCAPE]){
+	if(world.quitstate == 3 && !keystate[quitscancode]){
 		world.quitstate = 0;
 	}
 	if(keystate[SDL_SCANCODE_RETURN]){
@@ -1867,6 +1931,7 @@ Interface * Game::CreateLobbyConnectInterface(void){
 	passwordtext->x = 190;
 	passwordtext->y = 318;
 	TextInput * usernameinput = (TextInput *)world.CreateObject(ObjectTypes::TEXTINPUT);
+	strcpy(usernameinput->text, "ouya");
 	usernameinput->x = 275;
 	usernameinput->y = 293;
 	usernameinput->width = 180;
@@ -3045,7 +3110,7 @@ bool Game::ProcessLobbyInterface(Interface * iface){
 					if(textbox){
 						Object * object = world.GetObjectFromId(iface->scrollbar);
 						ScrollBar * scrollbar = static_cast<ScrollBar *>(object);
-						if(world.lobby.chatmessages.size() > chatlinesprinted){
+						if(minimized && world.lobby.chatmessages.size() > chatlinesprinted){
 							SDL_SysWMinfo info;
 							SDL_VERSION(&info.version);
 							if(SDL_GetWindowWMInfo(window, &info)){
@@ -3809,19 +3874,28 @@ void Game::IndexToConfigKey(int index, SDL_Scancode ** key1, SDL_Scancode ** key
 			*key2 = &Config::GetInstance().keydisguisebinding[1];
 			*keyop = &Config::GetInstance().keydisguiseoperator;
 		break;
+		case 19:
+			*key1 = &Config::GetInstance().keynextweaponbinding[0];
+			*key2 = &Config::GetInstance().keynextweaponbinding[1];
+			*keyop = &Config::GetInstance().keynextweaponoperator;
+		break;
 	}
 }
 
 const char * Game::GetKeyName(SDL_Scancode sym){
-	int symint = sym;
-	if(symint >= 300){ // Custom scancodes for game controller mappings
-		switch(symint){
-			case 300: return "LStick"; break;
-			case 301: return "RStick"; break;
-			case 302: return "LShoulder"; break;
-			case 303: return "RShoulder"; break;
-		}
+#ifdef OUYA // Custom scancodes for ouya controller
+	switch((int)sym){
+		case SDL_SCANCODE_HOME: return "Menu"; break;
+		case SDL_SCANCODE_RETURN: return "O"; break;
+		case SDL_SCANCODE_ESCAPE: return "A"; break;
+		case 99: return "U"; break;
+		case 100: return "Y"; break;
+		case 102: return "L1"; break;
+		case 103: return "R1"; break;
+		case 106: return "L3"; break;
+		case 107: return "R3"; break;
 	}
+#endif
 	switch(sym){
 		case SDL_SCANCODE_UNKNOWN: return ""; break;
 		case SDL_SCANCODE_UP: return "Up"; break;
@@ -3932,28 +4006,6 @@ const char * Game::GetKeyName(SDL_Scancode sym){
 	}
 }
 
-SDL_Scancode Game::OUYAMapping(int button){
-	switch(button){
-		case SDL_CONTROLLER_BUTTON_A: return SDL_SCANCODE_A; break;
-		case SDL_CONTROLLER_BUTTON_B: return SDL_SCANCODE_O; break;
-		case SDL_CONTROLLER_BUTTON_X: return SDL_SCANCODE_U; break;
-		case SDL_CONTROLLER_BUTTON_LEFTSTICK: return (SDL_Scancode)300; break;
-		case SDL_CONTROLLER_BUTTON_RIGHTSTICK: return (SDL_Scancode)301; break;
-		case SDL_CONTROLLER_BUTTON_LEFTSHOULDER: return (SDL_Scancode)302; break;
-		case SDL_CONTROLLER_BUTTON_RIGHTSHOULDER: return (SDL_Scancode)303; break;
-		default: return SDL_SCANCODE_UNKNOWN; break;
-	}
-}
-
-void Game::SetOUYAMappings(Uint8 * keystate, SDL_Joystick * joystick){
-	for(int i = 0; i < SDL_CONTROLLER_BUTTON_MAX; i++){
-		SDL_Scancode scancode = OUYAMapping((SDL_GameControllerButton)i);
-		if(scancode != SDL_SCANCODE_UNKNOWN){
-			keystate[scancode] = SDL_JoystickGetButton(joystick, i) ? 1 : 0;
-		}
-	}
-}
-
 void Game::GetGameChannelName(LobbyGame & lobbygame, char * name){
 	sprintf(name, "#%s-%d", lobbygame.name, lobbygame.accountid);
 }
@@ -4057,6 +4109,16 @@ bool Game::HandleSDLEvents(void){
 				}
 			}break;
 			case SDL_KEYDOWN:{
+#ifdef OUYA
+				if(event.key.keysym.scancode == SDL_SCANCODE_HOME){ // The menu key gets keydown and then keyup right after, so we have to toggle
+					keystate[event.key.keysym.scancode] = !keystate[event.key.keysym.scancode];
+				}else{
+					keystate[event.key.keysym.scancode] = true;
+				}
+#else
+				keystate[event.key.keysym.scancode] = true;
+#endif
+				
 				bool skip = true;
 				Uint8 ascii;
 				switch(event.key.keysym.scancode){
@@ -4102,77 +4164,14 @@ bool Game::HandleSDLEvents(void){
 					}
 				}
 			}break;
-			/*case SDL_CONTROLLERBUTTONDOWN:{
-				printf("controller button down %d\n", event.cbutton.button);
-				Interface * iface = (Interface *)world.GetObjectFromId(currentinterface);
-				if(iface){
-					SDL_Scancode scancode = OUYAMapping((SDL_GameControllerButton)event.cbutton.button);
-					iface->lastsym = scancode;
-				}
-			}break;
-			case SDL_JOYBUTTONDOWN:{
-				printf("joybutton down %d\n", event.jbutton.button);
-			}break;*/
-			/*case SDL_KEYDOWN:{
-				char ascii = event.key.keysym.unicode & 0x7F;
-				bool skip = true;
-				if(ascii >= 0x20 && ascii <= 0x7F){
-					skip = false;
-				}
-				if(event.key.keysym.sym == SDL_SCANCODE_LEFT){
-					ascii = 1;
-					skip = false;
-				}
-				if(event.key.keysym.sym == SDL_SCANCODE_RIGHT){
-					ascii = 2;
-					skip = false;
-				}
-				if(event.key.keysym.sym == SDL_SCANCODE_UP){
-					ascii = 3;
-					skip = false;
-				}
-				if(event.key.keysym.sym == SDL_SCANCODE_DOWN){
-					ascii = 4;
-					skip = false;
-				}
-				if(event.key.keysym.sym == SDL_SCANCODE_BACKSPACE){
-					ascii = '\b';
-					skip = false;
-				}
-				if(event.key.keysym.sym == SDL_SCANCODE_TAB){
-					ascii = '\t';
-					skip = false;
-				}
-				if(event.key.keysym.sym == SDL_SCANCODE_RETURN){
-					ascii = '\n';
-					skip = false;
-				}
-				if(event.key.keysym.sym == SDL_SCANCODE_ESCAPE){
-					ascii = 0x1B;
-					skip = false;
-				}
-				switch(ascii){
-					case '[':
-					case '\\':
-					case ']':
-					case '^':
-					case '_':
-					case '`':
-					case '{':
-					case '|':
-					case '}':
-					case '~':
-						skip = true;
+			case SDL_KEYUP:{
+#ifdef OUYA
+				if(event.key.keysym.scancode == SDL_SCANCODE_HOME){
 					break;
 				}
-				Interface * iface = (Interface *)world.GetObjectFromId(currentinterface);
-				if(iface){
-					iface->lastsym = event.key.keysym.sym;
-					if(!skip){
-						iface->ProcessKeyPress(&world, ascii);
-					}
-				}
-			}break;*/
+#endif
+				keystate[event.key.keysym.scancode] = false;
+			}break;
 			case SDL_MOUSEWHEEL:{
 				Interface * iface = (Interface *)world.GetObjectFromId(currentinterface);
 				if(iface){

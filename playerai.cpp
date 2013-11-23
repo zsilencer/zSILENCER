@@ -422,7 +422,7 @@ void PlayerAI::SetState(Uint8 state){
 }
 
 bool PlayerAI::TerminalSort(Terminal * a, Terminal * b){
-	if(a->state == Terminal::SECRETREADY){
+	if(a->state == Terminal::SECRETREADY && b->state != Terminal::SECRETREADY){
 		return true;
 	}
 	return false;

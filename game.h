@@ -73,13 +73,12 @@ private:
 	Uint8 GetSelectedAgency(void);
 	void IndexToConfigKey(int index, SDL_Scancode ** key1, SDL_Scancode ** key2, bool ** keyop);
 	const char * GetKeyName(SDL_Scancode sym);
-	SDL_Scancode OUYAMapping(int button);
-	void SetOUYAMappings(Uint8 * keystate, SDL_Joystick * joystick);
 	void GetGameChannelName(LobbyGame & lobbygame, char * name);
 	void CreateAmbienceChannels(void);
 	void UpdateAmbienceChannels(void);
-	static const int numkeys = 19;
+	static const int numkeys = 20;
 	const char * keynames[numkeys];
+	Uint8 keystate[SDL_NUM_SCANCODES];
 	enum {NONE, FADEOUT, MAINMENU, LOBBYCONNECT, LOBBY, INGAME, MISSIONSUMMARY, SINGLEPLAYERGAME, OPTIONS, OPTIONSCONTROLS, HOSTGAME, JOINGAME, TESTGAME};
 	Uint8 state;
 	Uint8 nextstate;
@@ -89,8 +88,8 @@ private:
 	Renderer renderer;
 	SDL_Window * window;
 	SDL_Renderer * windowrenderer;
-	SDL_Surface * screen;
-	SDL_Surface * screenbuffer;
+	Surface screenbuffer;
+	SDL_Surface * sdlscreenbuffer;
 	int frames;
 	int fps;
 	Uint32 lasttick;
@@ -112,6 +111,7 @@ private:
 	bool gamesummaryinfoloaded;
 	bool minimized;
 	bool creategameclicked;
+	Uint32 optionscontrolstick;
 };
 
 #endif

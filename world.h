@@ -175,8 +175,8 @@ private:
 	Uint32 localtoremoteticks[maxoldsnapshots];
 	LagSimulator lagsimulator;
 	std::list<Serializer *> snapshotqueue;
-	static const Uint32 snapshotqueueminsize = 1;
-	static const Uint32 snapshotqueuemaxsize = 5;
+	static const int snapshotqueueminsize = 1;
+	static const int snapshotqueuemaxsize = 4;
 	Uint8 illuminate;
 	bool systemcameraactive[2];
 	Uint16 systemcamerafollow[2];

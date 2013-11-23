@@ -1076,11 +1076,19 @@ void Player::Tick(World & world){
 			UnDisguise(world);
 			Uint8 direction;
 			Uint8 delay = weaponfiredelay[currentweapon];
+			res_bank = 21;
 			if(state_i >= 8 + delay){
 				state_i = 4;
 			}
-			if(state_i <= 4 || state_i >= 10){
-				res_bank = 21;
+			if(xv >= 4){
+				xv -= 4;
+			}else
+			if(xv <= -4){
+				xv += 4;
+			}else{
+				xv = 0;
+			}
+			if(1/*state_i <= 4 || state_i >= 10*/){
 				if(input.keymoveright || !mirrored){
 					direction = 2;
 					res_bank = 21;
@@ -1161,6 +1169,13 @@ void Player::Tick(World & world){
 					state_i -= 2;
 				}
 			}
+			if(!FollowGround(*this, world, xv)){
+				x += (xv - (x - oldx)) + (xv > 0 ? 1 : -1);
+				state = FALLING;
+				fallingnudge = 0;
+				state_i = 4 * 2;
+				break;
+			}
 		}break;
 		case RUNNING:{
 			// 122:0-19 civilian walking
@@ -1182,7 +1197,7 @@ void Player::Tick(World & world){
 				}
 			}
 			if(input.keymoveleft || (ladder && x > center)){
-				xv -= 2;
+				xv -= 3;
 				if(xv > 0){
 					xv = 0;
 				}
@@ -1194,7 +1209,7 @@ void Player::Tick(World & world){
 				mirrored = true;
 			}else
 			if(input.keymoveright || (ladder && x < center)){
-				xv += 2;
+				xv += 3;
 				if(xv < 0){
 					xv = 0;
 				}
@@ -1409,11 +1424,11 @@ void Player::Tick(World & world){
 		}break;
 		case CROUCHING:{
 			//xv = 0;
-			if(xv >= 2){
-				xv -= 2;
+			if(xv >= 3){
+				xv -= 3;
 			}else
-			if(xv <= -2){
-				xv += 2;
+			if(xv <= -3){
+				xv += 3;
 			}else{
 				xv = 0;
 			}
@@ -1427,6 +1442,16 @@ void Player::Tick(World & world){
 			res_bank = 17;
 			res_index = state_i;
 			if(state_i >= 4){
+				if(input.keymoveleft || input.keymoveright){
+					if(input.keymoveleft){
+						mirrored = true;
+					}else{
+						mirrored = false;
+					}
+					state = ROLLING;
+					state_i = -1;
+					break;
+				}
 				state = CROUCHED;
 				state_i = -1;
 				break;
@@ -1489,7 +1514,7 @@ void Player::Tick(World & world){
 			if(state_i >= 8 + delay){
 				state_i = 4;
 			}
-			if(state_i <= 4 || state_i >= 10){
+			if(1/*state_i <= 4 || state_i >= 10*/){
 				if(input.keymoveright || !mirrored){
 					direction = 8;
 					mirrored = false;
@@ -1576,7 +1601,12 @@ void Player::Tick(World & world){
 			if(state_i >= 8){
 				xv = 0;
 				res_bank = 18;
-				res_index = (state_i - 8) / 4;
+				res_index = (state_i - 8) / 2;
+				if((input.keymoveright || input.keymoveleft) && !input.keymovedown){
+					state = RUNNING;
+					state_i = -1;
+					break;
+				}
 				if(!input.keymovedown){
 					state = UNCROUCHING;
 					state_i = -1;
@@ -1606,7 +1636,7 @@ void Player::Tick(World & world){
 			}*/
 			//xv *= 1.2;
 			Uint32 impulse = -17 + jumpimpulse;
-			if(justjumpedfromladder && !input.keymoveleft && !input.keymoveright){
+			if(justjumpedfromladder && ((!input.keymoveleft && !input.keymoveright) || (input.keymoveleft && input.keymoveright))){
 				impulse = -29 + jumpimpulse;
 			}
 			
@@ -1680,8 +1710,8 @@ void Player::Tick(World & world){
 			if(state_i >= 8 + delay){
 				state_i = 4;
 			}
-			if(input.keyfire && (state_i <= 4 || state_i >= 10)){
-				res_bank = 26;
+			res_bank = 31;
+			if(input.keyfire && 1/*(state_i <= 4 || state_i >= 10)*/){
 				if(input.keymoveright || !mirrored){
 					direction = 22;
 					res_bank = 31;
@@ -1767,11 +1797,29 @@ void Player::Tick(World & world){
 			Uint8 oldres_index = res_index;
 			if(state == FALLINGSHOOT){
 				if(ProcessFallingState(world)){
+					if(state == STANDING || state == RUNNING){
+						state = STANDINGSHOOT;
+						state_i = oldstate_i;
+						res_bank = oldres_bank;
+						res_index = oldres_index;
+					}
 					break;
 				}
 			}else
 			if(state == JETPACKSHOOT){
 				if(ProcessJetpackState(world)){
+					if(state == STANDING || state == RUNNING){
+						state = STANDINGSHOOT;
+						state_i = oldstate_i;
+						res_bank = oldres_bank;
+						res_index = oldres_index;
+					}
+					if(state == FALLING){
+						state = FALLINGSHOOT;
+						state_i = oldstate_i;
+						res_bank = oldres_bank;
+						res_index = oldres_index;
+					}
 					break;
 				}
 			}
@@ -1934,13 +1982,14 @@ void Player::Tick(World & world){
 			// 29:0-8 ladder shoot up angle
 			// 30:0-8 ladder shoot down angle
 			// 0-3 is moving toward direction, 4 is the resting direction, 5-8 is firing
+			UnDisguise(world);
 			Uint8 direction = 200;
 			Uint8 delay = weaponfiredelay[currentweapon];
 			if(state_i >= 8 + delay){
 				state_i = 4;
 			}
-			if(input.keyfire && (state_i <= 4 || state_i >= 10)){
-				res_bank = 26;
+			res_bank = 26;
+			if(input.keyfire && 1/*(state_i <= 4 || state_i >= 10)*/){
 				if(input.keymoveup || 1){
 					direction = 10;
 					res_bank = 27;
@@ -2563,7 +2612,7 @@ bool Player::CheckForGround(World & world, Platform & platform){
 		state_i = -1;
 		return true;
 	}else
-	if(y <= yt + 80 && !IsDisguised() && !world.map.TestAABB(x > platform.x2 ? platform.x2 : platform.x1, yt - 1, x > platform.x2 ? platform.x2 : platform.x1, yt - 1, Platform::RECTANGLE | Platform::STAIRSUP | Platform::STAIRSDOWN)){
+	if(y <= yt + 80 && !IsDisguised() && !world.map.TestAABB(x > platform.x2 ? platform.x2 - 1 : platform.x1 - 1, yt - 1, x > platform.x2 ? platform.x2 + 1 : platform.x1 + 1, yt - 1, Platform::RECTANGLE | Platform::STAIRSUP | Platform::STAIRSDOWN)){
 		//y = yt + 48;
 		yv = -3;
 		if(x > platform.x2){
@@ -3425,18 +3474,18 @@ bool Player::ProcessFallingState(World & world){
 	if(state_i >= 6 * 4){
 		state_i = 6 * 4;
 	}
-	if(input.keymoveright){
-		mirrored = false;
-		fallingnudge++;
-		if(fallingnudge > 8){
-			fallingnudge = 8;
-		}
-	}
 	if(input.keymoveleft){
 		mirrored = true;
 		fallingnudge--;
 		if(fallingnudge < -8){
 			fallingnudge = -8;
+		}
+	}
+	if(input.keymoveright){
+		mirrored = false;
+		fallingnudge++;
+		if(fallingnudge > 8){
+			fallingnudge = 8;
 		}
 	}
 	xv += fallingnudge / 2;
@@ -3537,7 +3586,7 @@ bool Player::ProcessLadderState(World &world){
 	if(input.keymoveright){
 		mirrored = false;
 	}
-	if(input.keyjump && !oldinput.keyjump){
+	if((input.keyjump && !oldinput.keyjump) || (input.keymoveleft && input.keymoveright && input.keyactivate)){
 		if(input.keymovedown){
 			state = FALLING;
 			fallingnudge = 0;
@@ -3562,6 +3611,12 @@ bool Player::ProcessLadderState(World &world){
 			state_i = -1;
 			return true;
 		}
+	}
+	if(input.keyactivate && !oldinput.keyactivate){
+		state = FALLING;
+		fallingnudge = 0;
+		state_i = 4 * 2;
+		return true;
 	}
 	if(input.keyjetpack && !oldinput.keyjetpack && !fuellow){
 		justjumpedfromladder = true;

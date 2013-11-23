@@ -3,6 +3,7 @@
 
 #include "shared.h"
 #include "palette.h"
+#include "surface.h"
 #include <map>
 #include <string>
 
@@ -16,9 +17,9 @@ public:
 	bool LoadTiles(class Game & game, bool dedicatedserver = false);
 	bool LoadSounds(class Game & game, bool dedicatedserver = false);
 	void UnloadSounds(void);
-	SDL_Surface *** spritebank;
-	SDL_Surface *** tilebank;
-	SDL_Surface *** tileflippedbank;
+	Surface *** spritebank;
+	Surface *** tilebank;
+	Surface *** tileflippedbank;
 	int ** spriteoffsetx;
 	int ** spriteoffsety;
 	unsigned int ** spritewidth;
@@ -27,8 +28,8 @@ public:
 	Mix_Music * music;
 
 private:
-	void MirrorY(SDL_Surface * surface);
-	void RLESurface(SDL_Surface * surface);
+	void MirrorY(Surface * surface);
+	void RLESurface(Surface * surface);
 	int progress;
 	int totalprogressitems;
 };
