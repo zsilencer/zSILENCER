@@ -1931,7 +1931,6 @@ Interface * Game::CreateLobbyConnectInterface(void){
 	passwordtext->x = 190;
 	passwordtext->y = 318;
 	TextInput * usernameinput = (TextInput *)world.CreateObject(ObjectTypes::TEXTINPUT);
-	strcpy(usernameinput->text, "ouya");
 	usernameinput->x = 275;
 	usernameinput->y = 293;
 	usernameinput->width = 180;
