@@ -8,6 +8,7 @@ Object::Object(Uint8 type){
 	requiresauthority = false;
 	requiresmaptobeloaded = true;
 	snapshotinterval = -1;
+	lasttick = 0;
 	wasdestroyed = false;
 	issprite = true;
 	isphysical = false;

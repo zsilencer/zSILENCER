@@ -88,11 +88,7 @@ void World::Tick(void){
 		dedicatedserver.Tick(*this);
 	}
 	if(mode == REPLICA){
-		/*replaying = true;
-		 audio.enabled = false;
-		 TickObjects();
-		 audio.enabled = true;
-		 replaying = false;*/
+
 	}else{
 		TickObjects();
 	}
@@ -127,7 +123,6 @@ void World::TickObjects(void){
 		bool peercontrolled = false;
 		bool localpeercontrolled = false;
 		if(object->iscontrollable){
-			//if(IsAuthority()){
 			for(int i = 0; i < maxpeers; i++){
 				Peer * peer = peerlist[i];
 				if(peer && !peer->isbot){
@@ -141,22 +136,13 @@ void World::TickObjects(void){
 					}
 				}
 			}
-			/*}else{
-			 Peer * peer = peerlist[localpeerid];
-			 if(peer){
-			 for(std::list<Uint16>::iterator it = peer->controlledlist.begin(); it != peer->controlledlist.end(); it++){
-			 if((*it) == object->id){
-			 peercontrolled = true;
-			 }
-			 }
-			 }
-			 }*/
 		}
 		if(!(object->requiresmaptobeloaded && !map.loaded) && !object->wasdestroyed){
 			if(!peercontrolled){
 				object->oldx = object->x;
 				object->oldy = object->y;
 				object->Tick(*this);
+				object->lasttick = tickcount;
 			}else
 			if(!IsAuthority() && !localpeercontrolled){
 				// Tick everything to do the sounds and effects, then go back
@@ -167,6 +153,7 @@ void World::TickObjects(void){
 				//object->oldx = object->x;
 				//object->oldy = object->y;
 				object->Tick(*this);
+				object->lasttick = tickcount;
 				//replaying = false;
 				object->Serialize(Serializer::READ, olddata);
 				//
@@ -190,9 +177,6 @@ void World::DoNetwork_Authority(void){
 	socklen_t senderaddrsize = sizeof(senderaddr);
 	int received;
 	while((received = recvfrom(sockethandle, data.data, data.size, 0, (sockaddr *)&senderaddr, &senderaddrsize)) > 0){
-		/*if(state == IDLE){
-		 continue;
-		 }*/
 		data.offset = received * 8;
 		data.readoffset = 0;
 		totalbytesread += received;
@@ -275,6 +259,7 @@ void World::DoNetwork_Authority(void){
 								object->oldy = object->y;
 								object->HandleInput(peer->input);
 								object->Tick(*this);
+								object->lasttick = tickcount;
 							}
 						}
 					}
@@ -300,37 +285,16 @@ void World::DoNetwork_Authority(void){
 					response.Put(code);
 					response.Put(pingid);
 					SendPacket(peer, response.data, response.BitsToBytes(response.offset));
-					/*Serializer response;
-					 Uint8 code = MSG_PONG;
-					 response.Put(code);
-					 unsigned short port;
-					 data.Get(port);
-					 response.Put(port);
-					 sendto(sockethandle, response.data, response.BitsToBytes(response.offset), 0, (sockaddr *)&senderaddr, sizeof(senderaddr));*/
 				}
 			}break;
 			case MSG_PONG:{ // pong
-				//unsigned short port;
-				//data.Get(port);
-				//printf("received MSG_PONG\n");
-				/*if(peer){
-				 printf("lockedinport = %d\n", port);
-				 peer->lockedinport = port;
-				 peer->lastpacket = SDL_GetTicks();
-				 SendPeerList();
-				 }*/
+
 			}break;
 			case MSG_GAMEINFO:{
 				printf("Received MSG_GAMEINFO\n");
 				if(peer){
 					if(peer->ishost){
 						printf("loading game info from host\n");
-						/*char info[256];
-						 int i = 0;
-						 while(data.MoreBytesToRead()){
-						 data.Get(info[i++]);
-						 }
-						 gameinfo.LoadInfo(info);*/
 						gameinfo.Serialize(Serializer::READ, data);
 						Peer * localpeer = peerlist[localpeerid];
 						if(localpeer){
@@ -464,9 +428,6 @@ void World::DoNetwork_Replica(void){
 	if(!peerlist[authoritypeer]){
 		return;
 	}
-	/*if(!pingsent){
-	 printf("no ping sent\n");
-	 }*/
 	if(SDL_GetTicks() - lastpingsent >= 1000){
 		SendPing();
 	}
@@ -492,14 +453,12 @@ void World::DoNetwork_Replica(void){
 				if(peer){
 					if(data.GetBit()){
 						data.Get(localpeerid);
-						//unsigned short port;
-						//data.Get(port);
-						//GetAuthorityPeer()->lockedinport = port;
 						printf("we are connected, our peer id is %d\n", localpeerid);
 						RequestPeerList();
 					}else{
 						printf("failed to connect to game\n");
 						// host not accepting connection, password is wrong, or teams are full, etc
+						Disconnect();
 					}
 				}
 			}break;
@@ -533,13 +492,6 @@ void World::DoNetwork_Replica(void){
 			}break;
 			case MSG_PING:{ // ping
 				//printf("received ping from %s:%d\n", inet_ntoa(senderaddr.sin_addr), ntohs(senderaddr.sin_port));
-				/*Serializer response;
-				 Uint8 code = MSG_PONG;
-				 response.Put(code);
-				 unsigned short port;
-				 data.Get(port);
-				 response.Put(port);
-				 sendto(sockethandle, response.data, response.BitsToBytes(response.offset), 0, (sockaddr *)&senderaddr, sizeof(senderaddr));*/
 			}break;
 			case MSG_PONG:{ // pong
 				//printf("received MSG_PONG\n");
@@ -553,12 +505,6 @@ void World::DoNetwork_Replica(void){
 				if(peer){
 					printf("Received MSG_GAMEINFO\n");
 					gameinfo.Serialize(Serializer::READ, data);
-					/*char info[256];
-					 int i = 0;
-					 while(data.MoreBytesToRead()){
-					 data.Get(info[i++]);
-					 }
-					 gameinfo.LoadInfo(info);*/
 					Serializer response;
 					Uint8 code = MSG_GAMEINFO;
 					response.Put(code);
@@ -581,7 +527,6 @@ void World::DoNetwork_Replica(void){
 				}
 				delete[] wrapped;
 				
-				//chatlines.push_back(chatmsg);
 				showchat_i = 255;
 				while(chatlines.size() > 5){
 					chatlines.pop_front();
@@ -666,23 +611,14 @@ Peer * World::AddPeer(char * address, unsigned short port, Uint8 agency, Uint32 
 		newpeer->port = port;
 		newpeer->accountid = accountid;
 		if(peeradded){
-			/*if(newpeer->accountid == dedicatedserver.lobbygame.accountid){
-			 newpeer->ishost = true;
-			 }*/
 			if(!FindTeamForPeer(*newpeer, agency)){
 				printf("could not find team for new peer\n");
 				delete newpeer;
 				return 0;
 			}
-			
 			peerlist[newpeerid] = newpeer;
 			peercount++;
 			printf("new peer added, peer id: %d (%s:%d) peercount = %d\n", newpeerid, address, port, peercount);
-			/*if(gameplaystate == INGAME){
-			 Player * newplayer = (Player *)CreateObject(ObjectTypes::PLAYER);
-			 newplayer->suitcolor = rand() % 0xFF;
-			 newpeer->controlledlist.push_back(newplayer->id);
-			 }*/
 			return newpeer;
 		}else{
 			delete newpeer;
@@ -758,10 +694,6 @@ void World::ProcessSnapshotQueue(void){
 			if(peerlist[localpeerid]){
 				Serializer ** deltasnapshotptr = &oldsnapshots[localpeerid][deltatick % maxoldsnapshots];
 				if(tick > peerlist[localpeerid]->lasttick){
-					
-					
-					
-					
 					//printf("deltatick: %d, newtick: %d, ourtick: %d, localtick: %d, replaying %d, ticks queue size:%d\n", deltatick, tick, ourtick, peerlist[localpeerid]->lasttick, replayticks, snapshotqueue.size());
 					if(DELTAENABLED && *deltasnapshotptr && tick - deltatick < maxoldsnapshots){
 						LoadSnapshot(*data, true, *deltasnapshotptr);
@@ -797,6 +729,7 @@ void World::ProcessSnapshotQueue(void){
 									replaying = true;
 									audio.enabled = false;
 									object->Tick(*this);
+									object->lasttick = tickcount;
 									audio.enabled = true;
 									replaying = false;
 								}
@@ -806,19 +739,19 @@ void World::ProcessSnapshotQueue(void){
 					//
 					peerlist[localpeerid]->lasttick = tick;
 				}else
-					if(tick < peerlist[localpeerid]->lasttick){
-						/*Serializer olddata;
-						 SaveSnapshot(olddata, localpeerid);
-						 LoadSnapshot(*data, false);
-						 replaying = true;
-						 TickObjects();
-						 replaying = false;
-						 LoadSnapshot(olddata, false);
-						 printf("old snapshot replayed %d\n", tick);*/
-					}else
-						if(tick == peerlist[localpeerid]->lasttick){
-							// this shouldnt happen
-						}
+				if(tick < peerlist[localpeerid]->lasttick){
+					/*Serializer olddata;
+					 SaveSnapshot(olddata, localpeerid);
+					 LoadSnapshot(*data, false);
+					 replaying = true;
+					 TickObjects();
+					 replaying = false;
+					 LoadSnapshot(olddata, false);
+					 printf("old snapshot replayed %d\n", tick);*/
+				}else
+				if(tick == peerlist[localpeerid]->lasttick){
+					// this shouldnt happen
+				}
 			}
 			delete data;
 			snapshotqueue.pop_front();
@@ -933,27 +866,16 @@ void World::HandleDisconnect(Uint8 peerid){
 		}
 	}
 	if(mode == REPLICA){
-		/*for(std::list<Uint16>::iterator i = peerlist[peerid]->controlledlist.begin(); i != peerlist[peerid]->controlledlist.end(); i++){
-			Object * object = GetObjectFromId((*i));
-			if(object){
-				object->HandleDisconnect(*this, peerid);
-			}
-		}*/
 		delete peerlist[peerid];
 		peerlist[peerid] = 0;
 		peercount--;
 		if(peerid == authoritypeer){
 			ShowMessage("CONNECTION LOST", 128, 20);
+			SwitchToLocalAuthorityMode();
 			state = IDLE;
 		}
 	}else
 	if(mode == AUTHORITY){
-		/*for(std::list<Uint16>::iterator i = peerlist[peerid]->controlledlist.begin(); i != peerlist[peerid]->controlledlist.end(); i++){
-			Object * object = GetObjectFromId((*i));
-			if(object){
-				object->HandleDisconnect(*this, peerid);
-			}
-		}*/
 		delete peerlist[peerid];
 		peerlist[peerid] = 0;
 		peercount--;
@@ -1002,14 +924,6 @@ bool World::RelevantToPlayer(Player * player, Object * object){
 		if(abs(player->x - object->x) <= 500 && abs(player->y - object->y) <= 450){
 			return true;
 		}
-		/*if(player->InBase(*this)){
-			BaseDoor * basedoor = static_cast<BaseDoor *>(GetObjectFromId(player->basedoorentering));
-			if(basedoor){
-				if(abs(basedoor->x - object->x) <= 300 && abs(basedoor->y - object->y) <= 300){
-					return true;
-				}
-			}
-		}*/
 		for(std::vector<Uint16>::iterator it = objectsbytype[ObjectTypes::SURVEILLANCEMONITOR].begin(); it != objectsbytype[ObjectTypes::SURVEILLANCEMONITOR].end(); it++){
 			Object * obj = GetObjectFromId((*it));
 			if(obj){
@@ -1253,20 +1167,12 @@ void World::Connect(Uint8 agency, Uint32 accountid, const char * password){
 	printf("sending connect request with agency %d, accountid %d to %s:%d\n", agency, accountid, inet_ntoa(addr.sin_addr), GetAuthorityPeer()->port);
 	SwitchToMode(REPLICA);
 	state = CONNECTING;
+	messagetype = 0;
 	authoritypeer = 0;
 	GetAuthorityPeer()->lastpacket = SDL_GetTicks();
-	/*authoritypeer = 0;
-	 if(!peerlist[authoritypeer]){
-	 peerlist[authoritypeer] = new Peer();
-	 }
-	 peerlist[authoritypeer]->id = authoritypeer;
-	 peerlist[authoritypeer]->ip = ntohl(inet_addr(host));
-	 peerlist[authoritypeer]->port = port;
-	 peerlist[authoritypeer]->lastpacket = SDL_GetTicks();*/
 	Serializer data;
 	Uint8 code = MSG_CONNECT;
 	data.Put(code);
-	//data.Put(boundport);
 	data.Put(agency);
 	data.Put(accountid);
 	Uint8 passwordsize = password ? strlen(password) : 0;
@@ -1274,7 +1180,7 @@ void World::Connect(Uint8 agency, Uint32 accountid, const char * password){
 	for(int i = 0; i < passwordsize; i++){
 		data.Put(password[i]);
 	}
-	SendPacket(GetAuthorityPeer(), data.data, data.offset);
+	SendPacket(GetAuthorityPeer(), data.data, data.BitsToBytes(data.offset));
 }
 
 void World::Disconnect(void){
@@ -1290,9 +1196,10 @@ void World::Disconnect(void){
 			}
 		}
 	}else
-		if(mode == REPLICA){
-			SendPacket(GetAuthorityPeer(), data, sizeof(data));
-		}
+	if(mode == REPLICA){
+		SendPacket(GetAuthorityPeer(), data, sizeof(data));
+		HandleDisconnect(GetAuthorityPeer()->id);
+	}
 }
 
 void World::SendInput(void){
@@ -1310,7 +1217,7 @@ void World::SendInput(void){
 			data.Put(tickcount);
 			data.Put(peerlist[localpeerid]->lasttick);
 			peer->input.Serialize(Serializer::WRITE, data);
-			SendPacket(GetAuthorityPeer(), data.data, data.offset);
+			SendPacket(GetAuthorityPeer(), data.data, data.BitsToBytes(data.offset));
 		}
 	}else
 	if(mode == AUTHORITY){
@@ -1325,6 +1232,7 @@ void World::SendInput(void){
 				object->oldy = object->y;
 				object->HandleInput(peer->input);
 				object->Tick(*this);
+				object->lasttick = tickcount;
 			}
 		}
 	}
@@ -1448,11 +1356,6 @@ void World::SendGameInfo(Uint8 peerid){
 		Uint8 code = MSG_GAMEINFO;
 		data.Put(code);
 		gameinfo.Serialize(Serializer::WRITE, data);
-		/*char info[256];
-		 int size = gameinfo.SaveInfo(info);
-		 for(int i = 0; i < size; i++){
-		 data.Put(info[i]);
-		 }*/
 		SendPacket(peer, data.data, data.BitsToBytes(data.offset));
 	}
 }
@@ -1543,7 +1446,7 @@ void World::Illuminate(void){
 }
 
 void World::ShowMessage(const char * message, Uint8 time, Uint8 type, bool networked, Peer * peer){
-	if(messagetype >= 10){
+	if(messagetype >= 10){ // Skip any messages after end of game messages, so it is not replaced
 		return;
 	}
 	if(networked && IsAuthority()){
@@ -1565,22 +1468,16 @@ void World::ShowMessage(const char * message, Uint8 time, Uint8 type, bool netwo
 		}
 		delete[] msg;
 	}
-	if(!networked || IsAuthority()){
-		if((peer && peer->id == localpeerid) || !peer){
-			strncpy(World::message, message, sizeof(World::message) - 1);
-			World::message[sizeof(World::message) - 1] = 0;
-			message_i = 1;
-			messagetime = time;
-			messagetype = type;
-		}
+	if(!networked || (IsAuthority() && !peer) || (IsAuthority() && peer && peer->id == localpeerid)){
+		strncpy(World::message, message, sizeof(World::message) - 1);
+		World::message[sizeof(World::message) - 1] = 0;
+		message_i = 1;
+		messagetime = time;
+		messagetype = type;
 	}
 }
 
 void World::ShowStatus(const char * status, Uint8 color, bool networked, Peer * peer){
-	/*char * newstatus = new char[strlen(status) + 1 + 1 + 1];
-	strcpy(newstatus, status);
-	newstatus[strlen(status) + 1] = 100;
-	newstatus[strlen(status) + 2] = color;*/
 	char * newstatus = CreateStatusString(status, color, 100);
 	if(networked && IsAuthority()){
 		int msgsize = 1 + strlen(status) + 1 + 1 + 1;
@@ -1600,11 +1497,6 @@ void World::ShowStatus(const char * status, Uint8 color, bool networked, Peer * 
 		delete[] msg;
 	}
 	if(!networked || (IsAuthority() && !peer) || (IsAuthority() && peer && peer->id == localpeerid)){
-		/*while(statusmessages.size() >= maxstatusmessages){
-			delete[] statusmessages.back();
-			statusmessages.pop_back();
-		}
-		statusmessages.push_front(newstatus);*/
 		PushStatusString(newstatus);
 	}
 }
@@ -1945,15 +1837,6 @@ void World::MarkDestroyObject(Uint16 id){
 void World::DestroyMarkedObjects(void){
 	for(std::list<Uint16>::iterator i = objectdestroylist.begin(); i != objectdestroylist.end(); i++){
 		DestroyObject((*i));
-		/*for(std::list<Object *>::iterator j = objectlist.begin(); j != objectlist.end(); j++){
-			if((*j)->id == (*i)){
-				objectidlookup.erase((*j)->id);
-				(*j)->OnDestroy(*this);
-				delete (*j);
-				objectlist.erase(j);
-				break;
-			}
-		}*/
 	}
 	objectdestroylist.clear();
 }
@@ -1968,15 +1851,6 @@ void World::DestroyObject(Uint16 id){
 		objectsbytype[object->type].erase(std::find(objectsbytype[object->type].begin(), objectsbytype[object->type].end(), id));
 		delete object;
 	}
-	/*for(std::list<Object *>::iterator i = objectlist.begin(); i != objectlist.end(); i++){
-		if((*i)->id == id){
-			objectidlookup.erase((*i)->id);
-			(*i)->OnDestroy(*this);
-			delete (*i);
-			objectlist.erase(i);
-			break;
-		}
-	}*/
 }
 
 void World::DestroyAllObjects(void){
@@ -2031,10 +1905,6 @@ Object * World::TestIncr(int x1, int y1, int x2, int y2, int * xv, int * yv, std
 	int yb1 = y1 + (*yv < 0 ? *yv : 0);
 	int xb2 = x2 + (*xv > 0 ? *xv : 0);
 	int yb2 = y2 + (*yv > 0 ? *yv : 0);
-	/*int xb1 = x1 + *xv;
-	 int yb1 = y1 + *yv;
-	 int xb2 = x2 + *xv;
-	 int yb2 = y2 + *yv;*/
 	std::vector<Object *> testobjects = TestAABB(xb1, yb1, xb2, yb2, types, except, teamid); // broadphase
 	std::vector<Object *> test;
 	for(std::vector<Object *>::iterator it = testobjects.begin(); it != testobjects.end(); it++){

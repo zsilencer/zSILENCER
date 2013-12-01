@@ -1,7 +1,6 @@
 #include "resources.h"
 #include <vector>
 #include "game.h"
-#include "sdl_internal.h"
 
 Resources::Resources(){
 	spritebank = new Surface**[256];

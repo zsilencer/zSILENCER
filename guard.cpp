@@ -539,7 +539,9 @@ void Guard::HandleHit(World & world, Uint8 x, Uint8 y, Object & projectile){
 		}
 	}
 	xv = speed * xpcnt;
-	FollowGround(*this, world, xv);
+	if(state != LADDER && state != SHOOTLADDERUP && state != SHOOTLADDERDOWN){
+		FollowGround(*this, world, xv);
+	}
 	/*if(x < 50){
 		xv = abs(xv) * (mirrored ? -1 : 1);
 	}else{

@@ -26,7 +26,7 @@ void WallProjectile::Serialize(bool write, Serializer & data, Serializer * old){
 void WallProjectile::Tick(World & world){
 	Uint8 life = 20;
 	if(state_i == 1){
-		EmitSound(world, world.resources.soundbank["!laserel.wav"], 128);
+		EmitSound(world, world.resources.soundbank["!laserel.wav"], 64);
 	}
 	if(state_i < 7){
 		res_index = state_i;

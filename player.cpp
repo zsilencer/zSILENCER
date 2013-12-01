@@ -73,7 +73,7 @@ Player::Player() : Object(ObjectTypes::PLAYER){
 	chatinterfaceid = 0;
 	buyinterfaceid = 0;
 	techinterfaceid = 0;
-	chatwithteam = true;
+	chatwithteam = false;
 	fallingnudge = 0;
 	oldfiles = 0;
 	effecthackingcontinue = 0;
@@ -162,9 +162,6 @@ void Player::Serialize(bool write, Serializer & data, Serializer * old){
 }
 
 void Player::Tick(World & world){
-	//hassecret = true;
-	//Sint16 oldx = x;
-	//Sint16 oldy = y;
 	if(!abilitiesloaded){
 		LoadAbilities(world);
 	}
@@ -172,6 +169,9 @@ void Player::Tick(World & world){
 	Bipedal::Tick(*this, world);
 	if(ai){
 		ai->Tick(world);
+	}
+	if(state_hit / 32 == 1){
+		effectshieldcontinue = 48;
 	}
 	if(input.keychat && !chatinterfaceid && !buyinterfaceid && !techinterfaceid && this == world.GetPeerPlayer(world.localpeerid)){
 		Interface * iface = (Interface *)world.CreateObject(ObjectTypes::INTERFACE);
@@ -1599,6 +1599,14 @@ void Player::Tick(World & world){
 				EmitSound(world, world.resources.soundbank["roll2.wav"], 32);
 			}
 			if(state_i >= 8){
+				if(state_i >= 10){
+					if(input.keymoveleft){
+						mirrored = true;
+					}
+					if(input.keymoveright){
+						mirrored = false;
+					}
+				}
 				xv = 0;
 				res_bank = 18;
 				res_index = (state_i - 8) / 2;
@@ -2123,6 +2131,7 @@ void Player::Tick(World & world){
 					state_i = -1;
 				}else{
 					if(team && team->basedoorid){
+						draw = false;
 						state = RESPAWNING;
 						if(!world.replaying){
 							canresurrect = true;
@@ -2130,7 +2139,6 @@ void Player::Tick(World & world){
 						SetToRespawnPosition(world);
 						health = maxhealth;
 						shield = maxshield;
-						EmitSound(world, world.resources.soundbank["transrev.wav"], 64);
 						state_i = -1;
 						break;
 					}else{
@@ -2146,6 +2154,9 @@ void Player::Tick(World & world){
 		case RESPAWNING:{
 			draw = true;
 			res_bank = 198;
+			if(state_i == 0){
+				EmitSound(world, world.resources.soundbank["transrev.wav"], 64);
+			}
 			if(state_i / 2 > 27){
 				//rocketammo = 10;
 				//laserammo = 5;
@@ -2346,9 +2357,6 @@ void Player::Tick(World & world){
 void Player::HandleHit(World & world, Uint8 x, Uint8 y, Object & projectile){
 	//printf("hit at %d, %d\n", x, y);
 	Hittable::HandleHit(*this, world, x, y, projectile);
-	if(state_hit == 1 + (1 * 32)){
-		effectshieldcontinue = 48;
-	}
 	UnDisguise(world);
 	if(world.tickcount - hitsoundplaytick > 10){
 		if(rand() % 2 == 0){
@@ -2574,7 +2582,11 @@ bool Player::CheckForLadder(World & world){
 		if(abs(signed(center) - x) <= abs(ceil(float(xv)))){
 			x = center;
 			state = LADDER;
-			res_bank = 16;
+			if(IsDisguised()){
+				res_bank = 124;
+			}else{
+				res_bank = 16;
+			}
 			res_index = 0;
 			state_i = -1;
 			return true;

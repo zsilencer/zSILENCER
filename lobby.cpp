@@ -188,17 +188,18 @@ void Lobby::DoNetwork(void){
 									LobbyGame * lobbygame = new LobbyGame;
 									lobbygame->createdtime = SDL_GetTicks();
 									lobbygame->Serialize(Serializer::READ, data);
+									games.push_back(lobbygame);
+									gamesprocessed = false;
 									if(lobbygame->accountid == Lobby::accountid){ // CreateGame response
 										Lobby::creategamestatus = creategamestatus;
-									}
-									if(creategamestatus != 2){ // success
-										//char * info = (char *)&msg[1 + sizeof(accountid) + sizeof(creategamestatus)];
-										//lobbygame->accountid = accountid;
-										//lobbygame->LoadInfo(info);
-										games.push_back(lobbygame);
-										gamesprocessed = false;
-									}else{ // failure
-										delete lobbygame;
+										if(creategamestatus == 1){ // success
+											//char * info = (char *)&msg[1 + sizeof(accountid) + sizeof(creategamestatus)];
+											//lobbygame->accountid = accountid;
+											//lobbygame->LoadInfo(info);
+										}else{ // failure
+											games.pop_back();
+											delete lobbygame;
+										}
 									}
 								}break;
 								case MSG_DELGAME:{
@@ -436,6 +437,7 @@ void Lobby::CreateGame(const char * name, const char * map, const char * passwor
 	lobbygame.CalculateMapHash();
 	lobbygame.Serialize(Serializer::WRITE, data);
 	SendMessage(data.data, data.BitsToBytes(data.offset));
+	creategamestatus = 100;
 	printf("sent creategame %s %s %s\n", name, map, password ? password : "");
 }
 

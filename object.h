@@ -28,6 +28,7 @@ public:
 	Uint8 type;
 	Uint16 id;
 	int snapshotinterval;
+	Uint32 lasttick;
 	bool wasdestroyed;
 	bool issprite;
 	bool isphysical;

@@ -5,15 +5,25 @@
 #endif
 
 #ifdef __ANDROID__
-#include <jni.h>
-
-static Game * gameglobal = 0;
-static SDL_Event pushedevent;
-JNIEnv * env;
+JNIEnv * jenv;
 JavaVM * jvm;
 
+JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM * vm, void * pvt){
+	//printf("* JNI_OnLoad called\n");
+	jvm = vm;
+	if(jvm->AttachCurrentThread(&jenv, NULL) != JNI_OK){
+		//printf("AttachCurrentThread failed\n");
+	}
+	/*if(jvm->GetEnv((void **)&jenv, JNI_VERSION_1_6) != JNI_OK){
+		printf("getenv failed\n");
+	}*/
+	return JNI_VERSION_1_6;
+}
+
+#ifdef OUYA
 extern "C" void Java_com_zSILENCER_game_zSILENCER_OuyaControllerKeyEvent(JNIEnv * env, jclass cls, jint player, jint type, jint keycode){
-    printf("native ouya key down %d\n", keycode);
+    //printf("native ouya key down %d\n", keycode);
+	static SDL_Event pushedevent;
 	if(type == 1){
 		pushedevent.type = SDL_KEYDOWN;
 	}else{
@@ -32,6 +42,7 @@ extern "C" void Java_com_zSILENCER_game_zSILENCER_OuyaControllerKeyEvent(JNIEnv 
 	pushedevent.key.keysym.scancode = (SDL_Scancode)keycode2;
 	SDL_PushEvent(&pushedevent);
 }
+#endif
 
 #endif
 
@@ -67,9 +78,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     char path[PATH_MAX];
     if(!CFURLGetFileSystemRepresentation(resourcesURL, TRUE, (UInt8 *)path, PATH_MAX)){
         // error!
-#ifdef __ANDROID__
-		exit(-1);
-#endif
 		return -1;
     }
     CFRelease(resourcesURL);
@@ -78,9 +86,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 #endif
 	
 	Game game;
-#ifdef __ANDROID__
-	gameglobal = &game;
-#endif
 	if(!game.Load(cmdline)){
 #ifdef __ANDROID__
 		exit(-1);

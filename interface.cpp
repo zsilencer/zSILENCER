@@ -269,6 +269,13 @@ void Interface::ActiveChanged(World & world, Interface * callinginterface, bool 
 							if(index != -1){
 								activeobject = textinput->id;
 								//textinput->SetCaretPosition(index);
+#ifdef __ANDROID__
+								JNIEnv * env;
+								jvm->GetEnv((void **)&env, JNI_VERSION_1_6);
+								jclass cls = env->FindClass("com/zSILENCER/game/zSILENCER");
+								jmethodID show = env->GetStaticMethodID(cls, "showKeyboard", "()V");
+								env->CallStaticVoidMethod(cls, show);
+#endif
 							}
 						}
 						if(activeobject == textinput->id){

@@ -47,8 +47,10 @@ private:
 	Interface * CreateGameJoinInterface(void);
 	Interface * CreateGameTechInterface(void);
 	Interface * CreateGameSummaryInterface(Stats & stats, Uint8 agency);
-	Interface * CreateModalDialog(const char * message);
+	Interface * CreateModalDialog(const char * message, bool ok = true);
+	void DestroyModalDialog(void);
 	Interface * CreatePasswordDialog(void);
+	Interface * lobbyinterface;
 	Interface * characterinterface;
 	Interface * chatinterface;
 	Interface * gameselectinterface;
@@ -111,7 +113,10 @@ private:
 	bool gamesummaryinfoloaded;
 	bool minimized;
 	bool creategameclicked;
+	bool modaldialoghasok;
+	bool joininggame;
 	Uint32 optionscontrolstick;
+	int quitscancode;
 };
 
 #endif

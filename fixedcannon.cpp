@@ -203,7 +203,7 @@ bool FixedCannon::Look(World & world, bool up){
 		if(owner){
 			team = owner->GetTeam(world);
 		}
-		if(team && player->teamid != team->id){
+		if(team && player->teamid != team->id && !player->IsDisguised()){
 			return true;
 		}
 	}
