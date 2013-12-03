@@ -222,7 +222,7 @@ void World::DoNetwork_Authority(void){
 						}
 					}
 					if(dedicatedserver.active){
-						if(dedicatedserver.IsBanned(accountid) || peercount - 1 >= gameinfo.maxplayers){
+						if(dedicatedserver.IsBanned(accountid) || peercount >= gameinfo.maxplayers){
 							printf("banned or too many players\n");
 							canjoin = false;
 						}
