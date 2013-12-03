@@ -34,6 +34,7 @@ void Team::Serialize(bool write, Serializer & data, Serializer * old){
 	data.Serialize(write, agency, old);
 	data.Serialize(write, secrets, old);
 	data.Serialize(write, secretprogress, old);
+	data.Serialize(write, secretdelivered, old);
 	data.Serialize(write, basedoorid, old);
 	data.Serialize(write, beamingterminalid, old);
 	data.Serialize(write, numpeers, old);
