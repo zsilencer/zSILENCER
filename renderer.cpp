@@ -113,11 +113,11 @@ void Renderer::Draw(Surface * surface, float frametime){
 	if(localplayer && localplayer->InBase(world)){
 		ambience = world.map.baseambience;
 	}
-	if((world.gameplaystate == World::INGAME && world.map.loaded) || world.gameplaystate != World::INGAME){
-		ambiencelevel = 128 + (ambience * 4.7) + ambience_r;
-		memset(lightmap, ambiencelevel, surface->w * surface->h);
-		DrawWorld(surface, camera, lightmap, true, 3, frametime);
-	}
+	//if((world.gameplaystate == World::INGAME && world.map.loaded) || world.gameplaystate != World::INGAME){
+	ambiencelevel = 128 + (ambience * 4.7) + ambience_r;
+	memset(lightmap, ambiencelevel, surface->w * surface->h);
+	DrawWorld(surface, camera, lightmap, true, 3, frametime);
+	//}
 
 	if(world.map.loaded){
 		DrawHUD(surface, frametime);
