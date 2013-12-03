@@ -11,7 +11,7 @@ Team::Team() : Object(ObjectTypes::TEAM){
 	requiresmaptobeloaded = false;
 	overlayid = 0;
 	secrets = 0;
-	secretdelivered = false;
+	secretdelivered = 0;
 	secretprogress = 0;
 	number = 0;
 	basedoorid = 0;
@@ -33,7 +33,6 @@ void Team::Serialize(bool write, Serializer & data, Serializer * old){
 	Object::Serialize(write, data, old);
 	data.Serialize(write, agency, old);
 	data.Serialize(write, secrets, old);
-	data.Serialize(write, secretdelivered, old);
 	data.Serialize(write, secretprogress, old);
 	data.Serialize(write, basedoorid, old);
 	data.Serialize(write, beamingterminalid, old);
@@ -63,6 +62,23 @@ void Team::Tick(World & world){
 	if(secretdelivered){
 		secrets++;
 		world.SendSound("cathdoor.wav");
+		Player * player = static_cast<Player *>(world.GetObjectFromId(secretdelivered));
+		if(player){
+			Peer * peer = player->GetPeer(world);
+			if(peer){
+				User * user = world.lobby.GetUserInfo(peer->accountid);
+				bool stolen = false;
+				if(player->secretteamid != id){
+					stolen = true;
+				}
+				int remaining = 3 - secrets;
+				char text[128];
+				sprintf(text, "%s returned a %s\n(%d remaining)\n\nTeam awarded 1000 credits", user->name, stolen ? "stolen secret" : "secret", remaining);
+				if(!world.intutorialmode){
+					world.ShowMessage(text, 128, 0, true);
+				}
+			}
+		}
 		for(int i = 0; i < numpeers; i++){
 			Player * player = world.GetPeerPlayer(peers[i]);
 			if(player){
@@ -131,7 +147,7 @@ void Team::Tick(World & world){
 				}*/
 			}
 		}
-		secretdelivered = false;
+		secretdelivered = 0;
 	}
 	if(secretprogress >= 180 && oldsecretprogress > 0){
 		char teamtext[256];
@@ -149,9 +165,6 @@ void Team::Tick(World & world){
 			}
 		}
 		world.SendSound("typerev6.wav");
-		if(secrets == 2){
-			world.SendSound("alwarn.wav");
-		}
 		secretprogress = 0;
 		oldsecretprogress = 0;
 		if(world.IsAuthority()){

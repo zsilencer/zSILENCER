@@ -158,6 +158,7 @@ void Lobby::DoNetwork(void){
 									if(status){
 										state = AUTHENTICATED;
 										data.Get(accountid);
+										ForgetUserInfo(accountid);
 										GetUserInfo(accountid);
 									}else{
 										state = AUTHFAILED;
@@ -188,11 +189,13 @@ void Lobby::DoNetwork(void){
 									LobbyGame * lobbygame = new LobbyGame;
 									lobbygame->createdtime = SDL_GetTicks();
 									lobbygame->Serialize(Serializer::READ, data);
+									printf("password: %s\n", lobbygame->password);
 									games.push_back(lobbygame);
 									gamesprocessed = false;
 									if(lobbygame->accountid == Lobby::accountid){ // CreateGame response
 										Lobby::creategamestatus = creategamestatus;
 										if(creategamestatus == 1){ // success
+											createdgameid = lobbygame->id;
 											//char * info = (char *)&msg[1 + sizeof(accountid) + sizeof(creategamestatus)];
 											//lobbygame->accountid = accountid;
 											//lobbygame->LoadInfo(info);
@@ -207,7 +210,7 @@ void Lobby::DoNetwork(void){
 									data.Get(id);
 									for(std::list<LobbyGame *>::iterator it = games.begin(); it != games.end(); it++){
 										LobbyGame * lobbygame = *it;
-										if(lobbygame->accountid == id/* && (SDL_GetTicks() - lobbygame->createdtime > 3000)*/){
+										if(lobbygame->id == id/* && (SDL_GetTicks() - lobbygame->createdtime > 3000)*/){
 											delete lobbygame;
 											games.erase(it);
 											gamesprocessed = false;
@@ -424,7 +427,7 @@ void Lobby::JoinChannel(const char * channel){
 	SendMessage(msg, size);
 }
 
-void Lobby::CreateGame(const char * name, const char * map, const char * password){
+void Lobby::CreateGame(const char * name, const char * map, const char * password, Uint8 securitylevel, Uint8 minlevel, Uint8 maxlevel, Uint8 maxplayers, Uint8 maxteams){
 	Serializer data;
 	Uint8 code = MSG_NEWGAME;
 	data.Put(code);
@@ -434,6 +437,11 @@ void Lobby::CreateGame(const char * name, const char * map, const char * passwor
 	if(password){
 		strncpy(lobbygame.password, password, sizeof(lobbygame.password));
 	}
+	lobbygame.securitylevel = securitylevel;
+	lobbygame.minlevel = minlevel;
+	lobbygame.maxlevel = maxlevel;
+	lobbygame.maxplayers = maxplayers;
+	lobbygame.maxteams = maxteams;
 	lobbygame.CalculateMapHash();
 	lobbygame.Serialize(Serializer::WRITE, data);
 	SendMessage(data.data, data.BitsToBytes(data.offset));
@@ -464,10 +472,10 @@ void Lobby::ClearGames(void){
 	games.clear();
 }
 
-LobbyGame * Lobby::GetGameByAccountId(Uint32 accountid){
+LobbyGame * Lobby::GetGameById(Uint32 id){
 	for(std::list<LobbyGame *>::iterator it = games.begin(); it != games.end(); it++){
 		LobbyGame * lobbygame = (*it);
-		if(lobbygame->accountid == accountid){
+		if(lobbygame->id == id){
 			return lobbygame;
 		}
 	}
@@ -479,6 +487,9 @@ User * Lobby::GetUserInfo(Uint32 accountid){
 	if(!userinfo){
 		userinfos[accountid] = new User;
 		userinfo = userinfos[accountid];
+		if(state != AUTHENTICATED){
+			strcpy(userinfo->name, "Player");
+		}
 		userinfo->accountid = accountid;
 		Serializer data;
 		Uint8 code = MSG_USERINFO;
@@ -489,10 +500,10 @@ User * Lobby::GetUserInfo(Uint32 accountid){
 		userinfo->retrieving = true;
 		if(accountid >= 0xFFFFFFFF - 24){
 			// Bot
-			static const char * botnames[] = {"Sweet Pea", "Breadloaf", "Cheeseboy", "Damien", "Quicknades", "Giblets",
-				"State Machine", "MileyFan5", "J0hnny", "Young Watson", "Flynn", "Wi11i4m",
-				"HURRDURR", "0b4m4", "bitcoin", "strlen", "juan valdez", "Rebdomine",
-				"cyber criminal", "ID10T", "barnacle", "nodule", "u r bad", "widowmaker"};
+			static const char * botnames[] = {"Sweet pea", "Jimison", "Gamenut56k", "Damien", "Quicknades", "Giblet",
+				"travis", "MileyFan3", "J0hnny", "Young Watson", "melissa", "Wi11i4m",
+				"iPad", "0b4m4", "stevenson", "digitalcourtney", "juan valdez", "Rebdomine",
+				"willis", "spamloaf", "barnacle", "nodule", "samantha", "kyle"};
 			Uint32 index = 0xFFFFFFFF - accountid;
 			printf("index = %d\n", index);
 			strcpy(userinfo->name, botnames[index]);

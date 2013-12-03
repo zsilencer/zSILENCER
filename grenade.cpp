@@ -81,7 +81,7 @@ void Grenade::Tick(World & world){
 			draw = false;
 			switch(type){
 				case EMP:{
-					EmitSound(world, world.resources.soundbank["q_expl02.wav"], 128);
+					EmitSound(world, world.resources.soundbank["q_expl02.wav"], 96);
 					for(int i = 0; i < 8; i++){
 						Plume * plume = (Plume *)world.CreateObject(ObjectTypes::PLUME);
 						if(plume){
@@ -140,7 +140,7 @@ void Grenade::Tick(World & world){
 				}break;
 				case NEUTRON:{
 					world.SendSound("grenade1.wav");
-					EmitSound(world, world.resources.soundbank["q_expl02.wav"], 128);
+					EmitSound(world, world.resources.soundbank["q_expl02.wav"], 96);
 					for(int i = 0; i < 8; i++){
 						Plume * plume = (Plume *)world.CreateObject(ObjectTypes::PLUME);
 						if(plume){

@@ -29,7 +29,7 @@ public:
 	Uint16 peerleveloverlayids[4];
 	Uint8 number;
 	Uint8 secrets;
-	bool secretdelivered;
+	Uint16 secretdelivered;
 	Uint8 secretprogress;
 	Uint8 oldsecretprogress;
 	Uint16 basedoorid;

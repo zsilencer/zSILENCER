@@ -21,6 +21,7 @@ public:
 	Uint8 uid;
 	bool showcaret;
 	bool password;
+	bool numbersonly;
 	bool inactive;
 	Uint8 caretcolor;
 	bool enterpressed;

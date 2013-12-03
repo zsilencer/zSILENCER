@@ -10,6 +10,7 @@ TextInput::TextInput() : Object(ObjectTypes::TEXTINPUT){
 	uid = 0;
 	showcaret = false;
 	password = false;
+	numbersonly = false;
 	inactive = false;
 	caretcolor = 140;
 	enterpressed = false;
@@ -39,7 +40,7 @@ void TextInput::ProcessKeyPress(char ascii){
 	if(key == '\t'){
 		tabpressed = true;
 	}else
-	if(key >= 0x20 && key <= 0x7F){
+	if((!numbersonly && key >= 0x20 && key <= 0x7F) || (numbersonly && key >= 0x30 && key <= 0x39)){
 		if(offset >= maxchars){
 			return;
 		}

@@ -132,7 +132,7 @@ void FixedCannon::Tick(World & world){
 		}break;
 		case DYING:{
 			if(state_i == 0){
-				EmitSound(world, world.resources.soundbank["q_expl02.wav"], 128);
+				EmitSound(world, world.resources.soundbank["q_expl02.wav"], 96);
 				for(int i = 0; i < 6; i++){
 					Plume * plume = (Plume *)world.CreateObject(ObjectTypes::PLUME);
 					if(plume){

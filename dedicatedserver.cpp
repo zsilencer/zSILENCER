@@ -1,5 +1,7 @@
 #include "dedicatedserver.h"
 #include "world.h"
+#include "team.h"
+#include <algorithm>
 
 DedicatedServer::DedicatedServer(){
 	active = false;
@@ -15,14 +17,31 @@ DedicatedServer::~DedicatedServer(){
     closesocket(sockethandle);
 }
 
-void DedicatedServer::Start(char * lobbyaddress, unsigned short lobbyport, Uint32 accountid){
+void DedicatedServer::Start(char * lobbyaddress, unsigned short lobbyport, Uint32 gameid, Uint32 accountid){
 	strcpy(DedicatedServer::lobbyaddress, lobbyaddress);
 	DedicatedServer::lobbyport = lobbyport;
+	DedicatedServer::gameid = gameid;
 	DedicatedServer::accountid = accountid;
 	active = true;
 }
 
 void DedicatedServer::Tick(World & world){
+	if(world.gameplaystate == World::INLOBBY){
+		for(int i = 0; i < world.maxpeers; i++){
+			Peer * peer = world.peerlist[i];
+			if(peer){
+				User * user = world.lobby.GetUserInfo(peer->accountid);
+				if(!user->retrieving){
+					Team * team = world.GetPeerTeam(peer->id);
+					if(team){
+						if(user->agency[team->agency].level < world.gameinfo.minlevel || user->agency[team->agency].level > world.gameinfo.maxlevel){
+							world.HandleDisconnect(peer->id);
+						}
+					}
+				}
+			}
+		}
+	}
 	if(world.peercount < 1){
 		nopeerstime++;
 	}
@@ -42,7 +61,7 @@ void DedicatedServer::SendHeartBeat(World & world, Uint8 state){
 	Serializer data;
 	char code = 0;
 	data.Put(code);
-	data.Put(accountid);
+	data.Put(gameid);
 	data.Put(world.boundport);
 	data.Put(state);
 	sockaddr_in addr;
@@ -50,4 +69,17 @@ void DedicatedServer::SendHeartBeat(World & world, Uint8 state){
 	addr.sin_port = htons(lobbyport);
 	addr.sin_addr.s_addr = inet_addr(lobbyaddress);
 	sendto(sockethandle, data.data, data.BitsToBytes(data.offset), 0, (sockaddr *)&addr, sizeof(addr));
+}
+
+void DedicatedServer::Ban(Uint32 accountid){
+	if(!IsBanned(accountid)){
+		banlist.push_back(accountid);
+	}
+}
+
+bool DedicatedServer::IsBanned(Uint32 accountid){
+	if(std::find(banlist.begin(), banlist.end(), accountid) != banlist.end()){
+		return true;
+	}
+	return false;
 }

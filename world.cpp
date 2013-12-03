@@ -47,9 +47,8 @@ World::World(bool mode) : lobby(this), lagsimulator(&sockethandle), audio(Audio:
 	highlightsecrets = false;
 	highlightminimap = false;
 	intutorialmode = false;
-	memset(password, 0, sizeof(password));
 	choosingtech = false;
-	//lagsimulator.Activate(80, 100);
+	//lagsimulator.Activate(80, 120);
 }
 
 World::~World(){
@@ -77,9 +76,7 @@ void World::DoNetwork(void){
 
 void World::Tick(void){
 	if(mode == AUTHORITY){
-		//if(rand() % 10 == 0){
 		SendSnapshots();
-		//}
 	}
 	if(mode == REPLICA){
 		ProcessSnapshotQueue();
@@ -88,9 +85,20 @@ void World::Tick(void){
 		dedicatedserver.Tick(*this);
 	}
 	if(mode == REPLICA){
-
+		DestroyMarkedObjects();
 	}else{
 		TickObjects();
+		for(int i = 0; i < maxpeers; i++){
+			Peer * peer = peerlist[i];
+			if(peer){
+				Player * player = GetPeerPlayer(peer->id);
+				bool processed = false;
+				while(player && player->CanExhaustInputQueue(*this) && ProcessInputQueue(*peer)){ processed = true; };
+				if(!processed){
+					ProcessInputQueue(*peer);
+				}
+			}
+		}
 	}
 	if(tickcount % 25 == 0 && IsAuthority()){
 		ActivateTerminals();
@@ -201,14 +209,25 @@ void World::DoNetwork_Authority(void){
 					data.Get(accountid);
 					Uint8 passwordsize;
 					data.Get(passwordsize);
-					char temp[32];
-					if(passwordsize > sizeof(temp)){
-						passwordsize = sizeof(temp);
-					}
+					char temp[256];
+					memset(temp, 0, sizeof(temp));
 					for(int i = 0; i < passwordsize; i++){
 						data.Get(temp[i]);
 					}
-					if(memcmp(temp, password, passwordsize) == 0){
+					bool canjoin = true;
+					if(strcmp(gameinfo.password, temp) != 0){
+						if(!(dedicatedserver.active && accountid == dedicatedserver.accountid)){
+							printf("bad password\n");
+							canjoin = false;
+						}
+					}
+					if(dedicatedserver.active){
+						if(dedicatedserver.IsBanned(accountid) || peercount - 1 >= gameinfo.maxplayers){
+							printf("banned or too many players\n");
+							canjoin = false;
+						}
+					}
+					if(canjoin){
 						Peer * newpeer = AddPeer(host, port, agency, accountid);
 						if(newpeer){
 							if(dedicatedserver.active){
@@ -221,6 +240,7 @@ void World::DoNetwork_Authority(void){
 							response.PutBit(true);
 							response.Put(newpeer->id);
 						}else{
+							printf("couldnt add peer\n");
 							response.PutBit(false);
 						}
 						if(newpeer){
@@ -243,26 +263,9 @@ void World::DoNetwork_Authority(void){
 			case MSG_INPUT:{ // client sending input
 				if(peer){
 					totalinputpackets++;
-					Uint32 theirlasttick;
-					data.Get(theirlasttick);
-					Uint32 lasttick;
-					data.Get(lasttick);
-					if(lasttick >= peer->lasttick){
-						peer->theirlasttick = theirlasttick;
-						peer->lasttick = lasttick;
-						peer->port = ntohs(senderaddr.sin_port);
-						peer->input.Serialize(Serializer::READ, data);
-						for(std::list<Uint16>::iterator i = peer->controlledlist.begin(); i != peer->controlledlist.end(); i++){
-							Object * object = GetObjectFromId((*i));
-							if(object){
-								object->oldx = object->x;
-								object->oldy = object->y;
-								object->HandleInput(peer->input);
-								object->Tick(*this);
-								object->lasttick = tickcount;
-							}
-						}
-					}
+					Serializer * inputcopy = new Serializer;
+					inputcopy->Copy(data);
+					inputqueue[peer->id].push_back(inputcopy);
 				}
 			}break;
 			case MSG_PEERLIST:{ // peerlist requested
@@ -505,6 +508,7 @@ void World::DoNetwork_Replica(void){
 				if(peer){
 					printf("Received MSG_GAMEINFO\n");
 					gameinfo.Serialize(Serializer::READ, data);
+					printf("password %s\n", gameinfo.password);
 					Serializer response;
 					Uint8 code = MSG_GAMEINFO;
 					response.Put(code);
@@ -673,6 +677,36 @@ Peer * World::FindPeer(sockaddr_in & sockaddr){
 		}
 	}
 	return peer;
+}
+
+bool World::ProcessInputQueue(Peer & peer){
+	if(inputqueue[peer.id].size() > 0){
+		Serializer * data = inputqueue[peer.id].front();
+		Uint32 theirlasttick;
+		data->Get(theirlasttick);
+		Uint32 lasttick;
+		data->Get(lasttick);
+		if(lasttick >= peer.lasttick){
+			peer.theirlasttick = theirlasttick;
+			peer.lasttick = lasttick;
+			//peer.port = ntohs(senderaddr.sin_port);
+			peer.input.Serialize(Serializer::READ, *data);
+			for(std::list<Uint16>::iterator i = peer.controlledlist.begin(); i != peer.controlledlist.end(); i++){
+				Object * object = GetObjectFromId((*i));
+				if(object){
+					object->oldx = object->x;
+					object->oldy = object->y;
+					object->HandleInput(peer.input);
+					object->Tick(*this);
+					object->lasttick = tickcount;
+				}
+			}
+		}
+		delete data;
+		inputqueue[peer.id].pop_front();
+		return true;
+	}
+	return false;
 }
 
 void World::ProcessSnapshotQueue(void){
@@ -1279,7 +1313,14 @@ Team * World::GetPeerTeam(Uint8 peerid){
 }
 
 bool World::FindTeamForPeer(Peer & peer, Uint8 agency, int start){
-	if(start >= maxteams){
+	int maxteams2 = maxteams;
+	if(dedicatedserver.active){
+		maxteams2 = gameinfo.maxteams;
+		if(maxteams2 > maxteams){
+			maxteams2 = maxteams;
+		}
+	}
+	if(start >= maxteams2){
 		start = 0;
 	}
 	int teamnumber = start;
@@ -1323,7 +1364,7 @@ bool World::FindTeamForPeer(Peer & peer, Uint8 agency, int start){
 		}
 	}
 	if(!teamfound){
-		if(teamlist.size() >= maxteams){
+		if(teamlist.size() >= maxteams2){
 			return false;
 		}
 		Team * newteam = (Team *)CreateObject(ObjectTypes::TEAM);
@@ -1615,6 +1656,56 @@ int World::GetPingTime(void){
 	}
 }
 
+bool World::SecurityIDCanSpawn(Uint8 securityid){
+	// security ids:
+	// 0: all
+	// 1: low
+	// 2: medium
+	// 3: low medium
+	// 4: high
+	// 5: low high
+	// 6: medium high
+	if(gameinfo.securitylevel == LobbyGame::SECNONE){
+		return false;
+	}
+	switch(securityid){
+		case 0:
+			return true;
+		break;
+		case 1:
+			if(gameinfo.securitylevel == LobbyGame::SECLOW){
+				return true;
+			}
+		break;
+		case 2:
+			if(gameinfo.securitylevel == LobbyGame::SECMEDIUM){
+				return true;
+			}
+		break;
+		case 3:
+			if(gameinfo.securitylevel == LobbyGame::SECLOW || gameinfo.securitylevel == LobbyGame::SECMEDIUM){
+				return true;
+			}
+		break;
+		case 4:
+			if(gameinfo.securitylevel == LobbyGame::SECHIGH){
+				return true;
+			}
+		break;
+		case 5:
+			if(gameinfo.securitylevel == LobbyGame::SECLOW || gameinfo.securitylevel == LobbyGame::SECHIGH){
+				return true;
+			}
+		break;
+		case 6:
+			if(gameinfo.securitylevel == LobbyGame::SECMEDIUM || gameinfo.securitylevel == LobbyGame::SECHIGH){
+				return true;
+			}
+		break;
+	}
+	return false;
+}
+
 void World::SetSystemCamera(bool system, Uint16 objectfollow, Sint16 x, Sint16 y){
 	systemcameraactive[system] = true;
 	systemcamerafollow[system] = objectfollow;
@@ -1847,8 +1938,13 @@ void World::DestroyObject(Uint16 id){
 		objectidlookup.erase(object->id);
 		object->OnDestroy(*this);
 		objectlist.remove(object);
-		tobjectlist.remove(object);
-		objectsbytype[object->type].erase(std::find(objectsbytype[object->type].begin(), objectsbytype[object->type].end(), id));
+		if(IsCollidable(object->type)){
+			tobjectlist.remove(object);
+		}
+		std::vector<Uint16>::iterator f = std::find(objectsbytype[object->type].begin(), objectsbytype[object->type].end(), id);
+		if(f != objectsbytype[object->type].end()){
+			objectsbytype[object->type].erase(f);
+		}
 		delete object;
 	}
 }

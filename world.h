@@ -56,6 +56,7 @@ public:
 	int TechSlotsUsed(Peer & peer);
 	void SendPing(void);
 	int GetPingTime(void);
+	bool SecurityIDCanSpawn(Uint8 securityid);
 	void SetSystemCamera(bool system, Uint16 objectfollow, Sint16 x, Sint16 y);
 	bool TestAABB(int x1, int y1, int x2, int y2, Object * object, std::vector<Uint8> & types, bool onlycollidable = true);
 	std::vector<Object *> TestAABB(int x1, int y1, int x2, int y2, std::vector<Uint8> & types, Uint16 except = 0, Uint16 teamid = 0, bool onlycollidable = true);
@@ -84,7 +85,6 @@ public:
 	std::deque<char *> statusmessages;
 	static const int maxstatusmessages = 4;
 	Uint32 tickcount;
-	char password[32];
 	bool choosingtech;
 	
 	friend class Renderer;
@@ -117,7 +117,7 @@ private:
 	void DoNetwork_Authority(void);
 	void DoNetwork_Replica(void);
 	Peer * FindPeer(sockaddr_in & sockaddr);
-	void ProcessInputQueue(void);
+	bool ProcessInputQueue(Peer & peer);
 	void ProcessSnapshotQueue(void);
 	void ClearSnapshotQueue(void);
 	void SendGameInfo(Uint8 peerid);
@@ -177,6 +177,7 @@ private:
 	std::list<Serializer *> snapshotqueue;
 	static const int snapshotqueueminsize = 1;
 	static const int snapshotqueuemaxsize = 4;
+	std::list<Serializer *> inputqueue[maxpeers];
 	Uint8 illuminate;
 	bool systemcameraactive[2];
 	Uint16 systemcamerafollow[2];

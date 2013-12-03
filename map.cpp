@@ -42,9 +42,9 @@ Map::~Map(){
 	Unload();
 }
 
-bool Map::Load(const char * filename, World & world, Uint8 securitylevel){
+bool Map::Load(const char * filename, World & world){
 	Unload();
-	bool result = LoadFile(filename, world, 0, securitylevel);
+	bool result = LoadFile(filename, world, 0);
 	if(result){
 		std::vector<Team *> teams;
 		for(std::list<Object *>::iterator it = world.objectlist.begin(); it != world.objectlist.end(); it++){
@@ -79,7 +79,7 @@ bool Map::LoadBase(Team & team, World & world){
 	return LoadFile("XBASE15A.SIL", world, &team);
 }
 
-bool Map::LoadFile(const char * filename, World & world, Team * team, Uint8 securitylevel){
+bool Map::LoadFile(const char * filename, World & world, Team * team){
 	SDL_RWops * file = SDL_RWFromFile(filename, "rb");
 	if(!file){
 		return false;
@@ -246,21 +246,13 @@ bool Map::LoadFile(const char * filename, World & world, Team * team, Uint8 secu
 		i += sizeof(actorsecurityid);
 		actory += yoffset * 64;
 		//printf("(%u, %u) %d id:%u type:%d match:%u subp:%u unk:%x secid:%d\n", actorx, actory, actordirection, actorid, actortype, actormatchid, actorsubplane, actorunknown, actorsecurityid);
-		// security levels:
-		// 0: all
-		// 1: low
-		// 2: medium
-		// 3: low medium
-		// 4: high
-		// 5: low high
-		// 6: medium high
 		
 		switch(actorid){
 			case 0:{
 				// agent guard (has blaster)
 				// 0: patrol
 				// 1: guard
-				if(securitylevel == 3){
+				if(world.SecurityIDCanSpawn(actorsecurityid)){
 					Guard * guard = (Guard *)world.CreateObject(ObjectTypes::GUARD);
 					if(guard){
 						guard->x = actorx;
@@ -295,7 +287,7 @@ bool Map::LoadFile(const char * filename, World & world, Team * team, Uint8 secu
 				// captain guard (has laser)
 				// 0: patrol
 				// 1: guard
-				if(securitylevel == 3){
+				if(world.SecurityIDCanSpawn(actorsecurityid)){
 					if(actortype == 0 || actortype == 1){
 						Guard * guard = (Guard *)world.CreateObject(ObjectTypes::GUARD);
 						if(guard){
@@ -319,7 +311,7 @@ bool Map::LoadFile(const char * filename, World & world, Team * team, Uint8 secu
 				// 1: guard
 				// 2: magistrate's laser soldier
 				// 3: magistrate's rocket soldier
-				if(securitylevel == 3){
+				if(world.SecurityIDCanSpawn(actorsecurityid) && actortype <= 1){
 					Guard * guard = (Guard *)world.CreateObject(ObjectTypes::GUARD);
 					if(guard){
 						guard->x = actorx;
@@ -339,7 +331,7 @@ bool Map::LoadFile(const char * filename, World & world, Team * team, Uint8 secu
 				// robot
 				// 0: patrol
 				// 1: guard
-				if(securitylevel == 3){
+				if(world.SecurityIDCanSpawn(actorsecurityid)){
 					Robot * robot = (Robot *)world.CreateObject(ObjectTypes::ROBOT);
 					if(robot){
 						robot->x = actorx;
@@ -534,34 +526,44 @@ bool Map::LoadFile(const char * filename, World & world, Team * team, Uint8 secu
 				// 4: hacking bonus
 				// 5: see enemies
 				// 6: neutron depositor
-				PickUp * pickup = (PickUp *)world.CreateObject(ObjectTypes::PICKUP);
-				if(pickup){
-					pickup->powerup = true;
-					switch(actortype){
-						case 0:
-							pickup->type = PickUp::SUPERSHIELD;
-						break;
-						case 1:
-							pickup->type = PickUp::NEUTRONBOMB;
-						break;
-						case 2:
-							pickup->type = PickUp::JETPACK;
-						break;
-						case 4:
-							pickup->type = PickUp::HACKING;
-						break;
-						case 5:
-							pickup->type = PickUp::RADAR;
-						break;
-						default:
-							world.MarkDestroyObject(pickup->id);
-						break;
+				bool valid = false;
+				switch(actortype){
+					case 0:
+					case 1:
+					case 2:
+					case 4:
+					case 5:
+						valid = true;
+					break;
+				}
+				if(valid){
+					PickUp * pickup = (PickUp *)world.CreateObject(ObjectTypes::PICKUP);
+					if(pickup){
+						pickup->powerup = true;
+						switch(actortype){
+							default:
+							case 0:
+								pickup->type = PickUp::SUPERSHIELD;
+							break;
+							case 1:
+								pickup->type = PickUp::NEUTRONBOMB;
+							break;
+							case 2:
+								pickup->type = PickUp::JETPACK;
+							break;
+							case 4:
+								pickup->type = PickUp::HACKING;
+							break;
+							case 5:
+								pickup->type = PickUp::RADAR;
+							break;
+						}
+						pickup->x = actorx;
+						pickup->y = actory;
+						pickup->draw = false;
+						pickup->poweruprespawntime = 60;
+						pickup->quantity = pickup->poweruprespawntime;
 					}
-					pickup->x = actorx;
-					pickup->y = actory;
-					pickup->draw = false;
-					pickup->poweruprespawntime = 60;
-					pickup->quantity = pickup->poweruprespawntime;
 				}
 			}break;
 			case 64:{
@@ -596,7 +598,7 @@ bool Map::LoadFile(const char * filename, World & world, Team * team, Uint8 secu
 			case 67:{
 				// 0: base defense
 				// 1: guard defense
-				if(securitylevel == 3){
+				if(world.SecurityIDCanSpawn(actorsecurityid) || actortype == 0){
 					WallDefense * walldefense = (WallDefense *)world.CreateObject(ObjectTypes::WALLDEFENSE);
 					if(walldefense){
 						walldefense->x = actorx;

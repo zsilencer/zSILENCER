@@ -17,7 +17,7 @@
 #include "cocoawrapper.h"
 
 Game::Game() : renderer(world), screenbuffer(640, 480){
-	world.SetVersion("00020");
+	world.SetVersion("00021");
 	frames = 0;
 	fps = 0;
 	state = MAINMENU;
@@ -85,8 +85,9 @@ bool Game::Load(char * cmdline){
 			if(strncmp(cmdline, "-s", 2) == 0){
 				char * lobbyaddress = strtok(NULL, " ");
 				char * lobbyport = strtok(NULL, " ");
-				char * hostaccountid = strtok(NULL, " ");
-				if(hostaccountid && lobbyaddress && lobbyport){
+				char * gameid = strtok(NULL, " ");
+				char * accountid = strtok(NULL, " ");
+				if(gameid && accountid && lobbyaddress && lobbyport){
 					world.Listen();
 					world.lobby.Connect(lobbyaddress, atoi(lobbyport));
 					do{
@@ -106,9 +107,10 @@ bool Game::Load(char * cmdline){
 						world.lobby.DoNetwork();
 					}while(user->retrieving);
 					printf("name: %s, techslots: %d\n", user->name, user->agency[0].techslots);*/
-					world.dedicatedserver.Start(lobbyaddress, atoi(lobbyport), atoi(hostaccountid));
-					sharedstate = static_cast<State *>(world.CreateObject(ObjectTypes::STATE));
-					sharedstate->state = 0;
+					world.dedicatedserver.Start(lobbyaddress, atoi(lobbyport), atoi(gameid), atoi(accountid));
+					State * newstateobject = static_cast<State *>(world.CreateObject(ObjectTypes::STATE));
+					sharedstate = newstateobject->id;
+					newstateobject->state = 0;
 					state = NONE;
 				}
 			}else
@@ -250,17 +252,6 @@ bool Game::Loop(void){
 		SDL_Delay(1);
 	}
 	frames++;
-	/*if(SDL_GetTicks() - ticks >= 1000){
-		printf("%d\n", SDL_GetTicks() - ticks);
-		ticks = SDL_GetTicks();
-		char title[128];
-		sprintf(title, "zSILENCER - %d FPS  Latency: %d ms  B/s: D:%d U:%d", frames, world.GetPingTime(), world.totalbytesread, world.totalbytessent);
-		SDL_SetWindowTitle(window, title);
-		//SDL_WM_SetCaption(title, title);
-		frames = 0;
-		world.totalbytesread = 0;
-		world.totalbytessent = 0;
-	}*/
 	return true;
 }
 
@@ -278,12 +269,15 @@ bool Game::Tick(void){
 			world.dedicatedserver.SendHeartBeat(world, 2);
 			return false;
 		}
-		if(sharedstate && sharedstate->state == 0 && world.peercount >= 1 && world.AllPeersReady(world.localpeerid) && world.AllPeersLoadedGameInfo()){
-			sharedstate->state = 1;
-			nextstate = INGAME;
-			state = FADEOUT;
-			fade_i = 0;
-			stateisnew = true;
+		if(sharedstate){
+			State * sharedstateobject = static_cast<State *>(world.GetObjectFromId(sharedstate));
+			if(sharedstateobject && sharedstateobject->state == 0 && world.peercount >= 1 && world.AllPeersReady(world.localpeerid) && world.AllPeersLoadedGameInfo()){
+				sharedstateobject->state = 1;
+				nextstate = INGAME;
+				state = FADEOUT;
+				fade_i = 0;
+				stateisnew = true;
+			}
 		}
 	}
 	if(!sharedstate && !world.IsAuthority()){
@@ -291,14 +285,15 @@ bool Game::Tick(void){
 		for(std::list<Object *>::iterator it = world.objectlist.begin(); it != world.objectlist.end(); it++){
 			Object * object = *it;
 			if(object->type == ObjectTypes::STATE){
-				sharedstate = static_cast<State *>(object);
+				sharedstate = object->id;
 				break;
 			}
 		}
 	}
 	if(sharedstate && !world.IsAuthority()){
-		if(sharedstate->state != sharedstate->oldstate){
-			switch(sharedstate->state){
+		State * sharedstateobject = static_cast<State *>(world.GetObjectFromId(sharedstate));
+		if(sharedstateobject && sharedstateobject->state != sharedstateobject->oldstate){
+			switch(sharedstateobject->state){
 				case 1:
 					nextstate = INGAME;
 					state = FADEOUT;
@@ -310,7 +305,7 @@ bool Game::Tick(void){
 					stateisnew = true;
 				break;
 			}
-			sharedstate->oldstate = sharedstate->state;
+			sharedstateobject->oldstate = sharedstateobject->state;
 		}
 	}
 	if(world.gameplaystate == World::INGAME && (state == INGAME || state == SINGLEPLAYERGAME || state == TESTGAME)){
@@ -390,13 +385,20 @@ bool Game::Tick(void){
 				world.Disconnect();
 				Audio::GetInstance().PlayMusic(world.resources.music);
 				renderer.camera.SetPosition(320, 240);
+				lobbyinterface = 0;
+				characterinterface = 0;
+				chatinterface = 0;
+				gameselectinterface = 0;
+				gamecreateinterface = 0;
 				gamejoininterface = 0;
 				gametechinterface = 0;
-				gameselectinterface = 0;
+				gamesummaryinterface = 0;
+				modalinterface = 0;
+				passwordinterface = 0;
 				world.choosingtech = false;
 				world.lobby.channelchanged = true;
-				lobbyinterface = CreateLobbyInterface();
-				currentinterface = lobbyinterface->id;
+				lobbyinterface = CreateLobbyInterface()->id;
+				currentinterface = lobbyinterface;
 				world.GetAuthorityPeer()->controlledlist.push_back(currentinterface);
 				renderer.palette.SetPalette(2);
 				screenbuffer.Clear(0);
@@ -411,13 +413,16 @@ bool Game::Tick(void){
 					break;
 				}
 				if(lobbyinterface){
-					ProcessLobbyInterface(lobbyinterface);
+					Interface * iface = static_cast<Interface *>(world.GetObjectFromId(lobbyinterface));
+					if(iface){
+						ProcessLobbyInterface(iface);
+					}
 				}
 				if(gamecreateinterface){
 					if(world.lobby.creategamestatus == 1){
 						world.lobby.creategamestatus = 0;
 						Peer * authoritypeer = world.GetAuthorityPeer();
-						LobbyGame * lobbygame = world.lobby.GetGameByAccountId(world.lobby.accountid);
+						LobbyGame * lobbygame = world.lobby.GetGameById(world.lobby.createdgameid);
 						if(lobbygame){
 							Serializer data;
 							lobbygame->Serialize(Serializer::WRITE, data);
@@ -426,7 +431,7 @@ bool Game::Tick(void){
 							//authoritypeer->ip = ntohl(inet_addr("127.0.0.1")); // temporary
 							authoritypeer->port = lobbygame->port;
 							sharedstate = 0;
-							currentlobbygameid = lobbygame->accountid;
+							currentlobbygameid = lobbygame->id;
 							world.Connect(GetSelectedAgency(), world.lobby.accountid, lobbygame->password);
 							joininggame = true;
 						}
@@ -449,6 +454,27 @@ bool Game::Tick(void){
 							CreateModalDialog("Unable to join game");
 						}
 					}
+					if(modalinterface && !modaldialoghasok){
+						Interface * modaliface = static_cast<Interface *>(world.GetObjectFromId(modalinterface));
+						if(modaliface){
+							for(std::vector<Uint16>::iterator it = modaliface->objects.begin(); it != modaliface->objects.end(); it++){
+								Object * object = world.GetObjectFromId(*it);
+								if(object && object->type == ObjectTypes::OVERLAY){
+									Overlay * overlay = static_cast<Overlay *>(object);
+									if(overlay->text){
+										strcpy(overlay->text, "Creating game");
+										int dots = (world.tickcount / 4) % 6;
+										if(dots > 3){
+											dots = 6 - dots;
+										}
+										for(int i = 0; i < dots; i++){
+											strcat(overlay->text, ".");
+										}
+									}
+								}
+							}
+						}
+					}
 					if(!modaldialoghasok && world.lobby.creategamestatus != 100 && (world.state == World::CONNECTED || world.state == World::IDLE)){
 						DestroyModalDialog();
 						creategameclicked = false;
@@ -457,16 +483,28 @@ bool Game::Tick(void){
 						Peer * peer = world.peerlist[world.localpeerid];
 						if(peer){
 							if(gameselectinterface){
-								gameselectinterface->DestroyInterface(world, lobbyinterface);
+								Interface * lobbyiface = static_cast<Interface *>(world.GetObjectFromId(lobbyinterface));
+								if(lobbyiface){
+									Interface * gameselectiface = static_cast<Interface *>(world.GetObjectFromId(gameselectinterface));
+									if(gameselectiface){
+										gameselectiface->DestroyInterface(world, lobbyiface);
+									}
+								}
 								gameselectinterface = 0;
 							}
 							if(gamecreateinterface){
-								gamecreateinterface->DestroyInterface(world, lobbyinterface);
+								Interface * lobbyiface = static_cast<Interface *>(world.GetObjectFromId(lobbyinterface));
+								if(lobbyiface){
+									Interface * gamecreateiface = static_cast<Interface *>(world.GetObjectFromId(gamecreateinterface));
+									if(gamecreateiface){
+										gamecreateiface->DestroyInterface(world, lobbyiface);
+									}
+								}
 								gamecreateinterface = 0;
 							}
 							world.SetTech(Config::GetInstance().defaulttechchoices[GetSelectedAgency()]);
-							gamejoininterface = CreateGameJoinInterface();
-							LobbyGame * lobbygame = world.lobby.GetGameByAccountId(currentlobbygameid);
+							gamejoininterface = CreateGameJoinInterface()->id;
+							LobbyGame * lobbygame = world.lobby.GetGameById(currentlobbygameid);
 							if(lobbygame){
 								char temp[256];
 								GetGameChannelName(*lobbygame, temp);
@@ -474,19 +512,44 @@ bool Game::Tick(void){
 								strcpy(lastchannel, world.lobby.channel);
 								world.lobby.JoinChannel(temp);
 							}
-							lobbyinterface->AddObject(gamejoininterface->id);
+							Interface * lobbyiface = static_cast<Interface *>(world.GetObjectFromId(lobbyinterface));
+							if(lobbyiface){
+								lobbyiface->AddObject(gamejoininterface);
+							}
 						}
+					}
+				}
+				
+				if(world.state != World::CONNECTED && !modalinterface){
+					if(gamejoininterface || gametechinterface){
+						CreateModalDialog("Disconnected from game");
 					}
 				}
 			}
 		}break;
 		case INGAME:{
 			if(!world.map.loaded && stateisnew){
+				for(std::list<Object *>::iterator it = world.objectlist.begin(); it != world.objectlist.end(); it++){
+					Object * object = *it;
+					switch(object->type){
+						case ObjectTypes::TEAM:{
+							Team * team = static_cast<Team *>(object);
+							team->DestroyOverlays(world);
+						}break;
+						case ObjectTypes::INTERFACE:{
+							Interface * iface = static_cast<Interface *>(object);
+							iface->DestroyInterface(world, iface);
+						}break;
+					}
+				}
 				screenbuffer.Clear(0);
 				char mapname[256];
 				sprintf(mapname, "level/%s", world.gameinfo.mapname);
 				LoadMap(mapname);
-				sharedstate->state = 2;
+				State * sharedstateobject = static_cast<State *>(world.GetObjectFromId(sharedstate));
+				if(sharedstateobject){
+					sharedstateobject->state = 2;
+				}
 				ShowDeployMessage();
 				Audio::GetInstance().StopMusic();
 				//world.GetAuthorityPeer()->controlledlist.clear();
@@ -496,35 +559,28 @@ bool Game::Tick(void){
 					switch(object->type){
 						case ObjectTypes::TEAM:{
 							Team * team = static_cast<Team *>(object);
-							if(team){
-								team->DestroyOverlays(world);
-								for(int i = 0; i < team->numpeers; i++){
-									Peer * peer = world.peerlist[team->peers[i]];
-									if(peer){
-										world.ingameusers.push_back(peer->accountid);
-										User * user = world.lobby.GetUserInfo(peer->accountid);
-										if(user){
-											user->statsagency = team->agency;
-										}
+							for(int i = 0; i < team->numpeers; i++){
+								Peer * peer = world.peerlist[team->peers[i]];
+								if(peer){
+									world.ingameusers.push_back(peer->accountid);
+									User * user = world.lobby.GetUserInfo(peer->accountid);
+									if(user){
+										user->statsagency = team->agency;
 									}
-									Player * player = (Player *)world.CreateObject(ObjectTypes::PLAYER);
-									if(player){
-										world.map.RandomPlayerStartLocation(&player->x, &player->y);
-										player->oldx = player->x;
-										player->oldy = player->y;
-										player->teamid = team->id;
-										Uint8 teamcolor = team->GetColor();
-										player->suitcolor = teamcolor;//(((teamcolor >> 4) - i) << 4) + (teamcolor & 0xF);
-										world.peerlist[team->peers[i]]->controlledlist.clear();
-										world.peerlist[team->peers[i]]->controlledlist.push_back(player->id);
-									}
+								}
+								Player * player = (Player *)world.CreateObject(ObjectTypes::PLAYER);
+								if(player){
+									world.map.RandomPlayerStartLocation(&player->x, &player->y);
+									player->oldx = player->x;
+									player->oldy = player->y;
+									player->teamid = team->id;
+									Uint8 teamcolor = team->GetColor();
+									player->suitcolor = teamcolor;//(((teamcolor >> 4) - i) << 4) + (teamcolor & 0xF);
+									world.peerlist[team->peers[i]]->controlledlist.clear();
+									world.peerlist[team->peers[i]]->controlledlist.push_back(player->id);
 								}
 							}
 						}break;
-						case ObjectTypes::INTERFACE:
-							Interface * iface = static_cast<Interface *>(object);
-							iface->DestroyInterface(world, iface);
-						break;
 					}
 				}
 				world.SendPeerList();
@@ -534,6 +590,10 @@ bool Game::Tick(void){
 				screenbuffer.Clear(0);
 				SetColors(renderer.palette.GetColors());
 				stateisnew = false;
+			}
+			if(!deploymessageshown && world.messagetype == 1 && world.message_i == 63){
+				world.ShowMessage((char *)"Location : Base Arsia Mons, Surface Temperature : -7C", 64, 1);
+				deploymessageshown = true;
 			}
 			if(CheckForQuit()){
 				world.Disconnect();
@@ -595,14 +655,17 @@ bool Game::Tick(void){
 				Audio::GetInstance().PlayMusic(world.resources.music);
 				renderer.camera.SetPosition(320, 240);
 				User * user = world.lobby.GetUserInfo(world.lobby.accountid);
-				gamesummaryinterface = CreateGameSummaryInterface(user->statscopy, user->statsagency);
-				currentinterface = gamesummaryinterface->id;
+				gamesummaryinterface = CreateGameSummaryInterface(user->statscopy, user->statsagency)->id;
+				currentinterface = gamesummaryinterface;
 				renderer.palette.SetPalette(1);
 				screenbuffer.Clear(0);
 				SetColors(renderer.palette.GetColors());
 				stateisnew = false;
 			}else{
-				ProcessGameSummaryInterface(gamesummaryinterface);
+				Interface * gamesummaryiface = static_cast<Interface *>(world.GetObjectFromId(gamesummaryinterface));
+				if(gamesummaryiface){
+					ProcessGameSummaryInterface(gamesummaryiface);
+				}
 			}
 		}break;
 		case SINGLEPLAYERGAME:{
@@ -626,7 +689,8 @@ bool Game::Tick(void){
 				player->RemoveInventoryItem(Player::INV_BASEDOOR);
 				ShowDeployMessage();
 				world.GetAuthorityPeer()->controlledlist.push_back(player->id);
-				LoadMap("level/ALLY10c.sil", 0);
+				world.gameinfo.securitylevel = LobbyGame::SECNONE;
+				LoadMap("level/ALLY10c.sil");
 				//LoadMap("level/THET06e.SIL", 3);
 				//LoadMap("level/STAR72.SIL", 3);
 				//LoadMap("level/EASY05c.SIL", 3);
@@ -1200,23 +1264,26 @@ bool Game::Tick(void){
 				Audio::GetInstance().StopMusic();
 				world.gameplaystate = World::INLOBBY;
 				currentinterface = 0;
-				sharedstate = static_cast<State *>(world.CreateObject(ObjectTypes::STATE));
-				sharedstate->state = 0;
+				State * newsharedstateobject = static_cast<State *>(world.CreateObject(ObjectTypes::STATE));
+				sharedstate = newsharedstateobject->id;
+				newsharedstateobject->state = 0;
 				stateisnew = false;
 			}
 			/*if(world.tickcount % 48 == 0){
 				world.SendPeerList();
 			}*/
 			if(!world.map.loaded && world.peercount >= 2){
-				renderer.camera.SetPosition(-640, -480);
+				screenbuffer.Clear(0);
 				char mapname[256];
 				sprintf(mapname, "level/%s", world.gameinfo.mapname);
 				LoadMap(mapname);
 				renderer.palette.SetPalette(0);
 				renderer.palette.SetParallaxColors(world.map.parallax);
-				screenbuffer.Clear(0);
 				SetColors(renderer.palette.GetColors());
-				sharedstate->state = 2;
+				State * sharedstateobject = static_cast<State *>(world.GetObjectFromId(sharedstate));
+				if(sharedstateobject){
+					sharedstateobject->state = 2;
+				}
 				//world.GetAuthorityPeer()->controlledlist.clear();
 				world.gameplaystate = World::INGAME;
 				for(std::list<Object *>::iterator it = world.objectlist.begin(); it != world.objectlist.end(); it++){
@@ -1260,7 +1327,8 @@ bool Game::Tick(void){
 				world.DestroyAllObjects();
 				stateisnew = false;
 			}else{
-				if(sharedstate && sharedstate->state == 2){
+				State * sharedstateobject = static_cast<State *>(world.GetObjectFromId(sharedstate));
+				if(sharedstateobject && sharedstateobject->state == 2){
 					world.gameplaystate = World::INGAME;
 				}
 			}
@@ -1306,7 +1374,8 @@ bool Game::Tick(void){
 						botnum++;
 					}
 				}
-				LoadMap("level/ALLY10c.sil", 3);
+				world.gameinfo.securitylevel = LobbyGame::SECHIGH;
+				LoadMap("level/ALLY10c.sil");
 				for(std::list<Object *>::iterator it = world.objectlist.begin(); it != world.objectlist.end(); it++){
 					if((*it)->type == ObjectTypes::PLAYER){
 						Player * player = static_cast<Player *>(*it);
@@ -1452,8 +1521,8 @@ void Game::UpdateInputState(Input & input){
 	}
 }
 
-bool Game::LoadMap(const char * name, Uint8 securitylevel){
-	if(!world.map.Load(name, world, securitylevel)){
+bool Game::LoadMap(const char * name){
+	if(!world.map.Load(name, world)){
 		return false;
 	}
 	CreateAmbienceChannels();
@@ -1622,10 +1691,11 @@ void Game::ProcessInGameInterfaces(void){
 }
 
 void Game::ShowDeployMessage(void){
-	world.ShowMessage((char *)"STANDBY FOR TEAM DEPLOYMENT\n\nLocation : Base Arsia Mons, Surface Temperature : -7C", 128, 1);
+	world.ShowMessage((char *)"STANDBY FOR TEAM DEPLOYMENT", 64, 1);
+	deploymessageshown = false;
 }
 
-void Game::JoinGame(LobbyGame & lobbygame){
+void Game::JoinGame(LobbyGame & lobbygame, char * password){
 	strcpy(world.mapname, lobbygame.mapname);
 	Peer * peer = world.GetAuthorityPeer();
 	peer->ip = ntohl(inet_addr(lobbygame.hostname));
@@ -1635,7 +1705,7 @@ void Game::JoinGame(LobbyGame & lobbygame){
 	//world.lobby.ConnectToGame(*lobbygame, GetSelectedAgency());
 	sharedstate = 0;
 	world.mode = World::REPLICA;
-	world.Connect(GetSelectedAgency(), world.lobby.accountid, lobbygame.password);
+	world.Connect(GetSelectedAgency(), world.lobby.accountid, password);
 	joininggame = true;
 }
 
@@ -1930,20 +2000,20 @@ Interface * Game::CreateLobbyInterface(void){
 	exitbutton->uid = 10;
 	strcpy(exitbutton->text, "Go Back");
 	
-	characterinterface = CreateCharacterInterface();
-	gameselectinterface = CreateGameSelectInterface();
-	chatinterface = CreateChatInterface();
+	characterinterface = CreateCharacterInterface()->id;
+	gameselectinterface = CreateGameSelectInterface()->id;
+	chatinterface = CreateChatInterface()->id;
 	
 	Interface * iface = (Interface *)world.CreateObject(ObjectTypes::INTERFACE);
 	iface->AddObject(background->id);
 	iface->AddObject(toptext->id);
 	iface->AddObject(vertext->id);
 	iface->AddObject(exitbutton->id);
-	iface->AddObject(chatinterface->id);
-	iface->AddObject(characterinterface->id);
-	iface->AddObject(gameselectinterface->id);
+	iface->AddObject(chatinterface);
+	iface->AddObject(characterinterface);
+	iface->AddObject(gameselectinterface);
 	iface->buttonescape = exitbutton->id;
-	iface->activeobject = chatinterface->id;
+	iface->activeobject = chatinterface;
 	iface->ActiveChanged(world, iface, false);
 	return iface;
 }
@@ -2093,13 +2163,13 @@ Interface * Game::CreateGameSelectInterface(void){
 	gameselect->width = 214;
 	gameselect->height = 265;
 	gameselect->lineheight = 14;
-	gameselect->uid = 3;
+	gameselect->uid = 10;
 	ScrollBar * gamescrollbar = (ScrollBar *)world.CreateObject(ObjectTypes::SCROLLBAR);
 	gamescrollbar->res_index = 9;
 	gamescrollbar->scrollpixels = gameselect->lineheight;
 	gamescrollbar->scrollposition = gameselect->scrolled;
 	Overlay * gamenametext = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	gamenametext->text = new char[64];
+	gamenametext->text = new char[128];
 	gamenametext->text[0] = 0;
 	//strcpy(gamenametext->text, "game name");
 	gamenametext->textbank = 133;
@@ -2108,7 +2178,7 @@ Interface * Game::CreateGameSelectInterface(void){
 	gamenametext->y = 358;
 	gamenametext->uid = 1;
 	Overlay * gamemaptext = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	gamemaptext->text = new char[64];
+	gamemaptext->text = new char[128];
 	gamemaptext->text[0] = 0;
 	//strcpy(gamemaptext->text, "game map");
 	gamemaptext->textbank = 133;
@@ -2117,23 +2187,33 @@ Interface * Game::CreateGameSelectInterface(void){
 	gamemaptext->y = 370;
 	gamemaptext->uid = 2;
 	Overlay * gameplayerstext = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	gameplayerstext->text = new char[64];
+	gameplayerstext->text = new char[128];
 	gameplayerstext->text[0] = 0;
-	//strcpy(gameplayerstext->text, "game players");
+	//strcpy(gameplayerstext->text, "Players: ");
 	gameplayerstext->textbank = 133;
 	gameplayerstext->textwidth = 6;
 	gameplayerstext->x = 405;
 	gameplayerstext->y = 382;
 	gameplayerstext->uid = 3;
-	Overlay * gamepasswordtext = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	gamepasswordtext->text = new char[64];
-	gamepasswordtext->text[0] = 0;
-	//strcpy(gameplayerstext->text, "PASSWORDED");
-	gamepasswordtext->textbank = 133;
-	gamepasswordtext->textwidth = 6;
-	gamepasswordtext->x = 405;
-	gamepasswordtext->y = 394;
-	gamepasswordtext->uid = 4;
+	Overlay * gamecreatortext = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
+	gamecreatortext->text = new char[128];
+	gamecreatortext->text[0] = 0;
+	//strcpy(gamecreatortext->text, "Creator: ");
+	gamecreatortext->textbank = 133;
+	gamecreatortext->textwidth = 6;
+	gamecreatortext->x = 405;
+	gamecreatortext->y = 394;
+	gamecreatortext->uid = 4;
+	Overlay * gameinfotext = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
+	gameinfotext->text = new char[128];
+	gameinfotext->text[0] = 0;
+	//strcpy(gameinfotext->text, "Info: ");
+	gameinfotext->textbank = 133;
+	gameinfotext->textwidth = 6;
+	gameinfotext->x = 405;
+	gameinfotext->y = 406;
+	gameinfotext->uid = 5;
+	
 	Button * gamejoinbutton = (Button *)world.CreateObject(ObjectTypes::BUTTON);
 	gamejoinbutton->y = 430;
 	gamejoinbutton->x = 436;
@@ -2155,7 +2235,8 @@ Interface * Game::CreateGameSelectInterface(void){
 	gameselectinterface->AddObject(gamenametext->id);
 	gameselectinterface->AddObject(gamemaptext->id);
 	gameselectinterface->AddObject(gameplayerstext->id);
-	gameselectinterface->AddObject(gamepasswordtext->id);
+	gameselectinterface->AddObject(gamecreatortext->id);
+	gameselectinterface->AddObject(gameinfotext->id);
 	gameselectinterface->buttonenter = gamejoinbutton->id;
 	gameselectinterface->scrollbar = gamescrollbar->id;
 	return gameselectinterface;
@@ -2232,6 +2313,119 @@ Interface * Game::CreateGameCreateInterface(void){
 	Overlay * rightborder = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
 	rightborder->res_bank = 7;
 	rightborder->res_index = 8;
+	
+	Overlay * optionstext = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
+	optionstext->text = new char[64];
+	strcpy(optionstext->text, "Game Options");
+	optionstext->textbank = 134;
+	optionstext->textwidth = 8;
+	optionstext->x = 250;
+	optionstext->y = 70;
+	
+	int yoffset = 6;
+	
+	Overlay * securitytext = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
+	securitytext->text = new char[64];
+	strcpy(securitytext->text, "Security:");
+	securitytext->textbank = 134;
+	securitytext->textwidth = 8;
+	securitytext->x = 245;
+	securitytext->y = 87 + yoffset;
+	Button * buttonsecurity = (Button *)world.CreateObject(ObjectTypes::BUTTON);
+	buttonsecurity->SetType(Button::BNONE);
+	buttonsecurity->x = 323;
+	buttonsecurity->y = 87 + yoffset;
+	buttonsecurity->uid = 40;
+	buttonsecurity->width = 70;
+	buttonsecurity->height = 20;
+	buttonsecurity->textbank = 134;
+	buttonsecurity->textwidth = 9;
+	strcpy(buttonsecurity->text, "Medium");
+	
+	Overlay * minleveltext = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
+	minleveltext->text = new char[64];
+	strcpy(minleveltext->text, "Min Level:");
+	minleveltext->textbank = 134;
+	minleveltext->textwidth = 8;
+	minleveltext->x = 245;
+	minleveltext->y = 104 + yoffset;
+	
+	TextInput * minlevelinput = (TextInput *)world.CreateObject(ObjectTypes::TEXTINPUT);
+	minlevelinput->x = 350;
+	minlevelinput->y = 104 + yoffset;
+	minlevelinput->width = 20;
+	minlevelinput->height = 20;
+	minlevelinput->res_bank = 134;
+	minlevelinput->fontwidth = 8;
+	minlevelinput->maxchars = 2;
+	minlevelinput->maxwidth = 50;
+	minlevelinput->uid = 41;
+	minlevelinput->numbersonly = true;
+	minlevelinput->SetText("0");
+	
+	Overlay * maxleveltext = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
+	maxleveltext->text = new char[64];
+	strcpy(maxleveltext->text, "Max Level:");
+	maxleveltext->textbank = 134;
+	maxleveltext->textwidth = 8;
+	maxleveltext->x = 245;
+	maxleveltext->y = 121 + yoffset;
+	
+	TextInput * maxlevelinput = (TextInput *)world.CreateObject(ObjectTypes::TEXTINPUT);
+	maxlevelinput->x = 350;
+	maxlevelinput->y = 121 + yoffset;
+	maxlevelinput->width = 20;
+	maxlevelinput->height = 20;
+	maxlevelinput->res_bank = 134;
+	maxlevelinput->fontwidth = 8;
+	maxlevelinput->maxchars = 2;
+	maxlevelinput->maxwidth = 50;
+	maxlevelinput->uid = 42;
+	maxlevelinput->numbersonly = true;
+	maxlevelinput->SetText("99");
+	
+	Overlay * maxplayerstext = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
+	maxplayerstext->text = new char[64];
+	strcpy(maxplayerstext->text, "Max Players:");
+	maxplayerstext->textbank = 134;
+	maxplayerstext->textwidth = 8;
+	maxplayerstext->x = 245;
+	maxplayerstext->y = 138 + yoffset;
+	
+	TextInput * maxplayersinput = (TextInput *)world.CreateObject(ObjectTypes::TEXTINPUT);
+	maxplayersinput->x = 350;
+	maxplayersinput->y = 138 + yoffset;
+	maxplayersinput->width = 20;
+	maxplayersinput->height = 20;
+	maxplayersinput->res_bank = 134;
+	maxplayersinput->fontwidth = 8;
+	maxplayersinput->maxchars = 2;
+	maxplayersinput->maxwidth = 50;
+	maxplayersinput->uid = 43;
+	maxplayersinput->numbersonly = true;
+	maxplayersinput->SetText("24");
+	
+	Overlay * maxteamstext = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
+	maxteamstext->text = new char[64];
+	strcpy(maxteamstext->text, "Max Teams:");
+	maxteamstext->textbank = 134;
+	maxteamstext->textwidth = 8;
+	maxteamstext->x = 245;
+	maxteamstext->y = 155 + yoffset;
+	
+	TextInput * maxteamsinput = (TextInput *)world.CreateObject(ObjectTypes::TEXTINPUT);
+	maxteamsinput->x = 350;
+	maxteamsinput->y = 155 + yoffset;
+	maxteamsinput->width = 20;
+	maxteamsinput->height = 20;
+	maxteamsinput->res_bank = 134;
+	maxteamsinput->fontwidth = 8;
+	maxteamsinput->maxchars = 2;
+	maxteamsinput->maxwidth = 50;
+	maxteamsinput->uid = 44;
+	maxteamsinput->numbersonly = true;
+	maxteamsinput->SetText("6");
+	
 	Overlay * selectmaptext = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
 	selectmaptext->text = new char[64];
 	strcpy(selectmaptext->text, "Select Map");
@@ -2269,7 +2463,7 @@ Interface * Game::CreateGameCreateInterface(void){
 	nametextinput->maxwidth = 35;
 	nametextinput->uid = 5;
 	nametextinput->SetText(Config::GetInstance().defaultgamename);
-	/*Overlay * passwordtext = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
+	Overlay * passwordtext = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
 	passwordtext->text = new char[64];
 	strcpy(passwordtext->text, "Password (optional):");
 	passwordtext->textbank = 134;
@@ -2286,7 +2480,7 @@ Interface * Game::CreateGameCreateInterface(void){
 	passwordtextinput->maxchars = 20;
 	passwordtextinput->maxwidth = 20;
 	passwordtextinput->uid = 6;
-	passwordtextinput->password = true;*/
+	passwordtextinput->password = true;
 	Button * gamecreatebutton = (Button *)world.CreateObject(ObjectTypes::BUTTON);
 	gamecreatebutton->y = 430;
 	gamecreatebutton->x = 436;
@@ -2294,18 +2488,35 @@ Interface * Game::CreateGameCreateInterface(void){
 	gamecreatebutton->uid = 35;
 	strcpy(gamecreatebutton->text, "Create");
 	gamecreateinterface->AddObject(rightborder->id);
+	gamecreateinterface->AddObject(optionstext->id);
+	gamecreateinterface->AddObject(securitytext->id);
+	gamecreateinterface->AddObject(buttonsecurity->id);
+	gamecreateinterface->AddObject(minleveltext->id);
+	gamecreateinterface->AddObject(minlevelinput->id);
+	gamecreateinterface->AddObject(maxleveltext->id);
+	gamecreateinterface->AddObject(maxlevelinput->id);
+	gamecreateinterface->AddObject(maxplayerstext->id);
+	gamecreateinterface->AddObject(maxplayersinput->id);
+	gamecreateinterface->AddObject(maxteamstext->id);
+	gamecreateinterface->AddObject(maxteamsinput->id);
 	gamecreateinterface->AddObject(selectmaptext->id);
 	gamecreateinterface->AddObject(mapselect->id);
 	gamecreateinterface->AddObject(mapscrollbar->id);
 	gamecreateinterface->AddObject(nametext->id);
 	gamecreateinterface->AddObject(nametextinput->id);
-	//gamecreateinterface->AddObject(passwordtext->id);
-	//gamecreateinterface->AddObject(passwordtextinput->id);
+	gamecreateinterface->AddObject(passwordtext->id);
+	gamecreateinterface->AddObject(passwordtextinput->id);
 	gamecreateinterface->AddObject(gamecreatebutton->id);
+	//gamecreateinterface->AddTabObject(buttonsecurity->id);
 	gamecreateinterface->AddTabObject(nametextinput->id);
-	//gamecreateinterface->AddTabObject(passwordtextinput->id);
+	gamecreateinterface->AddTabObject(passwordtextinput->id);
 	gamecreateinterface->AddTabObject(gamecreatebutton->id);
+	gamecreateinterface->AddTabObject(minlevelinput->id);
+	gamecreateinterface->AddTabObject(maxlevelinput->id);
+	gamecreateinterface->AddTabObject(maxplayersinput->id);
+	gamecreateinterface->AddTabObject(maxteamsinput->id);
 	gamecreateinterface->buttonenter = gamecreatebutton->id;
+	gamecreateinterface->activeobject = nametextinput->id;
 	return gamecreateinterface;
 }
 
@@ -2633,7 +2844,7 @@ Interface * Game::CreateGameSummaryInterface(Stats & stats, Uint8 agency){
 	iface->buttonenter = okbutton->id;
 	iface->buttonescape = okbutton->id;
 	iface->scrollbar = scrollbar->id;
-	gamesummaryinterface = iface;
+	gamesummaryinterface = iface->id;
 	UpdateGameSummaryInterface();
 	return iface;
 }
@@ -2661,15 +2872,17 @@ Interface * Game::CreateModalDialog(const char * message, bool ok){
 		strcpy(okbutton->text, "OK");
 		dialoginterface->AddObject(okbutton->id);
 		dialoginterface->buttonenter = okbutton->id;
+	}else{
+		text->y = 218;
 	}
 	modaldialoghasok = ok;
 	dialoginterface->AddObject(background->id);
 	dialoginterface->AddObject(text->id);
 	dialoginterface->modal = true;
-	modalinterface = dialoginterface;
+	modalinterface = dialoginterface->id;
 	Interface * iface = static_cast<Interface *>(world.GetObjectFromId(currentinterface));
 	if(iface){
-		iface->AddObject(modalinterface->id);
+		iface->AddObject(modalinterface);
 	}
 	aftermodalinterface = currentinterface;
 	currentinterface = dialoginterface->id;
@@ -2682,7 +2895,10 @@ void Game::DestroyModalDialog(void){
 		aftermodalinterface = 0;
 		Interface * iface = static_cast<Interface *>(world.GetObjectFromId(currentinterface));
 		if(iface){
-			modalinterface->DestroyInterface(world, iface);
+			Interface * modaliface = static_cast<Interface *>(world.GetObjectFromId(modalinterface));
+			if(modaliface){
+				modaliface->DestroyInterface(world, iface);
+			}
 		}
 		modalinterface = 0;
 	}
@@ -2715,6 +2931,7 @@ Interface * Game::CreatePasswordDialog(void){
 	passwordinput->maxwidth = 20;
 	passwordinput->password = true;
 	passwordinput->uid = 1;
+	modaldialoghasok = true;
 	Button * okbutton = (Button *)world.CreateObject(ObjectTypes::BUTTON);
 	okbutton->x = 242;
 	okbutton->y = 267;
@@ -2731,11 +2948,87 @@ Interface * Game::CreatePasswordDialog(void){
 	dialoginterface->buttonenter = okbutton->id;
 	dialoginterface->buttonescape = okbutton->id;
 	dialoginterface->modal = true;
-	modalinterface = dialoginterface;
+	modalinterface = dialoginterface->id;
 	aftermodalinterface = currentinterface;
+	Interface * iface = static_cast<Interface *>(world.GetObjectFromId(currentinterface));
+	if(iface){
+		iface->AddObject(modalinterface);
+	}
 	currentinterface = dialoginterface->id;
-	passwordinterface = dialoginterface;
+	passwordinterface = dialoginterface->id;
 	return dialoginterface;
+}
+
+bool Game::GoBack(void){
+	if(gamejoininterface || gametechinterface){
+		world.Disconnect();
+		world.lobby.gamesprocessed = false;
+		world.lobby.channelchanged = true;
+		world.SwitchToLocalAuthorityMode();
+		sharedstate = 0;
+		Object * object = world.GetObjectFromId(currentinterface);
+		Interface * iface = static_cast<Interface *>(object);
+		if(gamejoininterface){
+			Interface * gamejoiniface = static_cast<Interface *>(world.GetObjectFromId(gamejoininterface));
+			if(gamejoiniface){
+				gamejoiniface->DestroyInterface(world, iface);
+			}
+			gamejoininterface = 0;
+			for(std::list<Object *>::iterator it = world.objectlist.begin(); it != world.objectlist.end(); it++){
+				Object * object = *it;
+				switch(object->type){
+					case ObjectTypes::TEAM:{
+						Team * team = static_cast<Team *>(object);
+						team->DestroyOverlays(world);
+						world.MarkDestroyObject(object->id);
+					}break;
+				}
+			}
+		}else
+		if(gametechinterface){
+			Interface * gametechiface = static_cast<Interface *>(world.GetObjectFromId(gametechinterface));
+			if(gametechiface){
+				gametechiface->DestroyInterface(world, iface);
+			}
+			gametechinterface = 0;
+			world.choosingtech = false;
+			for(std::list<Object *>::iterator it = world.objectlist.begin(); it != world.objectlist.end(); it++){
+				Object * object = *it;
+				switch(object->type){
+					case ObjectTypes::TEAM:{
+						Team * team = static_cast<Team *>(object);
+						team->DestroyOverlays(world);
+						world.MarkDestroyObject(object->id);
+					}break;
+				}
+			}
+		}
+		gameselectinterface = CreateGameSelectInterface()->id;
+		world.lobby.JoinChannel(lastchannel);
+		iface->AddObject(gameselectinterface);
+		currentinterface = iface->id;
+		return true;
+	}else
+	if(gamecreateinterface){
+		Object * object = world.GetObjectFromId(currentinterface);
+		Interface * iface = static_cast<Interface *>(object);
+		Interface * gamecreateiface = static_cast<Interface *>(world.GetObjectFromId(gamecreateinterface));
+		if(gamecreateiface){
+			gamecreateiface->DestroyInterface(world, iface);
+		}
+		gamecreateinterface = 0;
+		gameselectinterface = CreateGameSelectInterface()->id;
+		world.lobby.gamesprocessed = false;
+		iface->AddObject(gameselectinterface);
+		currentinterface = iface->id;
+		return true;
+	}else{
+		nextstate = MAINMENU;
+		state = FADEOUT;
+		fade_i = 0;
+		stateisnew = true;
+	}
+	return false;
 }
 
 bool Game::ProcessMainMenuInterface(Interface * iface){
@@ -2954,7 +3247,8 @@ bool Game::ProcessLobbyInterface(Interface * iface){
 				case ObjectTypes::TEXTINPUT:{
 					TextInput * textinput = static_cast<TextInput *>(object);
 					if(textinput){
-						if(chatinterface && iface->activeobject == chatinterface->activeobject){
+						Interface * chatiface = static_cast<Interface *>(world.GetObjectFromId(chatinterface));
+						if(chatiface && iface->activeobject == chatiface->activeobject){
 							if(textinput->enterpressed && strlen(textinput->text) > 0){
 								world.lobby.SendChat(world.lobby.channel, textinput->text);
 								textinput->Clear();
@@ -2968,14 +3262,14 @@ bool Game::ProcessLobbyInterface(Interface * iface){
 				case ObjectTypes::SELECTBOX:{
 					SelectBox * selectbox = static_cast<SelectBox *>(object);
 					if(selectbox){
-						if(selectbox->uid == 3 && !world.lobby.gamesprocessed){
+						if(selectbox->uid == 10 && !world.lobby.gamesprocessed){
 							bool deleted;
 							do{
 								deleted = false;
 								unsigned int index = 0;
 								for(std::deque<Uint32>::iterator it = selectbox->itemids.begin(); it != selectbox->itemids.end(); it++, index++){
-									Uint32 accountid = (*it);
-									if(!world.lobby.GetGameByAccountId(accountid)){
+									Uint32 gameid = (*it);
+									if(!world.lobby.GetGameById(gameid)){
 										selectbox->DeleteItem(index);
 										deleted = true;
 										break;
@@ -2984,8 +3278,8 @@ bool Game::ProcessLobbyInterface(Interface * iface){
 							}while(deleted);
 							for(std::list<LobbyGame *>::iterator it = world.lobby.games.begin(); it != world.lobby.games.end(); it++){
 								LobbyGame * lobbygame = (*it);
-								if(selectbox->IdToIndex(lobbygame->accountid) == -1){
-									selectbox->AddItem(lobbygame->name, lobbygame->accountid);
+								if(selectbox->IdToIndex(lobbygame->id) == -1){
+									selectbox->AddItem(lobbygame->name, lobbygame->id);
 								}
 							}
 							world.lobby.gamesprocessed = true;
@@ -3001,42 +3295,83 @@ bool Game::ProcessLobbyInterface(Interface * iface){
 							}else{
 								scrollbar->draw = false;
 							}
-							if(selectbox->selecteditem >= 0){
-								LobbyGame * lobbygame = world.lobby.GetGameByAccountId(selectbox->IndexToId(selectbox->selecteditem));
-								if(lobbygame){
-									Object * tobject = iface->GetObjectWithUid(world, 1);
-									if(tobject && tobject->type == ObjectTypes::OVERLAY){
-										Overlay * overlay = static_cast<Overlay *>(tobject);
-										if(overlay){
-											strcpy(overlay->text, lobbygame->name);
-										}
+							LobbyGame * lobbygame = world.lobby.GetGameById(selectbox->IndexToId(selectbox->selecteditem));
+							Object * tobject = iface->GetObjectWithUid(world, 1);
+							if(tobject && tobject->type == ObjectTypes::OVERLAY){
+								Overlay * overlay = static_cast<Overlay *>(tobject);
+								if(overlay){
+									if(lobbygame){
+										strcpy(overlay->text, lobbygame->name);
+									}else{
+										strcpy(overlay->text, "");
 									}
-									tobject = iface->GetObjectWithUid(world, 2);
-									if(tobject && tobject->type == ObjectTypes::OVERLAY){
-										Overlay * overlay = static_cast<Overlay *>(tobject);
-										if(overlay){
-											char temp[256];
-											//sprintf(temp, "Host: %s:%d", lobbygame->hostname, lobbygame->port);
-											sprintf(temp, "Map: %s", lobbygame->mapname);
-											strcpy(overlay->text, temp);
-											//strcpy(overlay->text, "Map: THET06e.SIL");
-										}
+								}
+							}
+							tobject = iface->GetObjectWithUid(world, 2);
+							if(tobject && tobject->type == ObjectTypes::OVERLAY){
+								Overlay * overlay = static_cast<Overlay *>(tobject);
+								if(overlay){
+									if(lobbygame){
+										char temp[256];
+										//sprintf(temp, "Host: %s:%d", lobbygame->hostname, lobbygame->port);
+										sprintf(temp, "Map: %s", lobbygame->mapname);
+										strcpy(overlay->text, temp);
+										//strcpy(overlay->text, "Map: THET06e.SIL");
+									}else{
+										strcpy(overlay->text, "");
 									}
-									tobject = iface->GetObjectWithUid(world, 3);
-									if(tobject && tobject->type == ObjectTypes::OVERLAY){
-										Overlay * overlay = static_cast<Overlay *>(tobject);
-										if(overlay){
-											sprintf(overlay->text, "Players: %d", lobbygame->players);
+								}
+							}
+							tobject = iface->GetObjectWithUid(world, 3);
+							if(tobject && tobject->type == ObjectTypes::OVERLAY){
+								Overlay * overlay = static_cast<Overlay *>(tobject);
+								if(overlay){
+									if(lobbygame){
+										const char * passwordlock = "";
+										if(strlen(lobbygame->password) > 0){
+											passwordlock = "*PASSWORD LOCK*";
 										}
+										const char * security = "No";
+										switch(lobbygame->securitylevel){
+											case LobbyGame::SECLOW:
+												security = "Low";
+												break;
+											case LobbyGame::SECMEDIUM:
+												security = "Medium";
+												break;
+											case LobbyGame::SECHIGH:
+												security = "High";
+												break;
+										}
+										sprintf(overlay->text, "%s Security", security);
+										while(strlen(overlay->text) < 21){
+											strcat(overlay->text, " ");
+										}
+										strcat(overlay->text, passwordlock);
+									}else{
+										strcpy(overlay->text, "");
 									}
-									tobject = iface->GetObjectWithUid(world, 4);
-									if(tobject && tobject->type == ObjectTypes::OVERLAY){
-										Overlay * overlay = static_cast<Overlay *>(tobject);
-										if(overlay){
-											if(strlen(lobbygame->password) > 0){
-												strcpy(overlay->text, "PASSWORD SET");
-											}
-										}
+								}
+							}
+							tobject = iface->GetObjectWithUid(world, 4);
+							if(tobject && tobject->type == ObjectTypes::OVERLAY){
+								Overlay * overlay = static_cast<Overlay *>(tobject);
+								if(overlay){
+									if(lobbygame){
+										sprintf(overlay->text, "Creator: %s", world.lobby.GetUserInfo(lobbygame->accountid)->name);
+									}else{
+										strcpy(overlay->text, "");
+									}
+								}
+							}
+							tobject = iface->GetObjectWithUid(world, 5);
+							if(tobject && tobject->type == ObjectTypes::OVERLAY){
+								Overlay * overlay = static_cast<Overlay *>(tobject);
+								if(overlay){
+									if(lobbygame){
+										sprintf(overlay->text, "MinLv:%d MaxLv:%d MaxPl:%d MaxTm:%d", lobbygame->minlevel, lobbygame->maxlevel, lobbygame->maxplayers, lobbygame->maxteams);
+									}else{
+										strcpy(overlay->text, "");
 									}
 								}
 							}
@@ -3044,7 +3379,7 @@ bool Game::ProcessLobbyInterface(Interface * iface){
 					}
 				}break;
 				case ObjectTypes::TOGGLE:{
-					if(iface == characterinterface){
+					if(iface->id == characterinterface){
 						Uint8 selectedagency = GetSelectedAgency();
 						if(selectedagency != oldselectedagency){
 							Config::GetInstance().defaultagency = selectedagency;
@@ -3124,7 +3459,7 @@ bool Game::ProcessLobbyInterface(Interface * iface){
 								}
 							}break;
 						}
-						if(agencychanged && iface == characterinterface){
+						if(agencychanged && iface->id == characterinterface){
 							//printf("agency changed\n");
 							User * user = world.lobby.GetUserInfo(world.lobby.accountid);
 							if(user && !user->retrieving){
@@ -3154,89 +3489,50 @@ bool Game::ProcessLobbyInterface(Interface * iface){
 						button->clicked = false;
 						switch(button->uid){
 							case 10:{ // go back
-								if(gamejoininterface || gametechinterface){
-									world.Disconnect();
-									world.lobby.gamesprocessed = false;
-									world.lobby.channelchanged = true;
-									world.SwitchToLocalAuthorityMode();
-									sharedstate = 0;
-									Object * object = world.GetObjectFromId(currentinterface);
-									Interface * iface = static_cast<Interface *>(object);
-									if(gamejoininterface){
-										gamejoininterface->DestroyInterface(world, iface);
-										gamejoininterface = 0;
-										for(std::list<Object *>::iterator it = world.objectlist.begin(); it != world.objectlist.end(); it++){
-											Object * object = *it;
-											switch(object->type){
-												case ObjectTypes::TEAM:{
-													Team * team = static_cast<Team *>(object);
-													team->DestroyOverlays(world);
-													world.MarkDestroyObject(object->id);
-												}break;
-											}
-										}
-									}else
-									if(gametechinterface){
-										gametechinterface->DestroyInterface(world, iface);
-										gametechinterface = 0;
-										world.choosingtech = false;
-										for(std::list<Object *>::iterator it = world.objectlist.begin(); it != world.objectlist.end(); it++){
-											Object * object = *it;
-											switch(object->type){
-												case ObjectTypes::TEAM:{
-													Team * team = static_cast<Team *>(object);
-													team->DestroyOverlays(world);
-													world.MarkDestroyObject(object->id);
-												}break;
-											}
-										}
-									}
-									gameselectinterface = CreateGameSelectInterface();
-									world.lobby.JoinChannel(lastchannel);
-									iface->AddObject(gameselectinterface->id);
-									currentinterface = iface->id;
+								if(GoBack()){
 									return false;
-								}else
-								if(gamecreateinterface){
-									Object * object = world.GetObjectFromId(currentinterface);
-									Interface * iface = static_cast<Interface *>(object);
-									gamecreateinterface->DestroyInterface(world, iface);
-									gamecreateinterface = 0;
-									gameselectinterface = CreateGameSelectInterface();
-									world.lobby.gamesprocessed = false;
-									iface->AddObject(gameselectinterface->id);
-									currentinterface = iface->id;
-									return false;
-								}else{
-									nextstate = MAINMENU;
-									state = FADEOUT;
-									fade_i = 0;
-									stateisnew = true;
 								}
 							}break;
 							case 20:{ // join game
 								if(gameselectinterface){
-									for(std::vector<Uint16>::iterator it = gameselectinterface->objects.begin(); it != gameselectinterface->objects.end(); it++){
-										Object * object = world.GetObjectFromId(*it);
-										if(object && object->type == ObjectTypes::SELECTBOX){
-											SelectBox * selectbox = static_cast<SelectBox *>(object);
-											if(selectbox->selecteditem != -1){
-												Uint32 accountid = selectbox->IndexToId(selectbox->selecteditem);
-												if(accountid){
-													LobbyGame * lobbygame = world.lobby.GetGameByAccountId(accountid);
-													if(lobbygame){
-														if(world.state == World::IDLE){
-															currentlobbygameid = lobbygame->accountid;
-															if(strlen(lobbygame->password) > 0){
-																currentinterface = CreatePasswordDialog()->id;
-															}else{
-																JoinGame(*lobbygame);
+									Interface * gameselectiface = static_cast<Interface *>(world.GetObjectFromId(gameselectinterface));
+									if(gameselectiface){
+										for(std::vector<Uint16>::iterator it = gameselectiface->objects.begin(); it != gameselectiface->objects.end(); it++){
+											Object * object = world.GetObjectFromId(*it);
+											if(object && object->type == ObjectTypes::SELECTBOX){
+												SelectBox * selectbox = static_cast<SelectBox *>(object);
+												if(selectbox->selecteditem != -1){
+													Uint32 gameid = selectbox->IndexToId(selectbox->selecteditem);
+													if(gameid){
+														LobbyGame * lobbygame = world.lobby.GetGameById(gameid);
+														if(lobbygame){
+															if(world.state == World::IDLE){
+																User * user = world.lobby.GetUserInfo(world.lobby.accountid);
+																bool canjoin = true;
+																if(user){
+																	if(lobbygame->minlevel > user->agency[GetSelectedAgency()].level){
+																		canjoin = false;
+																		CreateModalDialog("Your player level is too low");
+																	}else
+																	if(lobbygame->maxlevel < user->agency[GetSelectedAgency()].level){
+																		canjoin = false;
+																		CreateModalDialog("Your player level is too high");
+																	}
+																}
+																if(canjoin){
+																	currentlobbygameid = lobbygame->id;
+																	if(strlen(lobbygame->password) > 0 && lobbygame->accountid != world.lobby.accountid){
+																		currentinterface = CreatePasswordDialog()->id;
+																	}else{
+																		JoinGame(*lobbygame);
+																	}
+																}
 															}
 														}
 													}
+												}else{
+													CreateModalDialog("No game selected");
 												}
-											}else{
-												CreateModalDialog("No game selected");
 											}
 										}
 									}
@@ -3256,14 +3552,20 @@ bool Game::ProcessLobbyInterface(Interface * iface){
 								if(gamejoininterface){
 									Object * object = world.GetObjectFromId(currentinterface);
 									Interface * iface = static_cast<Interface *>(object);
-									gamejoininterface->DestroyInterface(world, gamejoininterface);
+									Interface * gamejoiniface = static_cast<Interface *>(world.GetObjectFromId(gamejoininterface));
+									if(gamejoiniface){
+										gamejoiniface->DestroyInterface(world, iface);
+									}
 									world.choosingtech = true;
 									ShowTeamOverlays(false);
 									gamejoininterface = 0;
-									gametechinterface = CreateGameTechInterface();
-									iface->AddObject(gametechinterface->id);
-									iface->activeobject = gametechinterface->id;
-									chatinterface->activeobject = 0;
+									gametechinterface = CreateGameTechInterface()->id;
+									iface->AddObject(gametechinterface);
+									iface->activeobject = gametechinterface;
+									Interface * chatiface = static_cast<Interface *>(world.GetObjectFromId(chatinterface));
+									if(chatiface){
+										chatiface->activeobject = 0;
+									}
 									currentinterface = iface->id;
 									iface->ActiveChanged(world, iface, false);
 									UpdateTechInterface();
@@ -3274,14 +3576,20 @@ bool Game::ProcessLobbyInterface(Interface * iface){
 								if(!gamejoininterface){
 									Object * object = world.GetObjectFromId(currentinterface);
 									Interface * iface = static_cast<Interface *>(object);
-									gametechinterface->DestroyInterface(world, gametechinterface);
+									Interface * gametechiface = static_cast<Interface *>(world.GetObjectFromId(gametechinterface));
+									if(gametechiface){
+										gametechiface->DestroyInterface(world, iface);
+									}
 									gametechinterface = 0;
-									gamejoininterface = CreateGameJoinInterface();
-									iface->AddObject(gamejoininterface->id);
+									gamejoininterface = CreateGameJoinInterface()->id;
+									iface->AddObject(gamejoininterface);
 									world.choosingtech = false;
 									ShowTeamOverlays(true);
-									iface->activeobject = gamejoininterface->id;
-									chatinterface->activeobject = 0;
+									iface->activeobject = gamejoininterface;
+									Interface * chatiface = static_cast<Interface *>(world.GetObjectFromId(chatinterface));
+									if(chatiface){
+										chatiface->activeobject = 0;
+									}
 									iface->ActiveChanged(world, iface, false);
 									return false;
 								}
@@ -3306,14 +3614,20 @@ bool Game::ProcessLobbyInterface(Interface * iface){
 									}
 									*/
 									if(gameselectinterface){
-										gameselectinterface->DestroyInterface(world, iface);
+										Interface * gameselectiface = static_cast<Interface *>(world.GetObjectFromId(gameselectinterface));
+										if(gameselectiface){
+											gameselectiface->DestroyInterface(world, iface);
+										}
 										//world.MarkDestroyObject(gameselectinterface->id);
 										gameselectinterface = 0;
 									}
-									gamecreateinterface = CreateGameCreateInterface();
-									iface->AddObject(gamecreateinterface->id);
-									iface->activeobject = gamecreateinterface->id;
-									chatinterface->activeobject = 0;
+									gamecreateinterface = CreateGameCreateInterface()->id;
+									iface->AddObject(gamecreateinterface);
+									iface->activeobject = gamecreateinterface;
+									Interface * chatiface = static_cast<Interface *>(world.GetObjectFromId(chatinterface));
+									if(chatiface){
+										chatiface->activeobject = 0;
+									}
 									iface->ActiveChanged(world, iface, false);
 									return false;
 								}
@@ -3330,50 +3644,115 @@ bool Game::ProcessLobbyInterface(Interface * iface){
 									const char * gamename = "";
 									const char * mapname = "";
 									const char * password = 0;
-									Object * tobject = gamecreateinterface->GetObjectWithUid(world, 5);
-									if(tobject){
-										TextInput * textinput = static_cast<TextInput *>(tobject);
-										gamename = textinput->text;
-									}
-									tobject = gamecreateinterface->GetObjectWithUid(world, 6);
-									if(tobject){
-										TextInput * textinput = static_cast<TextInput *>(tobject);
-										if(strlen(textinput->text) > 0){
-											password = textinput->text;
-										}
-									}
-									if(strlen(gamename) == 0){
-										CreateModalDialog("No game name");
-									}else{
-										tobject = gamecreateinterface->GetObjectWithUid(world, 4);
+									Interface * gamecreateiface = static_cast<Interface *>(world.GetObjectFromId(gamecreateinterface));
+									if(gamecreateiface){
+										Object * tobject = gamecreateiface->GetObjectWithUid(world, 5);
 										if(tobject){
-											SelectBox * selectbox = static_cast<SelectBox *>(tobject);
-											if(selectbox->selecteditem >= 0){
-												mapname = selectbox->GetItemName(selectbox->selecteditem);
-												world.lobby.CreateGame(gamename, mapname, password);
-												creategameclicked = true;
-												strcpy(Config::GetInstance().defaultgamename, gamename);
-												Config::GetInstance().Save();
-												CreateModalDialog("Creating game...", false);
-											}else{
-												CreateModalDialog("No map selected");
+											TextInput * textinput = static_cast<TextInput *>(tobject);
+											gamename = textinput->text;
+										}
+										tobject = gamecreateiface->GetObjectWithUid(world, 6);
+										if(tobject){
+											TextInput * textinput = static_cast<TextInput *>(tobject);
+											if(strlen(textinput->text) > 0){
+												password = textinput->text;
+											}
+										}
+										Uint8 securitylevel = LobbyGame::SECNONE;
+										tobject = gamecreateiface->GetObjectWithUid(world, 40);
+										if(tobject){
+											Button * button = static_cast<Button *>(tobject);
+											if(strcmp(button->text, "Low") == 0){
+												securitylevel = LobbyGame::SECLOW;
+											}else
+											if(strcmp(button->text, "Medium") == 0){
+												securitylevel = LobbyGame::SECMEDIUM;
+											}else
+											if(strcmp(button->text, "High") == 0){
+												securitylevel = LobbyGame::SECHIGH;
+											}
+										}
+										Uint8 minlevel = 0;
+										tobject = gamecreateiface->GetObjectWithUid(world, 41);
+										if(tobject){
+											TextInput * textinput = static_cast<TextInput *>(tobject);
+											minlevel = atoi(textinput->text);
+										}
+										Uint8 maxlevel = 0;
+										tobject = gamecreateiface->GetObjectWithUid(world, 42);
+										if(tobject){
+											TextInput * textinput = static_cast<TextInput *>(tobject);
+											maxlevel = atoi(textinput->text);
+										}
+										Uint8 maxplayers = 0;
+										tobject = gamecreateiface->GetObjectWithUid(world, 43);
+										if(tobject){
+											TextInput * textinput = static_cast<TextInput *>(tobject);
+											maxplayers = atoi(textinput->text);
+										}
+										Uint8 maxteams = 0;
+										tobject = gamecreateiface->GetObjectWithUid(world, 44);
+										if(tobject){
+											TextInput * textinput = static_cast<TextInput *>(tobject);
+											maxteams = atoi(textinput->text);
+										}
+										if(strlen(gamename) == 0){
+											CreateModalDialog("No game name");
+										}else{
+											tobject = gamecreateiface->GetObjectWithUid(world, 4);
+											if(tobject){
+												SelectBox * selectbox = static_cast<SelectBox *>(tobject);
+												if(selectbox->selecteditem >= 0){
+													mapname = selectbox->GetItemName(selectbox->selecteditem);
+													world.lobby.CreateGame(gamename, mapname, password, securitylevel, minlevel, maxlevel, maxplayers, maxteams);
+													creategameclicked = true;
+													strcpy(Config::GetInstance().defaultgamename, gamename);
+													Config::GetInstance().Save();
+													CreateModalDialog("Creating game...", false);
+												}else{
+													CreateModalDialog("No map selected");
+												}
 											}
 										}
 									}
 								}
 							}break;
-							case 50:
+							case 40:{ // security level
+								if(gamecreateinterface){
+									Interface * gamecreateiface = static_cast<Interface *>(world.GetObjectFromId(gamecreateinterface));
+									if(gamecreateiface){
+										if(strcmp(button->text, "Off") == 0){
+											strcpy(button->text, "Low");
+										}else
+										if(strcmp(button->text, "Low") == 0){
+											strcpy(button->text, "Medium");
+										}else
+										if(strcmp(button->text, "Medium") == 0){
+											strcpy(button->text, "High");
+										}else
+										if(strcmp(button->text, "High") == 0){
+											strcpy(button->text, "Off");
+										}
+									}
+								}
+							}break;
+							case 50: // modal ok button pressed
 								if(modalinterface){
-									if(iface == passwordinterface){
-										TextInput * passwordinput = static_cast<TextInput *>(modalinterface->GetObjectWithUid(world, 2));
-										LobbyGame * lobbygame = world.lobby.GetGameByAccountId(currentlobbygameid);
+									Interface * modaliface = static_cast<Interface *>(world.GetObjectFromId(modalinterface));
+									if(iface->id == passwordinterface && modaliface){
+										TextInput * passwordinput = static_cast<TextInput *>(modaliface->GetObjectWithUid(world, 1));
+										LobbyGame * lobbygame = world.lobby.GetGameById(currentlobbygameid);
 										if(lobbygame && passwordinput){
-											memcpy(lobbygame->password, passwordinput->text, sizeof(lobbygame->password));
-											JoinGame(*lobbygame);
+											JoinGame(*lobbygame, passwordinput->text);
 										}
 									}
 									DestroyModalDialog();
 									creategameclicked = false;
+									if(gamejoininterface || gametechinterface){
+										if(GoBack()){
+											return false;
+										}
+									}
 									return false;
 								}
 							break;
@@ -3454,15 +3833,18 @@ void Game::ProcessGameSummaryInterface(Interface * iface){
 void Game::UpdateTechInterface(void){
 	if(gametechinterface){
 		int techslotsleft = 0;
-		Overlay * overlay = static_cast<Overlay *>(gametechinterface->GetObjectWithUid(world, 70));
-		if(overlay){
-			Peer * peer = world.peerlist[world.localpeerid];
-			if(peer){
-				Team * team = world.GetPeerTeam(world.localpeerid);
-				User * user = world.lobby.GetUserInfo(peer->accountid);
-				if(user && team){
-					techslotsleft = user->agency[team->agency].techslots - world.TechSlotsUsed(*peer);
-					sprintf(overlay->text, "Tech slots left: %d", techslotsleft);
+		Interface * gametechiface = static_cast<Interface *>(world.GetObjectFromId(gametechinterface));
+		if(gametechiface){
+			Overlay * overlay = static_cast<Overlay *>(gametechiface->GetObjectWithUid(world, 70));
+			if(overlay){
+				Peer * peer = world.peerlist[world.localpeerid];
+				if(peer){
+					Team * team = world.GetPeerTeam(world.localpeerid);
+					User * user = world.lobby.GetUserInfo(peer->accountid);
+					if(user && team){
+						techslotsleft = user->agency[team->agency].techslots - world.TechSlotsUsed(*peer);
+						sprintf(overlay->text, "Tech slots left: %d", techslotsleft);
+					}
 				}
 			}
 		}
@@ -3493,73 +3875,78 @@ void Game::UpdateTechInterface(void){
 									usable = false;
 								}
 							}
-							Button * button = static_cast<Button *>(gametechinterface->GetObjectWithUid(world, uid));
-							if(button){
-								if(peer && peer->techchoices & buyableitem->techchoice){
-									button->res_index = 18;
-								}else{
-									button->res_index = 19;
-								}
-								if(team->peers[i] == world.localpeerid){
-									if(!usable){
-										button->effectbrightness = 128;
+							Interface * gametechiface = static_cast<Interface *>(world.GetObjectFromId(gametechinterface));
+							if(gametechiface){
+								Button * button = static_cast<Button *>(gametechiface->GetObjectWithUid(world, uid));
+								if(button){
+									if(peer && peer->techchoices & buyableitem->techchoice){
+										button->res_index = 18;
 									}else{
-										button->effectbrightness = 64;
+										button->res_index = 19;
 									}
-								}
-								if(button && button->type == Button::BCHECKBOX){
-									if(button->clicked){
-										if(button->uid >= 200 && button->effectbrightness == 128){
-											//Uint32 techchoice = 1 << (button->uid - 200);
-											Peer * peer = world.peerlist[world.localpeerid];
-											//printf("tech slots used: %d, %d\n", world.TechSlotsUsed(*peer), peer->techchoices);
-											if(peer){
-												world.SetTech(peer->techchoices ^ buyableitem->techchoice);
-												Team * team = world.GetPeerTeam(world.localpeerid);
-												if(team){
-													Config::GetInstance().defaulttechchoices[team->agency] = peer->techchoices ^ buyableitem->techchoice;
-													Config::GetInstance().Save();
+									if(team->peers[i] == world.localpeerid){
+										if(!usable){
+											button->effectbrightness = 128;
+										}else{
+											button->effectbrightness = 64;
+										}
+									}
+									if(button && button->type == Button::BCHECKBOX){
+										if(button->clicked){
+											if(button->uid >= 200 && button->effectbrightness == 128){
+												//Uint32 techchoice = 1 << (button->uid - 200);
+												Peer * peer = world.peerlist[world.localpeerid];
+												//printf("tech slots used: %d, %d\n", world.TechSlotsUsed(*peer), peer->techchoices);
+												if(peer){
+													world.SetTech(peer->techchoices ^ buyableitem->techchoice);
+													Team * team = world.GetPeerTeam(world.localpeerid);
+													if(team){
+														Config::GetInstance().defaulttechchoices[team->agency] = peer->techchoices ^ buyableitem->techchoice;
+														Config::GetInstance().Save();
+													}
 												}
 											}
+											button->clicked = false;
 										}
-										button->clicked = false;
 									}
+									button->draw = draw;
 								}
-								button->draw = draw;
 							}
-							Overlay * overlay = static_cast<Overlay *>(gametechinterface->GetObjectWithUid(world, 230 + b));
-							if(overlay){
-								if(overlay->clicked){
-									overlay->clicked = false;
-									Overlay * nameoverlay = static_cast<Overlay *>(gametechinterface->GetObjectWithUid(world, 60));
-									if(nameoverlay){
-										sprintf(nameoverlay->text, "-%s-", buyableitem->name);
-										nameoverlay->x = 401 + (116 - ((strlen(nameoverlay->text) * nameoverlay->textwidth) / 2));
-									}
-									char desc[1024];
-									strcpy(desc, buyableitem->description);
-									int linenum = 0;
-									char * descline = strtok(desc, "\n");
-									while(descline){
-										Overlay * descoverlay = static_cast<Overlay *>(gametechinterface->GetObjectWithUid(world, 61 + linenum));
-										if(descoverlay){
-											strcpy(descoverlay->text, descline);
+							if(gametechiface){
+								Overlay * overlay = static_cast<Overlay *>(gametechiface->GetObjectWithUid(world, 230 + b));
+								if(overlay){
+									if(overlay->clicked){
+										overlay->clicked = false;
+										Overlay * nameoverlay = static_cast<Overlay *>(gametechiface->GetObjectWithUid(world, 60));
+										if(nameoverlay){
+											sprintf(nameoverlay->text, "-%s-", buyableitem->name);
+											nameoverlay->x = 401 + (116 - ((strlen(nameoverlay->text) * nameoverlay->textwidth) / 2));
 										}
-										linenum++;
-										descline = strtok(NULL, "\n");
-									}
-									for(int i = linenum; i < 9; i++){
-										Overlay * descoverlay = static_cast<Overlay *>(gametechinterface->GetObjectWithUid(world, 61 + i));
-										if(descoverlay){
-											strcpy(descoverlay->text, "");
+										char desc[1024];
+										strcpy(desc, buyableitem->description);
+										int linenum = 0;
+										char * descline = strtok(desc, "\n");
+										while(descline){
+											Overlay * descoverlay = static_cast<Overlay *>(gametechiface->GetObjectWithUid(world, 61 + linenum));
+											if(descoverlay){
+												strcpy(descoverlay->text, descline);
+											}
+											linenum++;
+											descline = strtok(NULL, "\n");
+										}
+										for(int i = linenum; i < 9; i++){
+											Overlay * descoverlay = static_cast<Overlay *>(gametechiface->GetObjectWithUid(world, 61 + i));
+											if(descoverlay){
+												strcpy(descoverlay->text, "");
+											}
 										}
 									}
-								}
-								if(team->peers[i] == world.localpeerid){
-									if(!usable){
-										overlay->effectbrightness = 128;
-									}else{
-										overlay->effectbrightness = 64;
+									if(team->peers[i] == world.localpeerid){
+										if(!usable){
+											overlay->effectbrightness = 128;
+										}else{
+											overlay->effectbrightness = 64;
+										}
 									}
 								}
 							}
@@ -3569,15 +3956,18 @@ void Game::UpdateTechInterface(void){
 					}
 				}
 				if(team->peers[i] != world.localpeerid){
-					Overlay * overlay = static_cast<Overlay *>(gametechinterface->GetObjectWithUid(world, 80 + peerindex));
-					Overlay * overlayline = static_cast<Overlay *>(gametechinterface->GetObjectWithUid(world, 90 + peerindex));
-					if(overlay && overlayline){
-						overlay->draw = draw;
-						if(user){
-							strcpy(overlay->text, user->name);
-							overlay->x = 375 - (strlen(overlay->text) * 6);
+					Interface * gametechiface = static_cast<Interface *>(world.GetObjectFromId(gametechinterface));
+					if(gametechiface){
+						Overlay * overlay = static_cast<Overlay *>(gametechiface->GetObjectWithUid(world, 80 + peerindex));
+						Overlay * overlayline = static_cast<Overlay *>(gametechiface->GetObjectWithUid(world, 90 + peerindex));
+						if(overlay && overlayline){
+							overlay->draw = draw;
+							if(user){
+								strcpy(overlay->text, user->name);
+								overlay->x = 375 - (strlen(overlay->text) * 6);
+							}
+							overlayline->draw = draw;
 						}
-						overlayline->draw = draw;
 					}
 					peerindex++;
 				}
@@ -3587,7 +3977,11 @@ void Game::UpdateTechInterface(void){
 }
 
 void Game::UpdateGameSummaryInterface(void){
-	if(gamesummaryinterface){
+	if(!gamesummaryinterface){
+		return;
+	}
+	Interface * gamesummaryiface = static_cast<Interface *>(world.GetObjectFromId(gamesummaryinterface));
+	if(gamesummaryiface){
 		printf("Updated game summary\n");
 		bool upgradeavailable = false;
 		bool upgradesavailable[6];
@@ -3629,7 +4023,7 @@ void Game::UpdateGameSummaryInterface(void){
 		}
 		for(int i = 0; i < 6; i++){
 			if(upgradesavailable[i] && upgradeavailable){
-				if(!gamesummaryinterface->GetObjectWithUid(world, 10 + i)){
+				if(!gamesummaryiface->GetObjectWithUid(world, 10 + i)){
 					Button * button = (Button *)world.CreateObject(ObjectTypes::BUTTON);
 					button->y = -180 + (i * 46);
 					button->x = 62;
@@ -3642,16 +4036,16 @@ void Game::UpdateGameSummaryInterface(void){
 						case 4: sprintf(button->text, "+1 Hacking  "); break;
 						case 5: sprintf(button->text, "+1 Contacts "); break;
 					}
-					gamesummaryinterface->AddObject(button->id);
+					gamesummaryiface->AddObject(button->id);
 				}
 			}else{
-				Button * button = static_cast<Button *>(gamesummaryinterface->GetObjectWithUid(world, 10 + i));
+				Button * button = static_cast<Button *>(gamesummaryiface->GetObjectWithUid(world, 10 + i));
 				if(button){
-					gamesummaryinterface->RemoveObject(button->id);
+					gamesummaryiface->RemoveObject(button->id);
 					world.MarkDestroyObject(button->id);
 				}
 			}
-			Overlay * overlay = static_cast<Overlay *>(gamesummaryinterface->GetObjectWithUid(world, 20 + i));
+			Overlay * overlay = static_cast<Overlay *>(gamesummaryiface->GetObjectWithUid(world, 20 + i));
 			if(overlay){
 				switch(i){
 					case 0: sprintf(overlay->text, "%d", user->agency[user->statsagency].endurance); break;
@@ -3664,7 +4058,7 @@ void Game::UpdateGameSummaryInterface(void){
 				overlay->x = 556 - (strlen(overlay->text) * overlay->textwidth);
 			}
 		}
-		Overlay * overlay = static_cast<Overlay *>(gamesummaryinterface->GetObjectWithUid(world, 1));
+		Overlay * overlay = static_cast<Overlay *>(gamesummaryiface->GetObjectWithUid(world, 1));
 		if(overlay){
 			if(upgradeavailable){
 				overlay->draw = true;
@@ -3700,7 +4094,8 @@ void Game::ShowTeamOverlays(bool show){
 }
 
 Uint8 Game::GetSelectedAgency(void){
-	for(std::vector<Uint16>::iterator it = characterinterface->objects.begin(); it != characterinterface->objects.end(); it++){
+	Interface * characteriface = static_cast<Interface *>(world.GetObjectFromId(characterinterface));
+	for(std::vector<Uint16>::iterator it = characteriface->objects.begin(); it != characteriface->objects.end(); it++){
 		Object * object = world.GetObjectFromId(*it);
 		if(object && object->type == ObjectTypes::TOGGLE){
 			Toggle * toggle = static_cast<Toggle *>(object);

@@ -37,6 +37,7 @@ public:
 	void KillByGovt(World & world);
 	void AddCredits(int amount);
 	void UnDeploy(void);
+	bool CanExhaustInputQueue(World & world);
 	Peer * GetPeer(World & world);
 	enum {INV_NONE, INV_HEALTHPACK, INV_LAZARUSTRACT, INV_SECURITYPASS, INV_VIRUS,
 		INV_POISON, INV_NEUTRONBOMB, INV_EMPBOMB, INV_SHAPEDBOMB, INV_PLASMABOMB, INV_PLASMADET,

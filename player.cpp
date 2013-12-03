@@ -170,9 +170,6 @@ void Player::Tick(World & world){
 	if(ai){
 		ai->Tick(world);
 	}
-	if(state_hit / 32 == 1){
-		effectshieldcontinue = 48;
-	}
 	if(input.keychat && !chatinterfaceid && !buyinterfaceid && !techinterfaceid && this == world.GetPeerPlayer(world.localpeerid)){
 		Interface * iface = (Interface *)world.CreateObject(ObjectTypes::INTERFACE);
 		if(iface){
@@ -385,13 +382,13 @@ void Player::Tick(World & world){
 	if(state != HACKING){
 		effecthacking = false;
 	}
-	if(effecthackingcontinue > 0){
+	if(effecthackingcontinue > 0 && !world.replaying){
 		effecthackingcontinue--;
 		effecthacking = true;
 	}else{
 		effecthacking = false;
 	}
-	if(effectshieldcontinue > 0){
+	if(effectshieldcontinue > 0 && !world.replaying){
 		effectshieldcontinue--;
 	}
 	if(input.keymoveleft || input.keymoveright){
@@ -504,10 +501,15 @@ void Player::Tick(World & world){
 	if(oldhassecret != hassecret && !world.replaying){
 		Peer * peer = GetPeer(world);
 		if(hassecret){
-			world.SendSound("alinvest.wav");
+			Team * team = GetTeam(world);
+			if(team && team->secrets == 2){
+				world.SendSound("alwarn.wav");
+			}else{
+				world.SendSound("alinvest.wav");
+			}
 			if(peer && !world.intutorialmode){
 				User * user = world.lobby.GetUserInfo(peer->accountid);
-				char text[64];
+				char text[128];
 				sprintf(text, "Secret picked up by\n%s", user->name);
 				world.ShowMessage(text, 128, 0, true);
 				peer->stats.secretspickedup++;
@@ -515,7 +517,6 @@ void Player::Tick(World & world){
 		}else{
 			if(peer){
 				User * user = world.lobby.GetUserInfo(peer->accountid);
-				char text[64];
 				if(state != DEAD && state != DYING){
 					peer->stats.secretsreturned++;
 					Team * team = GetTeam(world);
@@ -524,16 +525,15 @@ void Player::Tick(World & world){
 						peer->stats.secretsstolen++;
 						stolen = true;
 					}
-					int remaining = 3 - team->secrets;
-					sprintf(text, "%s returned a %s\n(%d remaining)\n\nTeam awarded 1000 credits", user->name, stolen ? "stolen secret" : "secret", remaining);
 				}else{
+					char text[128];
 					sprintf(text, "%s dropped a secret", user->name);
+					if(!world.intutorialmode){
+						world.ShowMessage(text, 128, 0, true);
+					}
 					peer->stats.secretsdropped++;
 				}
 				tracetime = 0;
-				if(!world.intutorialmode){
-					world.ShowMessage(text, 128, 0, true);
-				}
 			}
 		}
 		oldhassecret = hassecret;
@@ -2292,7 +2292,7 @@ void Player::Tick(World & world){
 							if(team){
 								if(team->id == secretreturn->teamid){
 									if(world.IsAuthority()){
-										team->secretdelivered = true;
+										team->secretdelivered = id;
 										hassecret = false;
 										team->playerwithsecret = 0;
 									}
@@ -2365,6 +2365,9 @@ void Player::HandleHit(World & world, Uint8 x, Uint8 y, Object & projectile){
 			EmitSound(world, world.resources.soundbank["s_hitb01.wav"]);
 		}
 		hitsoundplaytick = world.tickcount;
+	}
+	if(state_hit / 32 == 1){
+		effectshieldcontinue = 48;
 	}
 	float xpcnt = -((x - 50) / 50.0) * (mirrored ? -1 : 1);
 	float ypcnt = -((y - 50) / 50.0);
@@ -3117,6 +3120,26 @@ void Player::UnDeploy(void){
 	state = UNDEPLOYING;
 	state_i = 0;
 	collidable = false;
+}
+
+bool Player::CanExhaustInputQueue(World & world){
+	bool otherplayersinview = false;
+	for(std::vector<Uint16>::iterator it = world.objectsbytype[ObjectTypes::PLAYER].begin(); it != world.objectsbytype[ObjectTypes::PLAYER].end(); it++){
+		Player * player = static_cast<Player *>(world.GetObjectFromId(*it));
+		if(player->id != id){
+			if(abs(player->x - x) < 500 && abs(player->y - y) < 700){
+				otherplayersinview = true;
+				break;
+			}
+		}
+	}
+	if(!otherplayersinview){
+		return true;
+	}
+	if(state == DEAD && yv == 0){
+		return true;
+	}
+	return false;
 }
 
 Projectile * Player::Fire(World & world, Uint8 direction){
@@ -3931,7 +3954,7 @@ bool Player::PickUpItem(World & world, PickUp & pickup){
 				char temp[256];
 				sprintf(temp, "%s", powerupname);
 				world.ShowStatus(temp);
-				EmitSound(world, world.resources.soundbank["power11.wav"], 128);
+				EmitSound(world, world.resources.soundbank["power11.wav"], 96);
 			}
 		}
 		/*	pickup.draw = false;

@@ -26,7 +26,7 @@ User::User(){
 	agency[Team::STATIC].defaultbonuses += 3;
 	agency[Team::BLACKROSE].shield = 2;
 	agency[Team::BLACKROSE].defaultbonuses += 2;
-	strcpy(name, "Player");
+	strcpy(name, "");
 	statsagency = 0;
 }
 

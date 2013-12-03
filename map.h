@@ -14,9 +14,9 @@ class Map
 public:
 	Map();
 	~Map();
-	bool Load(const char * filename, class World & world, Uint8 securitylevel = 3);
+	bool Load(const char * filename, class World & world);
 	bool LoadBase(class Team & team, class World & world);
-	bool LoadFile(const char * filename, class World & world, Team * team = 0, Uint8 securitylevel = 3);
+	bool LoadFile(const char * filename, class World & world, Team * team = 0);
 	void Unload(void);
 	void MiniMapCoords(int * x, int * y);
 	void RandomPlayerStartLocation(Sint16 * x, Sint16 * y);

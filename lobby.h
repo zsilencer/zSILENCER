@@ -24,10 +24,10 @@ public:
 	void SendCredentials(const char * username, const char * password);
 	void SendChat(const char * channel, const char * message);
 	void JoinChannel(const char * channel);
-	void CreateGame(const char * name, const char * map, const char * password = 0);
+	void CreateGame(const char * name, const char * map, const char * password = 0, Uint8 securitylevel = LobbyGame::SECMEDIUM, Uint8 minlevel = 0, Uint8 maxlevel = 99, Uint8 maxplayers = 24, Uint8 maxteams = 6);
 	//void ConnectToGame(LobbyGame & lobbygame, Uint8 agency);
 	void ClearGames(void);
-	LobbyGame * GetGameByAccountId(Uint32 accountid);
+	LobbyGame * GetGameById(Uint32 id);
 	User * GetUserInfo(Uint32 accountid);
 	void ForgetUserInfo(Uint32 accountid);
 	void UpgradeStat(Uint8 agency, Uint8 stat);
@@ -37,6 +37,7 @@ public:
 	char motd[2048];
 	bool motdreceived;
 	Uint8 creategamestatus;
+	Uint32 createdgameid;
 	Uint8 connectgamestatus;
 	std::list<char *> chatmessages;
 	std::list<LobbyGame *> games;

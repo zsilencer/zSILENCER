@@ -94,8 +94,10 @@ void Renderer::Draw(Surface * surface, float frametime){
 		}
 		int px = localplayer->x + ((localplayer->oldx - localplayer->x) * frametime);
 		int py = localplayer->y + ((localplayer->oldy - localplayer->y) * frametime);
-		camera.Follow(world, px, py, 15, 100, 0, 30);
-		camera.Smooth(frametime);
+		if(px && py){
+			camera.Follow(world, px, py, 15, 100, 0, 30);
+			camera.Smooth(frametime);
+		}
 	}
 	if(world.map.loaded){
 		// Clear the minimap
@@ -1340,7 +1342,7 @@ void Renderer::DrawTextInput(Surface * surface, TextInput & textinput){
 		dstrect.x = textinput.x + (strlen(text) * textinput.fontwidth);
 		dstrect.y = textinput.y - 1;
 		dstrect.w = 1;
-		dstrect.h = 11;
+		dstrect.h = textinput.height * 0.8f;
 		DrawFilledRectangle(surface, dstrect.x, dstrect.y, dstrect.x + dstrect.w, dstrect.y + dstrect.h, textinput.caretcolor);
 		//SDL_FillRect(surface, &dstrect, textinput.caretcolor);
 	}

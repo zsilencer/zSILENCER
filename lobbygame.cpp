@@ -8,7 +8,14 @@ LobbyGame::LobbyGame(){
 	memset(password, 0, sizeof(password));
 	memset(hostname, 0, sizeof(hostname));
 	memset(maphash, 0, sizeof(maphash));
+	id = 0;
 	accountid = 0;
+	securitylevel = SECHIGH;
+	minlevel = 0;
+	maxlevel = 99;
+	maxplayers = 24;
+	maxteams = 6;
+	extra = 0;
 	port = 0;
 	players = 0;
 	state = 0;
@@ -17,6 +24,7 @@ LobbyGame::LobbyGame(){
 }
 
 void LobbyGame::Serialize(bool write, Serializer & data){
+	data.Serialize(write, id);
 	data.Serialize(write, accountid);
 	Uint8 namesize = strlen(name);
 	data.Serialize(write, namesize);
@@ -47,6 +55,12 @@ void LobbyGame::Serialize(bool write, Serializer & data){
 	}
 	data.Serialize(write, players);
 	data.Serialize(write, state);
+	data.Serialize(write, securitylevel);
+	data.Serialize(write, minlevel);
+	data.Serialize(write, maxlevel);
+	data.Serialize(write, maxplayers);
+	data.Serialize(write, maxteams);
+	data.Serialize(write, extra);
 	char * host = strtok(hostname, ",");
 	if(host){
 		char * portstr = strtok(NULL, ",");

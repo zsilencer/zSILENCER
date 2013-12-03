@@ -111,7 +111,7 @@ void WallDefense::HandleHit(World & world, Uint8 x, Uint8 y, Object & projectile
 	if(health == 0 && state != DEAD){
 		state = DEAD;
 		state_i = 0;
-		EmitSound(world, world.resources.soundbank["q_expl02.wav"], 128);
+		EmitSound(world, world.resources.soundbank["q_expl02.wav"], 96);
 		for(int i = 0; i < 6; i++){
 			Plume * plume = (Plume *)world.CreateObject(ObjectTypes::PLUME);
 			if(plume){
