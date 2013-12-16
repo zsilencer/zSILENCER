@@ -1861,7 +1861,11 @@ void Renderer::EffectHit(Surface * dst, Rect * dstrect, Uint8 hitx, Uint8 hity, 
 				Uint8 overlay = GetPixel(world.resources.spritebank[153][index], x, y);
 				Uint8 pixel = GetPixel(dst, x + xoffset, y + yoffset);
 				if(overlay && pixel){
-					Uint8 newcolor = palette.RampColorMin(pixel, color);
+					//Uint8 newcolor = palette.RampColorMin(pixel, color);
+					Uint8 newcolor = palette.RampColor(pixel, color) + 6;
+					if(newcolor > color + 15){
+						newcolor = color + 15;
+					}
 					SetPixel(dst, x + xoffset, y + yoffset, newcolor);
 				}
 			}
@@ -1879,7 +1883,7 @@ void Renderer::EffectShieldDamage(Surface * dst, Rect * dstrect, Uint8 color){
 			Uint8 overlay = GetPixel(world.resources.spritebank[177][state_i % 8], x, y);
 			Uint8 pixel = GetPixel(dst, x, y);
 			if(overlay && pixel){
-				SetPixel(dst, x, y, palette.RampColorMin(pixel, color, 10));//SetPixel(dst, x, y, color);//palette.Mix(205, pixel));
+				SetPixel(dst, x, y, palette.RampColorMin(pixel, color, 14));//SetPixel(dst, x, y, color);//palette.Mix(205, pixel));
 			}
 		}
 	}

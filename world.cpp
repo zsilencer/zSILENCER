@@ -48,6 +48,7 @@ World::World(bool mode) : lobby(this), lagsimulator(&sockethandle), audio(Audio:
 	highlightminimap = false;
 	intutorialmode = false;
 	choosingtech = false;
+	boundport = 0;
 	//lagsimulator.Activate(80, 120);
 }
 

@@ -379,17 +379,19 @@ void Player::Tick(World & world){
 			}
 		}
 	}
-	if(state != HACKING){
-		effecthacking = false;
-	}
-	if(effecthackingcontinue > 0 && !world.replaying){
-		effecthackingcontinue--;
-		effecthacking = true;
-	}else{
-		effecthacking = false;
-	}
-	if(effectshieldcontinue > 0 && !world.replaying){
-		effectshieldcontinue--;
+	if(!world.replaying){
+		if(state != HACKING){
+			effecthacking = false;
+		}
+		if(effecthackingcontinue > 0){
+			effecthackingcontinue--;
+			effecthacking = true;
+		}else{
+			effecthacking = false;
+		}
+		if(effectshieldcontinue > 0){
+			effectshieldcontinue--;
+		}
 	}
 	if(input.keymoveleft || input.keymoveright){
 		if(isbuying){
@@ -1918,7 +1920,6 @@ void Player::Tick(World & world){
 				if((input.keymoveleft && !oldinput.keymoveleft) || (input.keymoveright && !oldinput.keymoveright)){
 					state = RUNNING;
 					state_i = -1;
-					effecthacking = false;
 					if(terminal){
 						terminal->HackerGone();
 					}
@@ -1927,7 +1928,6 @@ void Player::Tick(World & world){
 				if(input.keyjump && !oldinput.keyjump){
 					state = JUMPING;
 					state_i = -1;
-					effecthacking = false;
 					if(terminal){
 						terminal->HackerGone();
 					}
@@ -1935,7 +1935,6 @@ void Player::Tick(World & world){
 				}
 				if(input.keyactivate && !oldinput.keyactivate){
 					state_i = 16;
-					effecthacking = false;
 					if(terminal){
 						terminal->HackerGone();
 					}
