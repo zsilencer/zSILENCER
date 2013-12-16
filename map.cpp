@@ -97,42 +97,46 @@ bool Map::LoadFile(const char * filename, World & world, Team * team){
 	Uint32 minimapcompressedsize = 0;
 	Uint8 minimapcompressed[172 * 62];
 	Uint32 levelsize = 0;
-	Uint8 * levelcompressed = new Uint8[20000];
+	Uint8 levelcompressed[20000];
 	const unsigned int maxlevelsize = 300000;
-	Uint8 * level = new Uint8[maxlevelsize];
+	Uint8 level[maxlevelsize];
 	Uint32 numactors = 0;
 	Uint32 numplatforms = 0;
 	Uint16 width;
 	Uint16 height;
 	Sint32 x1, y1, x2, y2, type1, type2 = 0;
 
-	SDL_RWread(file, &firstbyte, 1, 1);
-	SDL_RWread(file, &headerversion, 1, 1);
-	SDL_RWread(file, &maxplayers, 1, 1);
-	SDL_RWread(file, &maxteams, 1, 1);
-	SDL_RWread(file, &width, 2, 1);
-	SDL_RWread(file, &height, 2, 1);
+	if(!SDL_RWread(file, &firstbyte, 1, 1)){ return false; }
+	if(!SDL_RWread(file, &headerversion, 1, 1)){ return false; }
+	if(!SDL_RWread(file, &maxplayers, 1, 1)){ return false; }
+	if(!SDL_RWread(file, &maxteams, 1, 1)){ return false; }
+	if(!SDL_RWread(file, &width, 2, 1)){ return false; }
+	if(!SDL_RWread(file, &height, 2, 1)){ return false; }
 	width = SDL_SwapBE16(width);
 	height = SDL_SwapBE16(height);
-	SDL_RWread(file, &padding, 1, 1);
-	SDL_RWread(file, &parallax, 1, 1);
-	SDL_RWread(file, &ambience, 1, 1);
+	if(!SDL_RWread(file, &padding, 1, 1)){ return false; }
+	if(!SDL_RWread(file, &parallax, 1, 1)){ return false; }
+	if(!SDL_RWread(file, &ambience, 1, 1)){ return false; }
 	//ambience -= 128;
-	SDL_RWread(file, &padding, 1, 1);
-	SDL_RWread(file, &padding, 1, 1);
-	SDL_RWread(file, &flags, 4, 1);
+	if(!SDL_RWread(file, &padding, 1, 1)){ return false; }
+	if(!SDL_RWread(file, &padding, 1, 1)){ return false; }
+	if(!SDL_RWread(file, &flags, 4, 1)){ return false; }
 	flags = SDL_SwapBE32(flags);
-	SDL_RWread(file, description, 1, 0x80);
+	if(!SDL_RWread(file, description, 1, 0x80)){ return false; }
 	description[0x80 - 1] = 0;
-	SDL_RWread(file, &minimapcompressedsize, 4, 1);
+	if(!SDL_RWread(file, &minimapcompressedsize, 4, 1)){ return false; }
 	minimapcompressedsize = SDL_SwapLE32(minimapcompressedsize);
-	SDL_RWread(file, minimapcompressed, 1, minimapcompressedsize);
+	if(!SDL_RWread(file, minimapcompressed, 1, minimapcompressedsize)){ return false; }
 	unsigned long minimapsizeuncompressed = sizeof(minimap.pixels);
-	SDL_RWread(file, &levelsize, 4, 1);
+	if(!SDL_RWread(file, &levelsize, 4, 1)){ return false; }
 	levelsize = SDL_SwapLE32(levelsize);
 	unsigned long levelsizeuncompressed = maxlevelsize;
-	SDL_RWread(file, levelcompressed, 1, levelsize);
+	if(!SDL_RWread(file, levelcompressed, 1, levelsize)){ return false; }
 	SDL_RWclose(file);
+	
+	if(width > 256 || height > 256){
+		return false;
+	}
 	
 	Uint32 yoffset = 0;
 	
@@ -146,7 +150,9 @@ bool Map::LoadFile(const char * filename, World & world, Team * team){
 		}*/
 		Map::parallax = parallax;
 		Map::ambience = ambience;
-		uncompress(minimap.pixels, &minimapsizeuncompressed, minimapcompressed, minimapcompressedsize);
+		if(uncompress(minimap.pixels, &minimapsizeuncompressed, minimapcompressed, minimapcompressedsize) != Z_OK){
+			return false;
+		}
 		minimap.Recolor(16 * 4);
 		strcpy(Map::description, description);
 		for(unsigned int i = 0; i < 4; i++){
@@ -170,7 +176,9 @@ bool Map::LoadFile(const char * filename, World & world, Team * team){
 		yoffset = Map::height + 10 + (team->number * (26));
 	}
 	
-	uncompress(level, &levelsizeuncompressed, levelcompressed, levelsize);
+	if(uncompress(level, &levelsizeuncompressed, levelcompressed, levelsize) != Z_OK){
+		return false;
+	}
 	
 	unsigned int i = 0;
 	for(unsigned int y = yoffset; y < yoffset + height; y++){
@@ -724,8 +732,8 @@ bool Map::LoadFile(const char * filename, World & world, Team * team){
 	}
 	//fclose(fileo);
 	
-	delete[] levelcompressed;
-	delete[] level;
+	//delete[] levelcompressed;
+	//delete[] level;
 	
 	return true;
 }
@@ -772,17 +780,17 @@ void Map::Unload(void){
 	}
 	platformsets.clear();
 	if(nodetypes){
-		delete nodetypes;
+		delete[] nodetypes;
 		nodetypes = 0;
 	}
 }
 
-void Map::MiniMapCoords(int * x, int * y){
-	*x = (*x / float(width * 64)) * 172;
-	*y = (*y / float(height * 64)) * 62;
+void Map::MiniMapCoords(int & x, int & y){
+	x = (x / float(width * 64)) * 172;
+	y = (y / float(height * 64)) * 62;
 }
 
-void Map::RandomPlayerStartLocation(Sint16 * x, Sint16 * y){
+void Map::RandomPlayerStartLocation(Sint16 & x, Sint16 & y){
 	if(playerstartlocations.size() == 0){
 		return;
 	}
@@ -791,8 +799,8 @@ void Map::RandomPlayerStartLocation(Sint16 * x, Sint16 * y){
 	for(std::vector<XY>::iterator it = playerstartlocations.begin(); it != playerstartlocations.end(); it++){
 		if(i == index){
 			XY xy = (*it);
-			*x = xy.x;
-			*y = xy.y;
+			x = xy.x;
+			y = xy.y;
 			return;
 		}
 		i++;

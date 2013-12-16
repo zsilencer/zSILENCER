@@ -17,6 +17,7 @@ Overlay::Overlay() : Object(ObjectTypes::OVERLAY){
 Overlay::~Overlay(){
 	if(text){
 		delete[] text;
+		text = 0;
 	}
 }
 

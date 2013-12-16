@@ -106,6 +106,32 @@ void Config::LoadDefaults(void){
 	defaulttechchoices[2] = World::BUY_LASER | World::BUY_ROCKET;
 	defaulttechchoices[3] = World::BUY_LASER | World::BUY_ROCKET;
 	defaulttechchoices[4] = World::BUY_LASER | World::BUY_ROCKET;
+#ifdef OUYA
+	keymoveupbinding[0] = SDL_SCANCODE_UP; keymoveupbinding[1] = SDL_SCANCODE_UNKNOWN; keymoveupoperator = OR;
+	keymovedownbinding[0] = SDL_SCANCODE_DOWN; keymovedownbinding[1] = SDL_SCANCODE_UNKNOWN; keymovedownoperator = OR;
+	keymoveleftbinding[0] = SDL_SCANCODE_LEFT; keymoveleftbinding[1] = SDL_SCANCODE_UNKNOWN; keymoveleftoperator = OR;
+	keymoverightbinding[0] = SDL_SCANCODE_RIGHT; keymoverightbinding[1] = SDL_SCANCODE_UNKNOWN; keymoverightoperator = OR;
+	keyupbinding[0] = SDL_SCANCODE_UP; keyupbinding[1] = SDL_SCANCODE_UNKNOWN; keyupoperator = OR;
+	keydownbinding[0] = SDL_SCANCODE_DOWN; keydownbinding[1] = SDL_SCANCODE_UNKNOWN; keydownoperator = OR;
+	keyleftbinding[0] = SDL_SCANCODE_LEFT; keyleftbinding[1] = SDL_SCANCODE_UNKNOWN; keyleftoperator = OR;
+	keyrightbinding[0] = SDL_SCANCODE_RIGHT; keyrightbinding[1] = SDL_SCANCODE_UNKNOWN; keyrightoperator = OR;
+	keylookupleftbinding[0] = SDL_SCANCODE_UP; keylookupleftbinding[1] = SDL_SCANCODE_LEFT; keylookupleftoperator = AND;
+	keylookuprightbinding[0] = SDL_SCANCODE_UP; keylookuprightbinding[1] = SDL_SCANCODE_RIGHT; keylookuprightoperator = AND;
+	keylookdownleftbinding[0] = SDL_SCANCODE_DOWN; keylookdownleftbinding[1] = SDL_SCANCODE_LEFT; keylookdownleftoperator = AND;
+	keylookdownrightbinding[0] = SDL_SCANCODE_DOWN; keylookdownrightbinding[1] = SDL_SCANCODE_RIGHT; keylookdownrightoperator = AND;
+	keynextinvbinding[0] = SDL_SCANCODE_LALT; keynextinvbinding[1] = SDL_SCANCODE_UNKNOWN; keynextinvoperator = OR;
+	keynextcambinding[0] = SDL_SCANCODE_KP_6; keynextcambinding[1] = SDL_SCANCODE_KP_8; keynextcamoperator = OR;
+	keyprevcambinding[0] = SDL_SCANCODE_KP_4; keyprevcambinding[1] = SDL_SCANCODE_KP_2; keyprevcamoperator = OR;
+	keydetonatebinding[0] = SDL_SCANCODE_ESCAPE; keydetonatebinding[1] = (SDL_Scancode)107; keydetonateoperator = OR;
+	keyjumpbinding[0] = SDL_SCANCODE_RETURN; keyjumpbinding[1] = SDL_SCANCODE_UNKNOWN; keyjumpoperator = OR;
+	keyjetpackbinding[0] = (SDL_Scancode)99; keyjetpackbinding[1] = SDL_SCANCODE_UNKNOWN; keyjetpackoperator = OR;
+	keyactivatebinding[0] = (SDL_Scancode)100; keyactivatebinding[1] = SDL_SCANCODE_UNKNOWN; keyactivateoperator = OR;
+	keyusebinding[0] = SDL_SCANCODE_RALT; keyusebinding[1] = SDL_SCANCODE_UNKNOWN; keyuseoperator = OR;
+	keyfirebinding[0] = (SDL_Scancode)103; keyfirebinding[1] = SDL_SCANCODE_UNKNOWN; keyfireoperator = OR;
+	keychatbinding[0] = SDL_SCANCODE_UNKNOWN; keychatbinding[1] = SDL_SCANCODE_UNKNOWN; keychatoperator = OR;
+	keydisguisebinding[0] = (SDL_Scancode)106; keydisguisebinding[1] = SDL_SCANCODE_UNKNOWN; keydisguiseoperator = OR;
+	keynextweaponbinding[0] = (SDL_Scancode)102; keynextweaponbinding[1] = SDL_SCANCODE_UNKNOWN; keynextweaponoperator = OR;
+#else
 	keymoveupbinding[0] = SDL_SCANCODE_UP; keymoveupbinding[1] = SDL_SCANCODE_UNKNOWN; keymoveupoperator = OR;
 	keymovedownbinding[0] = SDL_SCANCODE_DOWN; keymovedownbinding[1] = SDL_SCANCODE_UNKNOWN; keymovedownoperator = OR;
 	keymoveleftbinding[0] = SDL_SCANCODE_LEFT; keymoveleftbinding[1] = SDL_SCANCODE_UNKNOWN; keymoveleftoperator = OR;
@@ -130,6 +156,7 @@ void Config::LoadDefaults(void){
 	keychatbinding[0] = SDL_SCANCODE_T; keychatbinding[1] = SDL_SCANCODE_UNKNOWN; keychatoperator = OR;
 	keydisguisebinding[0] = SDL_SCANCODE_C; keydisguisebinding[1] = SDL_SCANCODE_UNKNOWN; keydisguiseoperator = OR;
 	keynextweaponbinding[0] = SDL_SCANCODE_UNKNOWN; keynextweaponbinding[1] = SDL_SCANCODE_UNKNOWN; keynextweaponoperator = OR;
+#endif
 }
 
 bool Config::KeyIsPressed(const Uint8 * keyboardstate, SDL_Scancode keybindings[2], bool keyoperator){

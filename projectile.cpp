@@ -21,10 +21,7 @@ Projectile::Projectile(){
 }
 
 void Projectile::Serialize(bool write, Serializer & data, Serializer * old){
-	//Sprite::Serialize(write, data, old);
-	//Physical::Serialize(write, data, old);
 	data.Serialize(write, ownerid, old);
-	//data.Serialize(write, moving, old);
 }
 
 bool Projectile::TestCollision(Object & object, World & world, Platform ** collidedplatform, Object ** collidedobject){

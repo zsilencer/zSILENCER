@@ -17,6 +17,7 @@ Terminal::Terminal() : Object(ObjectTypes::TERMINAL){
 	beamingtime = 0;
 	requiresauthority = true;
 	//SetSize(0);
+	isbig = false;
 	sizeset = false;
 	snapshotinterval = 24;
 	tracetime = 0;
@@ -40,8 +41,15 @@ void Terminal::Tick(World & world){
 	if(!sizeset){
 		SetSize(isbig);
 	}
-	if(soundchannel == -1){
-		soundchannel = EmitSound(world, world.resources.soundbank["ambloop4.wav"], isbig ? 45 : 32, true);
+	if(state == READY){
+		if(soundchannel == -1){
+			soundchannel = EmitSound(world, world.resources.soundbank["ambloop4.wav"], isbig ? 45 : 32, true);
+		}
+	}else{
+		if(soundchannel != -1){
+			Audio::GetInstance().Stop(soundchannel, 1000);
+			soundchannel = -1;
+		}
 	}
 	if(hackerid){
 		Player * player = (Player *)world.GetObjectFromId(hackerid);

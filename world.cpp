@@ -59,8 +59,14 @@ World::~World(){
 		delete (*it);
 	}
 	buyableitems.clear();
+	DestroyAllObjects();
 	for(unsigned int i = 0; i < maxpeers; i++){
 		DeleteOldSnapshots(i);
+		if(peerlist[i]){
+			delete peerlist[i];
+			peerlist[i] = 0;
+			peercount--;
+		}
 	}
 }
 
@@ -766,6 +772,14 @@ void World::ProcessSnapshotQueue(void){
 									object->lasttick = tickcount;
 									audio.enabled = true;
 									replaying = false;
+									// update surveillance monitors that are following the clientside predicted player
+									for(std::vector<Uint16>::iterator it = objectsbytype[ObjectTypes::SURVEILLANCEMONITOR].begin(); it != objectsbytype[ObjectTypes::SURVEILLANCEMONITOR].end(); it++){
+										SurveillanceMonitor * surveillancemonitor = static_cast<SurveillanceMonitor *>(GetObjectFromId(*it));
+										if(surveillancemonitor->objectfollowing == object->id){
+											surveillancemonitor->Tick(*this);
+										}
+									}
+									//
 								}
 							}
 						}

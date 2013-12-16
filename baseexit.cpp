@@ -9,6 +9,6 @@ BaseExit::BaseExit() : Object(ObjectTypes::BASEEXIT){
 
 void BaseExit::Tick(World & world){
 	if(soundchannel == -1){
-		soundchannel = EmitSound(world, world.resources.soundbank["wndloopc.wav"], 32, true);
+		soundchannel = EmitSound(world, world.resources.soundbank["wndloopc.wav"], 16, true);
 	}
 }

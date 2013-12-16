@@ -2145,7 +2145,7 @@ void Player::Tick(World & world){
 						draw = true;
 						Sint16 x;
 						Sint16 y;
-						world.map.RandomPlayerStartLocation(&x, &y);
+						world.map.RandomPlayerStartLocation(x, y);
 						Warp(world, x, y);
 					}
 				}
@@ -2454,7 +2454,7 @@ void Player::HandleHit(World & world, Uint8 x, Uint8 y, Object & projectile){
 			}else{
 				sprintf(temp, "%s was killed by %s", world.lobby.GetUserInfo(peer->accountid)->name, killedby);
 			}
-			world.ShowStatus(temp, 153, true);
+			world.ShowStatus(temp, 160, true);
 		}
 		if(projectile.type == ObjectTypes::ROCKETPROJECTILE){
 			draw = false;
@@ -3127,17 +3127,16 @@ bool Player::CanExhaustInputQueue(World & world){
 	for(std::vector<Uint16>::iterator it = world.objectsbytype[ObjectTypes::PLAYER].begin(); it != world.objectsbytype[ObjectTypes::PLAYER].end(); it++){
 		Player * player = static_cast<Player *>(world.GetObjectFromId(*it));
 		if(player->id != id){
-			if(abs(player->x - x) < 500 && abs(player->y - y) < 700){
+			if(abs(player->x - x) < 400 && abs(player->y - y) < 400){
 				otherplayersinview = true;
 				break;
 			}
 		}
 	}
-	if(!otherplayersinview){
-		return true;
-	}
-	if(state == DEAD && yv == 0){
-		return true;
+	if(xv == 0 && yv == 0 && !otherplayersinview){
+		if(state == STANDING || state == DEAD || state == CROUCHED){
+			return true;
+		}
 	}
 	return false;
 }

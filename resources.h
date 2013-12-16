@@ -6,6 +6,7 @@
 #include "surface.h"
 #include <map>
 #include <string>
+#include <vector>
 
 class Resources
 {
@@ -17,13 +18,13 @@ public:
 	bool LoadTiles(class Game & game, bool dedicatedserver = false);
 	bool LoadSounds(class Game & game, bool dedicatedserver = false);
 	void UnloadSounds(void);
-	Surface *** spritebank;
-	Surface *** tilebank;
-	Surface *** tileflippedbank;
-	int ** spriteoffsetx;
-	int ** spriteoffsety;
-	unsigned int ** spritewidth;
-	unsigned int ** spriteheight;
+	std::vector<std::vector<Surface *> > spritebank;
+	std::vector<std::vector<Surface *> > tilebank;
+	std::vector<std::vector<Surface *> > tileflippedbank;
+	std::vector<std::vector<int> > spriteoffsetx;
+	std::vector<std::vector<int> > spriteoffsety;
+	std::vector<std::vector<unsigned int> > spritewidth;
+	std::vector<std::vector<unsigned int> > spriteheight;
 	std::map<std::string, Mix_Chunk *> soundbank;
 	Mix_Music * music;
 

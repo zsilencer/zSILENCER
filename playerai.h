@@ -12,7 +12,6 @@ class PlayerAI
 {
 public:
 	PlayerAI(Player & player);
-	~PlayerAI();
 	void Tick(World & world);
 	bool CreatePathToPlatformSet(World & world, std::deque<PlatformSet *> & path, PlatformSet & target);
 	bool FollowPath(World & world);

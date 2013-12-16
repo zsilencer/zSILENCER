@@ -109,14 +109,10 @@ void Renderer::Draw(Surface * surface, float frametime){
 		minimap.pixels = 0;
 		//
 	}
-	Sint8 ambience = world.map.ambience;
-	if(localplayer && localplayer->InBase(world)){
-		ambience = world.map.baseambience;
-	}
 	//if((world.gameplaystate == World::INGAME && world.map.loaded) || world.gameplaystate != World::INGAME){
-	ambiencelevel = 128 + (ambience * 4.7) + ambience_r;
-	memset(lightmap, ambiencelevel, surface->w * surface->h);
-	DrawWorld(surface, camera, lightmap, true, 3, frametime);
+	
+	//memset(lightmap, ambiencelevel, surface->w * surface->h);
+	DrawWorld(surface, camera, true, true, 3, frametime);
 	//}
 
 	if(world.map.loaded){
@@ -136,6 +132,28 @@ void Renderer::Draw(Surface * surface, float frametime){
 }
 
 void Renderer::Tick(void){
+	// Update ambience level
+	Sint8 ambience = world.map.ambience;
+	if(localplayer && localplayer->InBase(world)){
+		ambience = world.map.baseambience;
+	}
+	ambiencelevel = 128 + (ambience * 4.5) + ambience_r;
+	/*static Uint8 t;
+	if(localplayer){
+		if(localplayer->state == Player::RUNNING){
+			if(localplayer->mirrored){
+				t++;
+			}else{
+				t--;
+			}
+		}
+	}
+	if(t > 128){
+		t = 0;
+	}
+	ambiencelevel = t;*/
+	//
+	
 	// Animate raindrops
 	for(int i = 0; i < raindropscount; i++){
 		if(rand() % 1000 == 0){
@@ -177,7 +195,7 @@ void Renderer::Tick(void){
 	state_i++;
 }
 
-void Renderer::DrawWorld(Surface * surface, Camera & camera, Uint8 * lightmap, bool drawminimap, int recursion, float frametime){
+void Renderer::DrawWorld(Surface * surface, Camera & camera, bool drawminimap, bool drawluminance, int recursion, float frametime){
 	recursion--;
 	if(recursion < 0){
 		return;
@@ -188,10 +206,11 @@ void Renderer::DrawWorld(Surface * surface, Camera & camera, Uint8 * lightmap, b
 		if(cameray < world.map.height * 64){
 			DrawParallax(surface, camera);
 		}
-		DrawBackground(surface, camera, lightmap);
+		DrawBackground(surface, camera, drawluminance);
 		DrawRain(surface, camera, frametime);
 		DrawRainPuddles(surface, camera);
 	}
+	std::vector<Object *> objectlights;
 	for(unsigned int renderpass = 0; renderpass < 4; renderpass++){
 		for(std::list<Object *>::iterator i = world.objectlist.begin(); i != world.objectlist.end(); i++){
 			Object * object = *i;
@@ -227,17 +246,17 @@ void Renderer::DrawWorld(Surface * surface, Camera & camera, Uint8 * lightmap, b
 								Player * player = static_cast<Player *>(object);
 								effectsurface = CreateSurfaceCopy(src);
 								EffectTeamColor(effectsurface, 0, player->suitcolor);
-								if(player->effecthacking){
-									EffectHacking(effectsurface, 0, 190);
-								}
-								if(player->hassecret || (player->disguised != 0 && player->disguised != 100)){
-									EffectHacking(effectsurface, 0, 124);
-								}
 								if(player->state_hit){
 									EffectHit(effectsurface, 0, player->hitx, player->hity, player->state_hit);
 								}
 								if(player->effectshieldcontinue){
 									EffectShieldDamage(effectsurface, 0, 205);
+								}
+								if(player->effecthacking){
+									EffectHacking(effectsurface, 0, 190);
+								}
+								if(player->hassecret || (player->disguised != 0 && player->disguised != 100)){
+									EffectHacking(effectsurface, 0, 124);
 								}
 								if(player->state_warp){
 									EffectWarp(effectsurface, 0, player->state_warp);
@@ -449,11 +468,11 @@ void Renderer::DrawWorld(Surface * surface, Camera & camera, Uint8 * lightmap, b
 								SurveillanceMonitor * surveillancemonitor = static_cast<SurveillanceMonitor *>(object);
 								if(surveillancemonitor->drawscreen){
 									Rect dstrect;
-									dstrect.w = surveillancemonitor->camera.w / 2;
-									dstrect.h = surveillancemonitor->camera.h / 2;
+									dstrect.w = surveillancemonitor->camera.w / surveillancemonitor->scalefactor;
+									dstrect.h = surveillancemonitor->camera.h / surveillancemonitor->scalefactor;
 									dstrect.x = surveillancemonitor->renderxoffset + object->x - world.resources.spriteoffsetx[object->res_bank][object->res_index] + camera.GetXOffset();
 									dstrect.y = surveillancemonitor->renderyoffset + object->y - world.resources.spriteoffsety[object->res_bank][object->res_index] + camera.GetYOffset();
-									Surface newsurface(dstrect.w, dstrect.h);
+									Surface newsurface(dstrect.w, dstrect.h, 1);
 									//memset(newsurface->pixels, 1, newsurface->w * newsurface->h);
 									Object * objectfollowing = 0;
 									if(surveillancemonitor->objectfollowing){
@@ -483,8 +502,9 @@ void Renderer::DrawWorld(Surface * surface, Camera & camera, Uint8 * lightmap, b
 								switch(overlay->res_bank){
 									case 222:{
 										src = 0;
-										lightingsurfacebank = overlay->res_bank;
-										lightingsurfaceindex = overlay->res_index;
+										objectlights.push_back(object);
+										//lightingsurfacebank = overlay->res_bank;
+										//lightingsurfaceindex = overlay->res_index;
 									}break;
 								}
 							}break;
@@ -772,7 +792,7 @@ void Renderer::DrawWorld(Surface * surface, Camera & camera, Uint8 * lightmap, b
 						lightingsurfacebank = 221;
 						lightingsurfaceindex = 0;
 					}
-					if(lightingsurfacebank){
+					if(drawluminance && lightingsurfacebank){
 						dstrect.x = object->x - world.resources.spriteoffsetx[lightingsurfacebank][lightingsurfaceindex] + camera.GetXOffset();
 						dstrect.y = object->y - world.resources.spriteoffsety[lightingsurfacebank][lightingsurfaceindex] + camera.GetYOffset();
 						Surface * src = world.resources.spritebank[lightingsurfacebank][lightingsurfaceindex];
@@ -784,7 +804,7 @@ void Renderer::DrawWorld(Surface * surface, Camera & camera, Uint8 * lightmap, b
 							src = srcmirrored;
 							dstrect.x = object->x - (world.resources.spritewidth[lightingsurfacebank][lightingsurfaceindex] - world.resources.spriteoffsetx[lightingsurfacebank][lightingsurfaceindex]) + camera.GetXOffset();
 						}
-						DrawLight(surface, src, &dstrect, lightmap);
+						DrawLight(surface, src, &dstrect);
 						if(object->mirrored){
 							delete src;
 						}
@@ -845,8 +865,17 @@ void Renderer::DrawWorld(Surface * surface, Camera & camera, Uint8 * lightmap, b
 		}
 	}
 	if(world.map.loaded){
-		DrawForeground(surface, camera, lightmap);
-		ApplyLightmap(surface, lightmap);
+		if(drawluminance){
+			DrawForegroundLuminance(surface, camera);
+			for(std::vector<Object *>::iterator it = objectlights.begin(); it != objectlights.end(); it++){
+				Surface * src = world.resources.spritebank[(*it)->res_bank][(*it)->res_index];
+				Rect dstrect;
+				dstrect.x = (*it)->x - world.resources.spriteoffsetx[(*it)->res_bank][(*it)->res_index] + camera.GetXOffset();
+				dstrect.y = (*it)->y - world.resources.spriteoffsety[(*it)->res_bank][(*it)->res_index] + camera.GetYOffset();
+				DrawLight(surface, src, &dstrect);
+			}
+		}
+		DrawForeground(surface, camera);
 	}
 }
 
@@ -880,7 +909,7 @@ void Renderer::DrawMiniMap(Object * object){
 					if(terminal->state == Terminal::SECRETBEAMING){
 						int x1 = terminal->x;
 						int y1 = terminal->y;
-						world.map.MiniMapCoords(&x1, &y1);
+						world.map.MiniMapCoords(x1, y1);
 						int radius = terminal->beamingtime * 2;
 						Uint8 color = enemycolor;
 						if(Config::GetInstance().teamcolors){
@@ -953,7 +982,7 @@ void Renderer::DrawMiniMap(Object * object){
 			if(player == localplayer){
 				int x = player->x;
 				int y = player->y;
-				world.map.MiniMapCoords(&x, &y);
+				world.map.MiniMapCoords(x, y);
 				x -= 1;
 				y -= 1;
 				if(y < 62 - 4 && x < 172 - 4){
@@ -1019,8 +1048,8 @@ void Renderer::DrawMiniMap(Object * object){
 }
 
 void Renderer::DrawWorldScaled(Surface * surface, Camera & camera, int recursion, float frametime, int factor){
-	Surface systemscreen(surface->w * 2, surface->h * 2);
-	DrawWorld(&systemscreen, camera, 0, false, recursion, frametime);
+	Surface systemscreen(surface->w * factor, surface->h * factor);
+	DrawWorld(&systemscreen, camera, false, false, recursion, frametime);
 	Rect dstrect;
 	dstrect.x = 0;
 	dstrect.y = 0;
@@ -1035,45 +1064,45 @@ void Renderer::BlitSurface(Surface * src, Rect * srcrect, Surface * dst, Rect * 
 
 bool Renderer::BlitSurfaceUpper(Surface * src, Rect * srcrect, Surface * dst, Rect * dstrect){
 	Rect fulldst;
-    int srcx, srcy, w, h;
-    if(!src || !dst){
-        return false;
-    }
-    // If the destination rectangle is NULL, use the entire dest surface
-    if(dstrect == NULL){
-        fulldst.x = fulldst.y = 0;
-        dstrect = &fulldst;
-    }
-    // Clip the source rectangle to the source surface
-    if(srcrect){
-        int maxw, maxh;
-        srcx = srcrect->x;
-        w = srcrect->w;
-        if(srcx < 0){
-            w += srcx;
-            dstrect->x -= srcx;
-            srcx = 0;
-        }
-        maxw = src->w - srcx;
-        if(maxw < w){
-            w = maxw;
+	int srcx, srcy, w, h;
+	if(!src || !dst){
+		return false;
+	}
+	// If the destination rectangle is NULL, use the entire dest surface
+	if(dstrect == NULL){
+		fulldst.x = fulldst.y = 0;
+		dstrect = &fulldst;
+	}
+	// Clip the source rectangle to the source surface
+	if(srcrect){
+		int maxw, maxh;
+		srcx = srcrect->x;
+		w = srcrect->w;
+		if(srcx < 0){
+			w += srcx;
+			dstrect->x -= srcx;
+			srcx = 0;
 		}
-        srcy = srcrect->y;
-        h = srcrect->h;
-        if(srcy < 0){
-            h += srcy;
-            dstrect->y -= srcy;
-            srcy = 0;
-        }
-        maxh = src->h - srcy;
-        if(maxh < h){
-            h = maxh;
+		maxw = src->w - srcx;
+		if(maxw < w){
+			w = maxw;
 		}
-    }else{
-        srcx = srcy = 0;
-        w = src->w;
-        h = src->h;
-    }
+		srcy = srcrect->y;
+		h = srcrect->h;
+		if(srcy < 0){
+			h += srcy;
+			dstrect->y -= srcy;
+			srcy = 0;
+		}
+		maxh = src->h - srcy;
+		if(maxh < h){
+			h = maxh;
+		}
+	}else{
+		srcx = srcy = 0;
+		w = src->w;
+		h = src->h;
+	}
 	// Clip the destination rectangle to the destination surface
 	int dx, dy;
 	dx = 0 - dstrect->x;
@@ -1096,21 +1125,21 @@ bool Renderer::BlitSurfaceUpper(Surface * src, Rect * srcrect, Surface * dst, Re
 	if(dy > 0){
 		h -= dy;
 	}
-    if(w > 0 && h > 0){
-        Rect sr;
-        sr.x = srcx;
-        sr.y = srcy;
-        sr.w = dstrect->w = w;
-        sr.h = dstrect->h = h;
+	if(w > 0 && h > 0){
+		Rect sr;
+		sr.x = srcx;
+		sr.y = srcy;
+		sr.w = dstrect->w = w;
+		sr.h = dstrect->h = h;
 		if(src->rlepixels){
 			BlitSurfaceRLE(src, &sr, dst, dstrect);
 		}else{
 			BlitSurfaceFast(src, &sr, dst, dstrect);
 		}
 		return true;
-    }
-    dstrect->w = dstrect->h = 0;
-    return false;
+	}
+	dstrect->w = dstrect->h = 0;
+	return false;
 }
 
 void Renderer::BlitSurfaceSlow(Surface * src, Rect * srcrect, Surface * dst, Rect * dstrect){
@@ -1287,7 +1316,7 @@ void Renderer::DrawText(Surface * surface, Uint16 x, Uint16 y, const char * text
 			if(bank == 132){
 				ioffset = 34;
 			}
-			Surface * glyph = world.resources.spritebank[bank][text[i] - ioffset];
+			Surface * glyph = world.resources.spritebank[bank][Uint8(text[i] - ioffset)];
 			if(glyph){
 				Surface * es = 0;
 				if(color || brightness){
@@ -1454,7 +1483,7 @@ void Renderer::DrawDebug(Surface * surface){
 	char temp[1234];
 	sprintf(temp, "%d %d %d %d %d %d", world.localinput.keymovedown, world.localinput.keymoveup, world.localinput.keymoveleft, world.localinput.keymoveright, world.localinput.keyjump, world.localinput.keyjetpack);
 	DrawText(surface, 10, 30, temp, 133, 7, false, -16);
-	sprintf(temp, "mode: %s(%d), total snapshots: %d, total input packets: %d, ambience: %d objects: %d", world.mode ? "REPLICA" : "AUTHORITY", world.localpeerid, world.totalsnapshots, world.totalinputpackets, world.map.ambience, int(world.objectlist.size()));
+	sprintf(temp, "mode: %s(%d), snapshots: %d, input packets: %d, ambience: %d objects: %d", world.mode ? "REPLICA" : "AUTHORITY", world.localpeerid, world.totalsnapshots, world.totalinputpackets, world.map.ambience, int(world.objectlist.size()));
 	DrawText(surface, 10, 40, temp, 133, 7, false, -64);
 	for(int i = 0; i < world.maxpeers; i++){
 		if(world.peerlist[i]){
@@ -1555,6 +1584,8 @@ void Renderer::DrawMessage(Surface * surface){
 				textbank = 135;
 			}
 		}
+		Uint8 brightness2 = (int(brightness) - 64) < 8 ? 8 : brightness - 64;
+		DrawText(surface, ((640 - (linelength * textwidth)) / 2) + (textwidth * (linelength - nextline)) + 1, liney + 1, temp, textbank, textwidth, false, color, brightness2);
 		DrawText(surface, ((640 - (linelength * textwidth)) / 2) + (textwidth * (linelength - nextline)), liney, temp, textbank, textwidth, false, color, brightness);
 		nextline--;
 		if(nextline < 0){
@@ -1585,6 +1616,8 @@ void Renderer::DrawStatus(Surface * surface){
 		if(*time <= 16){
 			brightness -= (16 - *time) * 8;
 		}
+		Uint8 brightness2 = (int(brightness) - 64) < 8 ? 8 : brightness - 64;
+		DrawText(surface, (640 - (strlen(text) * 7)) / 2 + 1, 370 + liney + 1, text, 133, 7, false, *color, brightness2);
 		DrawText(surface, (640 - (strlen(text) * 7)) / 2, 370 + liney, text, 133, 7, false, *color, brightness);
 		liney -= 10;
 	}
@@ -1695,7 +1728,8 @@ void Renderer::EffectHacking(Surface * dst, Rect * dstrect, Uint8 color){
 			Uint8 overlay = GetPixel(world.resources.spritebank[178][index], x + ex, y + ey);
 			Uint8 pixel = GetPixel(dst, x, y);
 			if(overlay && pixel){
-				SetPixel(dst, x, y, palette.Mix(color, pixel));
+				//SetPixel(dst, x, y, palette.Mix(color, pixel));
+				SetPixel(dst, x, y, palette.RampColorMin(pixel, color));
 			}
 		}
 	}
@@ -1782,34 +1816,54 @@ void Renderer::EffectRampColor(Surface * dst, Rect * dstrect, Uint8 color){
     }
 }
 
+void Renderer::EffectRampColorPlus(Surface * dst, Rect * dstrect, Uint8 color, Uint8 plus){
+	Rect zerodstrect;
+	if(!dstrect){
+		zerodstrect.w = dst->w;
+		zerodstrect.h = dst->h;
+		zerodstrect.x = 0;
+		zerodstrect.y = 0;
+		dstrect = &zerodstrect;
+	}
+	for(Uint32 x = dstrect->x; x < dstrect->w + dstrect->x; x++){
+        for(Uint32 y = dstrect->y; y < dstrect->h + dstrect->y; y++){
+			Uint8 * pixel = &((Uint8 *)dst->pixels)[x + (y * dst->w)];
+			if(*pixel){
+				*pixel = palette.RampColorPlus(*pixel, color, plus);
+			}
+        }
+    }
+}
+
 void Renderer::EffectHit(Surface * dst, Rect * dstrect, Uint8 hitx, Uint8 hity, Uint8 state_hit){
 	Uint8 hit_type = state_hit / 32;
 	Uint8 index = (state_hit % 32) - 1;
 	if(index > 7){
-		return;
+		index = 7 - (index - 7);
 	}
-	Uint8 color = 0;
-	switch(hit_type){
-		case 0:{
-			color = 146;
-		}break;
-		case 1:{
-			color = 146;
-		}break;
-		case 2:{
-			color = 194;
-		}break;
-	}
-	for(int y = 0; y < world.resources.spritebank[153][index]->h; y++){
-		for(int x = 0; x < world.resources.spritebank[153][index]->w; x++){
-			Uint8 overlay = GetPixel(world.resources.spritebank[153][index], x, y);
-			Uint8 pixel = GetPixel(dst, x + ((float(hitx) / 100) * dst->w) - world.resources.spriteoffsetx[153][index], y + ((float(hity) / 100) * dst->h) - world.resources.spriteoffsety[153][index]);
-			if(overlay && pixel){
-				Uint8 newcolor = palette.RampColor(pixel, color) + 6;
-				if(newcolor > color + 15){
-					newcolor = color + 15;
+	if(index <= 7){
+		Uint8 color = 0;
+		switch(hit_type){
+			case 0:{
+				color = 146;
+			}break;
+			case 1:{
+				color = 146;
+			}break;
+			case 2:{
+				color = 194;
+			}break;
+		}
+		int xoffset = ((float(hitx) / 100) * dst->w) - world.resources.spriteoffsetx[153][index];
+		int yoffset = ((float(hity) / 100) * dst->h) - world.resources.spriteoffsety[153][index];
+		for(int y = 0; y < world.resources.spritebank[153][index]->h; y++){
+			for(int x = 0; x < world.resources.spritebank[153][index]->w; x++){
+				Uint8 overlay = GetPixel(world.resources.spritebank[153][index], x, y);
+				Uint8 pixel = GetPixel(dst, x + xoffset, y + yoffset);
+				if(overlay && pixel){
+					Uint8 newcolor = palette.RampColorMin(pixel, color);
+					SetPixel(dst, x + xoffset, y + yoffset, newcolor);
 				}
-				SetPixel(dst, x + ((float(hitx) / 100) * dst->w) - world.resources.spriteoffsetx[153][index], y + ((float(hity) / 100) * dst->h) - world.resources.spriteoffsety[153][index], newcolor);
 			}
 		}
 	}
@@ -1825,7 +1879,7 @@ void Renderer::EffectShieldDamage(Surface * dst, Rect * dstrect, Uint8 color){
 			Uint8 overlay = GetPixel(world.resources.spritebank[177][state_i % 8], x, y);
 			Uint8 pixel = GetPixel(dst, x, y);
 			if(overlay && pixel){
-				SetPixel(dst, x, y, color);//palette.Mix(205, pixel));
+				SetPixel(dst, x, y, palette.RampColorMin(pixel, color, 10));//SetPixel(dst, x, y, color);//palette.Mix(205, pixel));
 			}
 		}
 	}
@@ -1859,7 +1913,7 @@ void Renderer::EffectWarp(Surface * dst, Rect * dstrect, Uint8 state_warp){
 void Renderer::MiniMapBlit(Uint8 res_bank, Uint8 res_index, int x, int y, bool alpha, Uint8 teamcolor){
 	Rect dstrect;
 	int xm = x, ym = y;
-	world.map.MiniMapCoords(&xm, &ym);
+	world.map.MiniMapCoords(xm, ym);
 	dstrect.x = xm - world.resources.spriteoffsetx[res_bank][res_index];
 	dstrect.y = ym - world.resources.spriteoffsety[res_bank][res_index];
 	if(teamcolor || alpha){
@@ -1881,7 +1935,7 @@ void Renderer::MiniMapBlit(Uint8 res_bank, Uint8 res_index, int x, int y, bool a
 void Renderer::MiniMapCircle(int x, int y, Uint8 color){
 	int x1 = x;
 	int y1 = y;
-	world.map.MiniMapCoords(&x1, &y1);
+	world.map.MiniMapCoords(x1, y1);
 	int radius = ((state_i % 16) / 2) + 3;
 	Uint8 newcolor = color - ((state_i % 16) / 2) + 4;
 	Uint8 oldramp = (color - 2) / 16;
@@ -1910,10 +1964,7 @@ void Renderer::DrawMirrored(Surface * src, Rect * srcrect, Surface * dst, Rect *
     }
 }
 
-void Renderer::DrawLight(Surface * surface, Surface * src, Rect * rect, Uint8 * lightmap, bool clear){
-	if(!lightmap){
-		return;
-	}
+void Renderer::DrawLight(Surface * surface, Surface * src, Rect * rect){
 	if(rect->x <= surface->w && rect->y <= surface->h && rect->x >= -src->w && rect->y >= -src->h){
 		int surfacew = surface->w;
 		int surfaceh = surface->h;
@@ -1939,54 +1990,37 @@ void Renderer::DrawLight(Surface * surface, Surface * src, Rect * rect, Uint8 * 
 		}
 		int srcw = src->w;
 		Uint8 * pixels = (Uint8 *)src->pixels;
-		if(clear){
-			for(int y1 = miny1, y2 = minh; y2 < maxh; y1++, y2++){
-				unsigned int i = (y1 * srcw) + minx1;
-				unsigned int i2 = (y2 * surfacew) + minw;
-				for(int x2 = minw; x2 < maxw; x2++){
-					Uint8 lum = pixels[i];
-					if(lum){
-						((Uint8 *)lightmap)[i2] = ambiencelevel;
-					}
-					i++;
-					i2++;
+		for(int y1 = miny1, y2 = minh; y2 < maxh; y1++, y2++){
+			unsigned int i = (y1 * srcw) + minx1;
+			unsigned int i2 = (y2 * surfacew) + minw;
+			for(int x2 = minw; x2 < maxw; x2++){
+				int lum = pixels[i];
+				if(lum){
+					Uint8 * surfacepixel = &surface->pixels[i2];
+					Uint8 newcolor = palette.Light(*surfacepixel, lum % 16);
+					*surfacepixel = newcolor;
 				}
-			}
-		}else{
-			for(int y1 = miny1, y2 = minh; y2 < maxh; y1++, y2++){
-				unsigned int i = (y1 * srcw) + minx1;
-				unsigned int i2 = (y2 * surfacew) + minw;
-				for(int x2 = minw; x2 < maxw; x2++){
-					Uint8 lum = palette.colors[0][pixels[i]].r;
-					Uint8 * lightmappixel = &lightmap[i2];
-					if(*lightmappixel + lum > 128){
-						*lightmappixel = 128;
+				/*
+				// Unoptimized lighting algorithm
+				int lum = pixels[i] % 16;
+				Uint8 * surfacepixel = &surface->pixels[i2];
+				if(lum && *surfacepixel < 114 && *surfacepixel > 1){
+					int lum2 = (lum * 8) + ambiencelevel;
+					if(lum2 > 128){
+						lum = 128;
 					}else{
-						*lightmappixel += lum;
+						lum = lum2;
 					}
-					i++;
-					i2++;
-				}
+					Uint8 newcolor = palette.Brightness(*surfacepixel, lum);
+					int newcolorbrightness = (newcolor - 2) % 16;
+					Uint8 oldcolorbrightness = (*surfacepixel - 2) % 16;
+					if(newcolorbrightness >= oldcolorbrightness * (float(ambiencelevel) / 128)){
+						*surfacepixel = newcolor + 112;
+					}
+				}*/
+				i++;
+				i2++;
 			}
-		}
-	}
-}
-
-void Renderer::ApplyLightmap(Surface * surface, Uint8 * lightmap){
-	if(!lightmap){
-		return;
-	}
-	int i = 0;
-	int surfacew = surface->w;
-	int surfaceh = surface->h;
-	Uint8 * pixels = (Uint8 *)surface->pixels;
-	for(int y = 0; y < surfaceh; y++){
-		for(int x = 0; x < surfacew; x++){
-			Uint8 pixel = pixels[i];
-			if(pixel < 114){
-				pixels[i] = palette.Brightness(pixel, lightmap[i]);
-			}
-			i++;
 		}
 	}
 }
@@ -2012,7 +2046,7 @@ void Renderer::DrawParallax(Surface * surface, Camera & camera){
 	}
 }
 
-void Renderer::DrawBackground(Surface * surface, Camera & camera, Uint8 * lightmap){
+void Renderer::DrawBackground(Surface * surface, Camera & camera, bool drawluminance){
 	Rect dstrect;
 	Surface * tile;
 	int minx = (camera.x - (camera.w / 2)) / 64;
@@ -2045,8 +2079,8 @@ void Renderer::DrawBackground(Surface * surface, Camera & camera, Uint8 * lightm
 					}
 					if(tile){
 						if(world.map.bglum[j][i]){
-							if(lightmap){
-								DrawLight(surface, tile, &dstrect, lightmap);
+							if(drawluminance){
+								DrawLight(surface, tile, &dstrect);
 							}
 						}else{
 							DrawTile(surface, tile, &dstrect);
@@ -2058,7 +2092,52 @@ void Renderer::DrawBackground(Surface * surface, Camera & camera, Uint8 * lightm
 	}
 }
 
-void Renderer::DrawForeground(Surface * surface, Camera & camera, Uint8 * lightmap){
+void Renderer::DrawForeground(Surface * surface, Camera & camera){
+	Rect dstrect;
+	Surface * tile;
+	int minx = (camera.x - (camera.w / 2)) / 64;
+	if(minx < 0){
+		minx = 0;
+	}
+	int maxx = ceil(float(camera.x + (camera.w / 2)) / 64);
+	if(maxx > world.map.expandedwidth){
+		maxx = world.map.expandedwidth;
+	}
+	int miny = (camera.y - (camera.h / 2)) / 64;
+	if(miny < 0){
+		miny = 0;
+	}
+	int maxy = ceil(float(camera.y + (camera.h / 2)) / 64);
+	if(maxy > world.map.expandedheight){
+		maxy = world.map.expandedheight;
+	}
+	for(int y = miny; y < maxy; y++){
+		for(int x = minx; x < maxx; x++){
+			int i = (y * world.map.expandedwidth) + x;
+			for(int j = 0; j < 4; j++){
+				if(world.map.fg[j][i]){
+					dstrect.x = (x * 64) + camera.GetXOffset();
+					dstrect.y = (y * 64) + camera.GetYOffset();
+					if(world.map.fgflipped[j][i]){
+						tile = world.resources.tileflippedbank[(world.map.fg[j][i] & 0xFF00) >> 8][world.map.fg[j][i] & 0xFF];
+					}else{
+						tile = world.resources.tilebank[(world.map.fg[j][i] & 0xFF00) >> 8][world.map.fg[j][i] & 0xFF];
+					}
+					if(tile){
+						if(!world.map.fglum[j][i]){
+							DrawTile(surface, tile, &dstrect);
+						}
+					}
+				}
+			}
+			/*if(world.map.nodetypes[i]){
+				DrawFilledRectangle(surface, (x * 64) + camera.GetXOffset() + 28, (y * 64) + camera.GetYOffset() + 28, (x * 64) + camera.GetXOffset() + 36, (y * 64) + camera.GetYOffset() + 36, 224);
+			}*/
+		}
+	}
+}
+
+void Renderer::DrawForegroundLuminance(Surface * surface, Camera & camera){
 	Rect dstrect;
 	Surface * tile;
 	int minx = (camera.x - (camera.w / 2)) / 64;
@@ -2091,21 +2170,11 @@ void Renderer::DrawForeground(Surface * surface, Camera & camera, Uint8 * lightm
 					}
 					if(tile){
 						if(world.map.fglum[j][i]){
-							if(lightmap){
-								DrawLight(surface, tile, &dstrect, lightmap);
-							}
-						}else{
-							if(lightmap && j == 3){
-								DrawLight(surface, tile, &dstrect, lightmap, true);
-							}
-							DrawTile(surface, tile, &dstrect);
+							DrawLight(surface, tile, &dstrect);
 						}
 					}
 				}
 			}
-			/*if(world.map.nodetypes[i]){
-				DrawFilledRectangle(surface, (x * 64) + camera.GetXOffset() + 28, (y * 64) + camera.GetYOffset() + 28, (x * 64) + camera.GetXOffset() + 36, (y * 64) + camera.GetYOffset() + 36, 224);
-			}*/
 		}
 	}
 }
@@ -2136,7 +2205,7 @@ void Renderer::DrawHUD(Surface * surface, float frametime){
 			dstrect.y = -world.resources.spriteoffsety[92][2] + 381;
 			BlitSurface(world.resources.spritebank[95][2], 0, surface, &dstrect);
 			
-			Surface systemscreen(135, 44);
+			Surface systemscreen(135, 44, 1);
 			Camera camera(135 * 2, 44 * 2);
 			Object * followobject = world.GetObjectFromId(world.systemcamerafollow[0]);
 			int px = 0;
@@ -2157,7 +2226,7 @@ void Renderer::DrawHUD(Surface * surface, float frametime){
 			dstrect.y = -world.resources.spriteoffsety[92][11] + 318;
 			BlitSurface(world.resources.spritebank[95][11], 0, surface, &dstrect);
 			
-			Surface systemscreen(135, 44);
+			Surface systemscreen(135, 44, 1);
 			Camera camera(135 * 2, 44 * 2);
 			Object * followobject = world.GetObjectFromId(world.systemcamerafollow[1]);
 			int px = 0;
@@ -2388,23 +2457,21 @@ void Renderer::DrawHUD(Surface * surface, float frametime){
 							dstrect.y = -world.resources.spriteoffsety[103][index + i] + teamyoffset;
 							if(player->InBase(world) || player->hassecret){
 								Surface * effectsurface = CreateSurfaceCopy(world.resources.spritebank[103][index + i]);
-								Uint8 brightness = 120;
-								Uint8 time = 16;
+								Uint8 plus = 0;
+								Uint8 time = 6;
+								Uint8 shift = 2;
+								Uint8 color = 210;
 								if(player->hassecret){
-									brightness = 150;
-									time = 8;
+									time = 6;
+									color = 114;
+									shift = 0;
 								}
-								if(state_i % (time * 2) < time){
-									brightness += (state_i % time);
+								if((state_i >> shift) % (time * 2) < time){
+									plus += ((state_i >> shift) % time);
 								}else{
-									brightness += time - (state_i % time);
+									plus += time - ((state_i >> shift) % time);
 								}
-								EffectBrightness(effectsurface, 0, brightness);
-								if(player->hassecret){
-									EffectColor(effectsurface, 0, 128);
-								}else{
-									EffectColor(effectsurface, 0, 224);
-								}
+								EffectRampColorPlus(effectsurface, 0, color, plus);
 								BlitSurface(effectsurface, 0, surface, &dstrect);
 								delete effectsurface;
 							}else{
@@ -2445,7 +2512,7 @@ void Renderer::DrawHUD(Surface * surface, float frametime){
 					for(int i = 0; i < sizeof(names) / sizeof(char *); i++){
 						secretprogress -= 20;
 						if(secretprogress < ((player->state == Player::HACKING && player->state_i == 16 && state_i % 16 < 8) ? -20 : 0)){
-							color = 2;
+							color = 114;
 							brightness = 96;
 						}
 						DrawText(surface, 10, 54 + (i * lineheight) + yoffset, (char *)names[i], 133, 6, false, color, brightness);
@@ -2742,6 +2809,10 @@ void Renderer::DrawMessageBackground(Surface * surface, Rect * dstrect){
 	dstrect2.x = -world.resources.spriteoffsetx[188][8] + dstrect->x + dstrect->w - 36;// - world.resources.spritewidth[188][8];
 	dstrect2.y = -world.resources.spriteoffsety[188][8] + dstrect->y + y;
 	BlitSurface(world.resources.spritebank[188][8], 0, surface, &dstrect2);
+}
+
+Uint8 Renderer::GetAmbienceLevel(void){
+	return ambiencelevel;
 }
 
 void Renderer::DrawLine(Surface * surface, int x1, int y1, int x2, int y2, Uint8 color, int thickness){

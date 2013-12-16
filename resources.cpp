@@ -3,65 +3,41 @@
 #include "game.h"
 
 Resources::Resources(){
-	spritebank = new Surface**[256];
-	tilebank = new Surface**[256];
-	tileflippedbank = new Surface**[256];
-	spriteoffsetx = new int*[256];
-	spriteoffsety = new int*[256];
-	spritewidth = new unsigned int*[256];
-	spriteheight = new unsigned int*[256];
-	for(int i = 0; i < 256; i++){
-		spritebank[i] = new Surface*[256];
-		tilebank[i] = new Surface*[256];
-		tileflippedbank[i] = new Surface*[256];
-		spriteoffsetx[i] = new int[256];
-		spriteoffsety[i] = new int[256];
-		spritewidth[i] = new unsigned int[256];
-		spriteheight[i] = new unsigned int[256];
-		for(int j = 0; j < 256; j++){
-			spritebank[i][j] = 0;
-			tilebank[i][j] = 0;
-			tileflippedbank[i][j] = 0;
-			spriteoffsetx[i][j] = 0;
-			spriteoffsety[i][j] = 0;
-			spritewidth[i][j] = 0;
-			spriteheight[i][j] = 0;
-		}
-	}
+	spritebank.assign(256, std::vector<Surface *>(256, (Surface *)0));
+	tilebank.assign(256, std::vector<Surface *>(256, (Surface *)0));
+	tileflippedbank.assign(256, std::vector<Surface *>(256, (Surface *)0));
+	spriteoffsetx.assign(256, std::vector<int>(256, 0));
+	spriteoffsety.assign(256, std::vector<int>(256, 0));
+	spritewidth.assign(256, std::vector<unsigned int>(256, 0));
+	spriteheight.assign(256, std::vector<unsigned int>(256, 0));
 	music = 0;
 }
 
 Resources::~Resources(){
-	for(int i = 0; i < 256; i++){
-		for(int j = 0; j < 256; j++){
-			if(spritebank[i][j] && spritebank[i][j] != (Surface *)true){
-				//SDL_FreeSurface(spritebank[i][j]);
-				delete spritebank[i][j];
-			}
-			if(tilebank[i][j]){
-				//SDL_FreeSurface(tilebank[i][j]);
-				delete tilebank[i][j];
-			}
-			if(tileflippedbank[i][j]){
-				//SDL_FreeSurface(tileflippedbank[i][j]);
-				delete tileflippedbank[i][j];
+	for(std::vector<std::vector<Surface *> >::iterator it = spritebank.begin(); it != spritebank.end(); it++){
+		for(std::vector<Surface *>::iterator ij = (*it).begin(); ij != (*it).end(); ij++){
+			if(*ij){
+				delete *ij;
+				*ij = 0;
 			}
 		}
-		delete[] spritebank[i];
-		delete[] tilebank[i];
-		delete[] tileflippedbank[i];
-		delete[] spriteoffsetx[i];
-		delete[] spriteoffsety[i];
-		delete[] spritewidth[i];
-		delete[] spriteheight[i];
 	}
-	delete[] spritebank;
-	delete[] tilebank;
-	delete[] tileflippedbank;
-	delete[] spriteoffsetx;
-	delete[] spriteoffsety;
-	delete[] spritewidth;
-	delete[] spriteheight;
+	for(std::vector<std::vector<Surface *> >::iterator it = tilebank.begin(); it != tilebank.end(); it++){
+		for(std::vector<Surface *>::iterator ij = (*it).begin(); ij != (*it).end(); ij++){
+			if(*ij){
+				delete *ij;
+				*ij = 0;
+			}
+		}
+	}
+	for(std::vector<std::vector<Surface *> >::iterator it = tileflippedbank.begin(); it != tileflippedbank.end(); it++){
+		for(std::vector<Surface *>::iterator ij = (*it).begin(); ij != (*it).end(); ij++){
+			if(*ij){
+				delete *ij;
+				*ij = 0;
+			}
+		}
+	}
 }
 
 bool Resources::Load(Game & game, bool dedicatedserver){
@@ -91,8 +67,6 @@ bool Resources::LoadSprites(Game & game, bool dedicatedserver){
 	for(unsigned int i = 0; i < 256; i++){
 		progress++;
 		game.LoadProgressCallback(progress, totalprogressitems);
-		//Uint8 header[64];
-		//SDL_RWread(file, header, sizeof(header), 1);
 		if(headers[i][2]){
 			sprintf(FileName, "bin_spr/SPR_%.3d.BIN", i);
 			SDL_RWops * file2 = SDL_RWFromFile(FileName, "rb");
@@ -171,8 +145,7 @@ bool Resources::LoadSprites(Game & game, bool dedicatedserver){
 					}
 					Uint8 * sprite = new Uint8[width * height];
 					memcpy(sprite, decompressed, width * height);
-					Surface * surface = new Surface(width, height);//SDL_CreateRGBSurface(SDL_SWSURFACE, width, height, 8, 0, 0, 0, 0);
-					//SDL_SetColorKey(surface, SDL_TRUE, 0);
+					Surface * surface = new Surface(width, height);
 					unsigned int paletteoffset = 0;
 					switch(i){
 						case 0:
@@ -194,12 +167,8 @@ bool Resources::LoadSprites(Game & game, bool dedicatedserver){
 							paletteoffset = 2;
 						break;
 					}
-					//SDL_SetColors(surface, palette.colors[paletteoffset], 0, 256);
-					//SDL_SetPalette(surface,  SDL_LOGPAL, palette.colors[paletteoffset], 0, 256);
 					spritebank[i][j] = surface;
-					//SDL_LockSurface(surface);
 					memcpy(surface->pixels, sprite, width * height);
-					//SDL_UnlockSurface(surface);
 					RLESurface(surface);
 					delete[] sprite;
 					delete[] data;
@@ -233,8 +202,6 @@ bool Resources::LoadTiles(Game & game, bool dedicatedserver){
 	for(unsigned int i = 0; i < 256; i++){
 		progress++;
 		game.LoadProgressCallback(progress, totalprogressitems);
-		//Uint8 header[64];
-		//SDL_RWread(file, header, sizeof(header), 1);
 		if(headers[i][2]){
 			sprintf(filename, "bin_til/TIL_%.3d.BIN", i);
 			SDL_RWops * file2 = SDL_RWFromFile(filename, "rb");
@@ -264,21 +231,13 @@ bool Resources::LoadTiles(Game & game, bool dedicatedserver){
 				for(unsigned int j = 0; j < headers[i][2]; j++){
 					Uint8 tile[64 * 64];
 					memcpy(tile, decompressed + (j * 64 * 64), sizeof(tile));
-					Surface * surface = new Surface(64, 64);//SDL_CreateRGBSurface(SDL_SWSURFACE, 64, 64, 8, 0, 0, 0, 0);
-					//SDL_SetColorKey(surface, SDL_TRUE, 0);
-					//SDL_SetColors(surface, palette.colors[0], 0, 256);
+					Surface * surface = new Surface(64, 64);
 					tilebank[i][j] = surface;
-					//SDL_LockSurface(surface);
 					memcpy(surface->pixels, tile, 64 * 64);
-					//SDL_UnlockSurface(surface);
-					tileflippedbank[i][j] = new Surface(64, 64);//SDL_CreateRGBSurface(SDL_SWSURFACE, 64, 64, 8, 0, 0, 0, 0);
-				    //SDL_SetColorKey(tileflippedbank[i][j], SDL_TRUE, 0);
-					//SDL_SetColors(tileflippedbank[i][j], palette.colors[0], 0, 256);
-					//SDL_LockSurface(tileflippedbank[i][j]);
-					memcpy(tileflippedbank[i][j]->pixels, surface->pixels, surface->w * surface->h);
-					//SDL_UnlockSurface(tileflippedbank[i][j]);
-					MirrorY(tileflippedbank[i][j]);
 					RLESurface(tilebank[i][j]);
+					tileflippedbank[i][j] = new Surface(64, 64);
+					memcpy(tileflippedbank[i][j]->pixels, surface->pixels, surface->w * surface->h);
+					MirrorY(tileflippedbank[i][j]);
 					RLESurface(tileflippedbank[i][j]);
 				}
 				delete[] data;
@@ -327,6 +286,12 @@ bool Resources::LoadSounds(Game & game, bool dedicatedserver){
 		if(!length){
 			continue;
 		}
+		
+		if(length < 256){
+			// really small sound data such as grnup.wav cause issues with Mix_LoadWAV_RW
+			// will need to revisit this sound loading below, for now just going to skip it
+			continue;
+		}
 	
 		Uint8 header[] = {
 			0x52, 0x49, 0x46, 0x46, // RIFF
@@ -354,11 +319,13 @@ bool Resources::LoadSounds(Game & game, bool dedicatedserver){
 		//printf("name: %s, wavinfo: %d length: %X\n", name, wavinfo, length);
 		
 		Uint32 lengthplus = length + 0x34;
-		Uint32 lengthminus = length;
+		Uint32 lengthminus = length - sizeof(header);
 		
+		int memsize = sizeof(header) + length;
 		memcpy(&header[4], &lengthplus, sizeof(lengthplus));
 		memcpy(&header[sizeof(header) - 4], &lengthminus, sizeof(lengthminus));
-		Uint8 * mem = new Uint8[sizeof(header) + length];
+		Uint8 * mem = new Uint8[memsize];
+		memset(mem, 0, memsize);
 		memcpy(mem, header, sizeof(header));
 		
 		SDL_RWseek(file, sizeof(numsounds) + sizeof(soundssize) + (numsounds * sizeof(soundheader)) + offset, RW_SEEK_SET);
@@ -369,7 +336,7 @@ bool Resources::LoadSounds(Game & game, bool dedicatedserver){
 		fwrite(&mem[sizeof(header)], 1, length, file2);
 		fclose(file2);*/
 		
-		Mix_Chunk * chunk = Mix_LoadWAV_RW(SDL_RWFromConstMem(mem, sizeof(header) + length), true);
+		Mix_Chunk * chunk = Mix_LoadWAV_RW(SDL_RWFromConstMem(mem, memsize), true);
 		delete[] mem;
 		if(!chunk){
 			printf("Could not load sound %s - %s\n", name, Mix_GetError());
@@ -391,13 +358,15 @@ bool Resources::LoadSounds(Game & game, bool dedicatedserver){
 					((Sint16 *)chunk->abuf)[i] *= v / float(100);
 				}
 			}
+			//
 		}
 	}
 	SDL_RWclose(file);
-	music = Mix_LoadMUS("CLOSER2.MP3");
+	// commented out because the SDL_Mixer MP3 system crashes randomly on Windows with this particular MP3
+	/*music = Mix_LoadMUS("CLOSER2.MP3");
 	if(!music){
 		return false;
-	}
+	}*/
 	return true;
 }
 
@@ -413,130 +382,112 @@ void Resources::UnloadSounds(void){
 }
 
 void Resources::MirrorY(Surface * surface){
-    Surface newsurface(surface->w, surface->h);//SDL_CreateRGBSurface(SDL_SWSURFACE, surface->w, surface->h, surface->format->BitsPerPixel, 0, 0, 0, 0);
-    //SDL_SetColors(newsurface, palette.colors[0], 0, 256);
-    //SDL_BlitSurface(surface, 0, &newsurface, 0);
+    Surface newsurface(surface->w, surface->h);
 	memcpy(newsurface.pixels, surface->pixels, surface->w * surface->h);
-    //SDL_LockSurface(surface);
-    //SDL_LockSurface(newsurface);
     for(int y = 0; y < surface->h; y++){
         for(int x = 0; x < surface->w; x++){
             ((Uint8 *)surface->pixels)[x + (y * surface->w)] = ((Uint8 *)newsurface.pixels)[(y * surface->w) + (surface->w - (x + 1))];
         }
     }
-    //SDL_UnlockSurface(newsurface);
-    //SDL_UnlockSurface(surface);
-    //SDL_FreeSurface(newsurface);
 }
 
 void Resources::RLESurface(Surface * surface){
 	Uint8 *rlebuf, *dst;
-    int maxn;
-    int y;
-    Uint8 *srcbuf, *curbuf, *lastline;
-    int maxsize = 0;
-    int skip, run;
-    int bpp = 1;//surface->format->BytesPerPixel;
-    Uint32 ckey, rgbmask;
-    int w, h;
-	
-    /* calculate the worst case size for the compressed surface */
+	int maxn;
+	int y;
+	Uint8 *srcbuf, *curbuf, *lastline;
+	int maxsize = 0;
+	int skip, run;
+	int bpp = 1;
+	Uint32 ckey, rgbmask;
+	int w, h;
+
+	/* calculate the worst case size for the compressed surface */
 
 	/* worst case is alternating opaque and transparent pixels,
 	 starting with an opaque pixel */
 	maxsize = surface->h * 3 * (surface->w / 2 + 1) + 2;
-	
-    rlebuf = new Uint8[maxsize];
-	
-    /* Set up the conversion */
-    srcbuf = (Uint8 *) surface->pixels;
-    curbuf = srcbuf;
-    maxn = 255;
-    skip = run = 0;
-    dst = rlebuf;
-    rgbmask = 0xFF;//~surface->format->Amask;
-    ckey = 0;
-    lastline = dst;
-    w = surface->w;
-    h = surface->h;
-	
-#define ADD_COUNTS(n, m)			\
-if(bpp == 4) {				\
-((Uint16 *)dst)[0] = n;		\
-((Uint16 *)dst)[1] = m;		\
-dst += 4;				\
-} else {				\
-dst[0] = n;				\
-dst[1] = m;				\
-dst += 2;				\
-}
-	
-    for (y = 0; y < h; y++) {
-        int x = 0;
-        int blankline = 0;
-        do {
-            int run, skip, len;
-            int runstart;
-            int skipstart = x;
+
+	rlebuf = new Uint8[maxsize];
+
+	/* Set up the conversion */
+	srcbuf = (Uint8 *) surface->pixels;
+	curbuf = srcbuf;
+	maxn = 255;
+	skip = run = 0;
+	dst = rlebuf;
+	rgbmask = 0xFF;//~surface->format->Amask;
+	ckey = 0;
+	lastline = dst;
+	w = surface->w;
+	h = surface->h;
+
+	#define ADD_COUNTS(n, m)			\
+	if(bpp == 4) {				\
+	((Uint16 *)dst)[0] = n;		\
+	((Uint16 *)dst)[1] = m;		\
+	dst += 4;				\
+	} else {				\
+	dst[0] = n;				\
+	dst[1] = m;				\
+	dst += 2;				\
+	}
+
+	for (y = 0; y < h; y++) {
+		int x = 0;
+		int blankline = 0;
+		do {
+			int run, skip, len;
+			int runstart;
+			int skipstart = x;
 			
-            /* find run of transparent, then opaque pixels */
-            while (x < w && (*(srcbuf + x * bpp) & rgbmask) == ckey)
-                x++;
-            runstart = x;
-            while (x < w && (*(srcbuf + x * bpp) & rgbmask) != ckey)
-                x++;
-            skip = runstart - skipstart;
-            if (skip == w)
-                blankline = 1;
-            run = x - runstart;
+			/* find run of transparent, then opaque pixels */
+			while (x < w && (*(srcbuf + x * bpp) & rgbmask) == ckey)
+				x++;
+			runstart = x;
+			while (x < w && (*(srcbuf + x * bpp) & rgbmask) != ckey)
+				x++;
+			skip = runstart - skipstart;
+			if (skip == w)
+				blankline = 1;
+			run = x - runstart;
 			
-            /* encode segment */
-            while (skip > maxn) {
-                ADD_COUNTS(maxn, 0);
-                skip -= maxn;
-            }
-            len = (run < maxn ? run : maxn);
-            ADD_COUNTS(skip, len);
-            SDL_memcpy(dst, srcbuf + runstart * bpp, len * bpp);
-            dst += len * bpp;
-            run -= len;
-            runstart += len;
-            while (run) {
-                len = (run < maxn ? run : maxn);
-                ADD_COUNTS(0, len);
-                SDL_memcpy(dst, srcbuf + runstart * bpp, len * bpp);
-                dst += len * bpp;
-                runstart += len;
-                run -= len;
-            }
-            if (!blankline)
-                lastline = dst;
-        } while (x < w);
+			/* encode segment */
+			while (skip > maxn) {
+				ADD_COUNTS(maxn, 0);
+				skip -= maxn;
+			}
+			len = (run < maxn ? run : maxn);
+			ADD_COUNTS(skip, len);
+			SDL_memcpy(dst, srcbuf + runstart * bpp, len * bpp);
+			dst += len * bpp;
+			run -= len;
+			runstart += len;
+			while (run) {
+				len = (run < maxn ? run : maxn);
+				ADD_COUNTS(0, len);
+				SDL_memcpy(dst, srcbuf + runstart * bpp, len * bpp);
+				dst += len * bpp;
+				runstart += len;
+				run -= len;
+			}
+			if (!blankline)
+				lastline = dst;
+		} while (x < w);
 		
-        srcbuf += surface->w;//surface->pitch;
-    }
-    dst = lastline;             /* back up bast trailing blank lines */
-    ADD_COUNTS(0, 0);
-	
-#undef ADD_COUNTS
-	
-    /* Now that we have it encoded, release the original pixels */
-    /*if (!(surface->flags & SDL_PREALLOC)) {
-        SDL_free(surface->pixels);
-        surface->pixels = NULL;
-    }*/
-	
-    /* realloc the buffer to release unused memory */
+		srcbuf += surface->w;//surface->pitch;
+	}
+	dst = lastline;             /* back up bast trailing blank lines */
+	ADD_COUNTS(0, 0);
+
+	#undef ADD_COUNTS
+
+	/* realloc the buffer to release unused memory */
 	int newsize = dst - rlebuf;
 	Uint8 * newbuf = new Uint8[newsize];
 	memcpy(newbuf, rlebuf, newsize);
 	delete[] rlebuf;
 	surface->rlepixels = newbuf;
-    //{
-        /* If realloc returns NULL, the original block is left intact */
-        /*Uint8 *p = (Uint8 *)SDL_realloc(rlebuf, dst - rlebuf);
-        if (!p)
-            p = rlebuf;
-		surface->map->sw_data->aux_data = p;
-    }*/
+	//delete[] surface->pixels;
+	//surface->pixels = 0;
 }

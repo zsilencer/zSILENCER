@@ -24,6 +24,8 @@ public:
 
 private:
 	bool Tick(void);
+	void Present(void);
+	bool SetupOpenGL(void);
 	static Uint32 TimerCallback(Uint32 interval, void * param);
 	void SetColors(SDL_Color * colors);
 	void UpdateInputState(Input & input);
@@ -35,6 +37,7 @@ private:
 	void ProcessInGameInterfaces(void);
 	void ShowDeployMessage(void);
 	void JoinGame(LobbyGame & lobbygame, char * password = 0);
+	void GoToState(Uint8 newstate);
 	Interface * CreateMainMenuInterface(void);
 	Interface * CreateOptionsInterface(void);
 	Interface * CreateOptionsControlsInterface(void);
@@ -87,9 +90,14 @@ private:
 	Uint8 nextstate;
 	Uint8 fade_i;
 	bool stateisnew;
+	bool nextstateprocessed;
 	class World world;
 	Renderer renderer;
 	SDL_Window * window;
+	SDL_GLContext glcontext;
+	GLuint gltextures[2];
+	GLuint fbo;
+	bool usingopengl;
 	SDL_Renderer * windowrenderer;
 	Surface screenbuffer;
 	SDL_Surface * sdlscreenbuffer;
@@ -110,6 +118,7 @@ private:
 	Uint32 currentlobbygameid;
 	char lastchannel[64];
 	Uint8 oldselectedagency;
+	Uint8 oldambiencelevel;
 	bool agencychanged;
 	bool gamesummaryinfoloaded;
 	bool minimized;

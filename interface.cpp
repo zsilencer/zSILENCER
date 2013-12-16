@@ -275,6 +275,7 @@ void Interface::ActiveChanged(World & world, Interface * callinginterface, bool 
 								jclass cls = env->FindClass("com/zSILENCER/game/zSILENCER");
 								jmethodID show = env->GetStaticMethodID(cls, "showKeyboard", "()V");
 								env->CallStaticVoidMethod(cls, show);
+								env->DeleteLocalRef(cls);
 #endif
 							}
 						}

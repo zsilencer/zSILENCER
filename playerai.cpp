@@ -11,10 +11,6 @@ PlayerAI::PlayerAI(Player & player) : player(player){
 	state = IDLE;
 }
 
-PlayerAI::~PlayerAI(){
-	
-}
-
 void PlayerAI::Tick(World & world){
 	Input zeroinput;
 	player.input = zeroinput;

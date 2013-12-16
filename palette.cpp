@@ -4,7 +4,6 @@
 Palette::Palette(){
 	currentpalette = 0;
 	for(int i = 0; i < 11; i++){
-		mixed[i] = 0;
 		brightness[i] = 0;
 		colored[i] = 0;
 		alphaed[i] = 0;
@@ -13,9 +12,6 @@ Palette::Palette(){
 
 Palette::~Palette(){
 	for(int i = 0; i < 11; i++){
-		if(mixed[i]){
-			delete[] mixed[i];
-		}
 		if(brightness[i]){
 			delete[] brightness[i];
 		}
@@ -29,10 +25,6 @@ Palette::~Palette(){
 }
 
 bool Palette::Load(void){
-	if(!mixed[currentpalette]){
-		mixed[currentpalette] = new Uint8[256 * 256];
-		memset(mixed[currentpalette], 0, 256 * 256);
-	}
 	if(!brightness[currentpalette]){
 		brightness[currentpalette] = new Uint8[256 * 256];
 		memset(brightness[currentpalette], 0, 256 * 256);
@@ -48,12 +40,11 @@ bool Palette::Load(void){
 	currentalphaedpalette = alphaed[currentpalette];
 	currentbrightnesspalette = brightness[currentpalette];
 	currentcoloredpalette = colored[currentpalette];
-	currentmixedpalette = mixed[currentpalette];
 	char filename[256];
 	sprintf(filename, "PALETTECALC%d.BIN", currentpalette);
-	//system("rm PALETTECALC0.BIN");
-	//system("rm PALETTECALC1.BIN");
-	//system("rm PALETTECALC2.BIN");
+	/*system("rm PALETTECALC0.BIN");
+	system("rm PALETTECALC1.BIN");
+	system("rm PALETTECALC2.BIN");*/
 	SDL_RWops * file = SDL_RWFromFile("PALETTE.BIN", "rb");
 	SDL_RWops * filec = SDL_RWFromFile(filename, "rb");
 	if(file){
@@ -64,23 +55,21 @@ bool Palette::Load(void){
 				SDL_RWread(file, &r, 1, 1);
 				SDL_RWread(file, &g, 1, 1);
 				SDL_RWread(file, &b, 1, 1);
-				colors[offset][i].b = b << (Uint8)2;
-				colors[offset][i].g = g << (Uint8)2;
-				colors[offset][i].r = r << (Uint8)2;
+				colors[offset][i].b = b << 2;
+				colors[offset][i].g = g << 2;
+				colors[offset][i].r = r << 2;
 			}
 		}
 		SDL_RWclose(file);
 		if(filec){
 			for(unsigned int i = 0; i < 256; i++){
-				for(unsigned int j = 0; j < 256; j++){
-					SDL_RWread(filec, &mixed[currentpalette][(i * 256) + j], 1, 1);
-					SDL_RWread(filec, &brightness[currentpalette][(i * 256) + j], 1, 1);
-					SDL_RWread(filec, &colored[currentpalette][(i * 256) + j], 1, 1);
-					SDL_RWread(filec, &alphaed[currentpalette][(i * 256) + j], 1, 1);
-				}
+				SDL_RWread(filec, &brightness[currentpalette][(i * 256)], 256, 1);
+				SDL_RWread(filec, &colored[currentpalette][(i * 256)], 256, 1);
+				SDL_RWread(filec, &alphaed[currentpalette][(i * 256)], 256, 1);
 			}
 			SDL_RWclose(filec);
 		}else{
+			printf("%s not found, calculating lookup tables...", filename);
 			Calculate(2, 256 - 30);
 			Save();
 		}
@@ -117,11 +106,13 @@ void Palette::SetParallaxColors(Uint8 parallax){
 }
 
 bool Palette::SetPalette(Uint8 palette){
+	if(palette >= 11){
+		return false;
+	}
 	currentpalette = palette;
 	currentalphaedpalette = alphaed[currentpalette];
 	currentbrightnesspalette = brightness[currentpalette];
 	currentcoloredpalette = colored[currentpalette];
-	currentmixedpalette = mixed[currentpalette];
 	return Load();
 }
 
@@ -134,30 +125,30 @@ void Palette::Save(void){
 	sprintf(filename, "PALETTECALC%d.BIN", currentpalette);
 	SDL_RWops * file = SDL_RWFromFile(filename, "wb");
 	for(unsigned int i = 0; i < 256; i++){
-		for(unsigned int j = 0; j < 256; j++){
-			SDL_RWwrite(file, &mixed[currentpalette][(i * 256) + j], 1, 1);
-			SDL_RWwrite(file, &brightness[currentpalette][(i * 256) + j], 1, 1);
-			SDL_RWwrite(file, &colored[currentpalette][(i * 256) + j], 1, 1);
-			SDL_RWwrite(file, &alphaed[currentpalette][(i * 256) + j], 1, 1);
-		}
+		SDL_RWwrite(file, &brightness[currentpalette][(i * 256)], 256, 1);
+		SDL_RWwrite(file, &colored[currentpalette][(i * 256)], 256, 1);
+		SDL_RWwrite(file, &alphaed[currentpalette][(i * 256)], 256, 1);
 	}
 	SDL_RWclose(file);
 }
 
 Uint8 Palette::ClosestMatch(SDL_Color color, bool upperonly){
 	Uint8 choice = 0;
-	int smallestdiff = 256 * 3;
+	int smallestdiff = (256 * 256) + (256 * 256) + (256 * 256);
 	int start = 2;
 	int end = 256;
 	if(upperonly && currentpalette == 0){
 		start = 114;
 	}
 	for(unsigned int i = start; i < end; i++){
-		int diff = 0;
-		diff += abs(colors[currentpalette][i].r - color.r);
-		diff += abs(colors[currentpalette][i].g - color.g);
-		diff += abs(colors[currentpalette][i].b - color.b);
-		if(abs(diff) < smallestdiff){
+		int x = colors[currentpalette][i].r - color.r;
+		int y = colors[currentpalette][i].g - color.g;
+		int z = colors[currentpalette][i].b - color.b;
+		int diff = (x * x) + (y * y) + (z * z);
+		//diff += abs(colors[currentpalette][i].r - color.r);
+		//diff += abs(colors[currentpalette][i].g - color.g);
+		//diff += abs(colors[currentpalette][i].b - color.b);
+		if(diff < smallestdiff){
 			smallestdiff = diff;
 			choice = i;
 		}
@@ -179,7 +170,6 @@ void Palette::Calculate(Uint8 begin, Uint8 end){
 			alpha = 1;
 		}
 		for(unsigned int j = begin; j <= end; j++){
-			mixed[currentpalette][(i * 256) + j] = ClosestMatch(Mix(colors[currentpalette][i], colors[currentpalette][j]), upperonly);
 			Uint8 intensity = j;
 			if(intensity > 128 || currentpalette != 0){
 				brightness[currentpalette][(i * 256) + j] = ClosestMatch(Brightness(colors[currentpalette][i], intensity), upperonly);
@@ -203,36 +193,48 @@ void Palette::Calculate(Uint8 begin, Uint8 end){
 	}
 }
 
-/*Uint8 Palette::Mix(Uint8 a, Uint8 b){
-	return currentmixedpalette[(a * 256) + b];
-}
-
-Uint8 Palette::Brightness(Uint8 a, Uint8 i){
-	return currentbrightnesspalette[(a * 256) + i];
-}
-
-Uint8 Palette::Color(Uint8 a, Uint8 b){
-	return currentcoloredpalette[(a * 256) + b];
-}
-
-Uint8 Palette::Alpha(Uint8 a, Uint8 b){
-	return currentalphaedpalette[(a * 256) + b];
-}*/
-
-/*Uint8 Palette::RampColor(Uint8 a, Uint8 b){
-	if(a <= 1){
-		a = 5;
-	}
-	if(a >= 256 - 30){
-		return Color(a, b);
-	}
-	return ((a - 2) % 16) + (((b - 2) / 16) * 16) + 2;
-}*/
-
-SDL_Color * Palette::CopyWithBrightness(SDL_Color * palette, Uint8 brightness){
+void Palette::CalculateLighted(Uint8 ambiencelevel){
 	for(int i = 0; i < 256; i++){
+		for(int j = 0; j < 16; j++){
+			Uint8 * entry = &currentlightedpalette[(i * 16) + j];
+			if(i <= 1){
+				*entry = i;
+			}else{
+				if(i >= 114){
+					*entry = i;
+				}else{
+					int lum = (j * 8) + ambiencelevel;
+					if(lum > 128){
+						lum = 128;
+					}
+					if(lum == 0){
+						*entry = i;
+					}else{
+						Uint8 newcolor = Brightness(i, lum);
+						int newcolorbrightness = (newcolor - 2) % 16;
+						Uint8 oldcolorbrightness = (i - 2) % 16;
+						if(newcolorbrightness >= oldcolorbrightness * (float(ambiencelevel) / 128)){
+							*entry = newcolor + 112;
+						}else{
+							*entry = i;
+							//Uint8 newcolor2 = Brightness(i, ambiencelevel - 8);
+							//*entry = newcolor2 + 112;
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+SDL_Color * Palette::CopyWithBrightness(SDL_Color * palette, Uint8 brightness, Uint8 begin, Uint8 end){
+	for(int i = begin; i <= end; i++){
 		temppalette[i] = Brightness(palette[i], brightness);
 	}
+	return temppalette;
+}
+
+SDL_Color * Palette::GetTempPalette(void){
 	return temppalette;
 }
 

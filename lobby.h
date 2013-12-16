@@ -65,8 +65,7 @@ private:
 	hostent * he;
 	bool resolvethreadrunning;
 	char resolvehost[256];
-	char * sendbuffer;
-	unsigned int sendbuffermax;
+	char sendbuffer[4096];
 	unsigned int sendbuffersize;
 	unsigned int sendbufferoffset;
 	static const unsigned int maxusername = 16;

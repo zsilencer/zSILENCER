@@ -14,23 +14,27 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM * vm, void * pvt){
 	if(jvm->AttachCurrentThread(&jenv, NULL) != JNI_OK){
 		//printf("AttachCurrentThread failed\n");
 	}
-	/*if(jvm->GetEnv((void **)&jenv, JNI_VERSION_1_6) != JNI_OK){
-		printf("getenv failed\n");
-	}*/
 	return JNI_VERSION_1_6;
+}
+
+extern "C" void Java_com_zSILENCER_game_zSILENCER_SetPath(JNIEnv * env, jclass cls, jobject path){
+	const char * pathstring = env->GetStringUTFChars((jstring)path, NULL);
+	chdir(pathstring);
 }
 
 #ifdef OUYA
 extern "C" void Java_com_zSILENCER_game_zSILENCER_OuyaControllerKeyEvent(JNIEnv * env, jclass cls, jint player, jint type, jint keycode){
-    //printf("native ouya key down %d\n", keycode);
 	static SDL_Event pushedevent;
 	if(type == 1){
 		pushedevent.type = SDL_KEYDOWN;
+		//printf("native ouya key down %d\n", keycode);
 	}else{
 		pushedevent.type = SDL_KEYUP;
 	}
 	int keycode2 = keycode;
 	switch(keycode){
+		case 17: keycode2 = SDL_SCANCODE_LALT; break; // L2
+		case 18: keycode2 = SDL_SCANCODE_RALT; break; // R2
 		case 19: keycode2 = SDL_SCANCODE_UP; break;
 		case 20: keycode2 = SDL_SCANCODE_DOWN; break;
 		case 21: keycode2 = SDL_SCANCODE_LEFT; break;
@@ -38,6 +42,10 @@ extern "C" void Java_com_zSILENCER_game_zSILENCER_OuyaControllerKeyEvent(JNIEnv 
 		case 82: keycode2 = SDL_SCANCODE_HOME; break; // Menu
 		case 96: keycode2 = SDL_SCANCODE_RETURN; break; // O
 		case 97: keycode2 = SDL_SCANCODE_ESCAPE; break; // A
+		case 200: keycode2 = SDL_SCANCODE_KP_2; break; // RUp
+		case 201: keycode2 = SDL_SCANCODE_KP_4; break; // RLeft
+		case 202: keycode2 = SDL_SCANCODE_KP_6; break; // RRight
+		case 203: keycode2 = SDL_SCANCODE_KP_8; break; // RDown
 	}
 	pushedevent.key.keysym.scancode = (SDL_Scancode)keycode2;
 	SDL_PushEvent(&pushedevent);

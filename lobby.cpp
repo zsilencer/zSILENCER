@@ -13,9 +13,7 @@ Lobby::Lobby(World * world){
 	sendbuffersize = 0;
 	creategamestatus = 0;
 	connectgamestatus = 0;
-	sendbuffermax = 4096;
 	sendbufferoffset = 0;
-	sendbuffer = new char[sendbuffermax];
 	gamesprocessed = false;
 	channelchanged = false;
 	channel[0] = 0;
@@ -26,9 +24,12 @@ Lobby::Lobby(World * world){
 
 Lobby::~Lobby(){
 	LockMutex();
-	delete[] sendbuffer;
 	Disconnect();
 	ClearGames();
+	for(std::map<Uint32, User *>::iterator it = userinfos.begin(); it != userinfos.end(); it++){
+		delete (*it).second;
+	}
+	userinfos.clear();
 	SDL_DestroyMutex(mutex);
 }
 
@@ -51,7 +52,7 @@ void Lobby::Connect(const char * host, unsigned short port){
 		addr.sin_port = htons(port);
 		addr.sin_addr.s_addr = inet_addr(serverip);//*(in_addr *)(he->h_addr_list[0]);
 		connect(sockethandle, (sockaddr *)&addr, sizeof(addr));
-		//printf("%d %d\n", ret, errno);
+		//printf("%d\n", errno);
 		state = CONNECTING;
 		lasttime = SDL_GetTicks();
 	}else{
@@ -548,7 +549,7 @@ bool Lobby::Send(const char * data, unsigned int size){
 	}else{
 		if(ret < size){
 			unsigned int bytesremaining = size - ret;
-			if(sendbuffersize + bytesremaining > sendbuffersize){
+			if(sendbuffersize + bytesremaining > sizeof(sendbuffer)){
 				Disconnect();
 				return false;
 			}

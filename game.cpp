@@ -59,9 +59,18 @@ Game::Game() : renderer(world), screenbuffer(640, 480){
 	currentinterface = 0;
 	lastchannel[0] = 0;
 	minimized = false;
+	modaldialoghasok = false;
 	window = 0;
 	windowrenderer = 0;
+	glcontext = 0;
+	fbo = 0;
+	gltextures[0] = 0;
+	gltextures[1] = 0;
 	lasttick = 0;
+	usingopengl = true;
+	sdlscreenbuffer = 0;
+	oldambiencelevel = 0;
+	nextstateprocessed = false;
 #ifdef OUYA
 	quitscancode = SDL_SCANCODE_HOME;
 #else
@@ -70,9 +79,21 @@ Game::Game() : renderer(world), screenbuffer(640, 480){
 }
 
 Game::~Game(){
-	SDL_FreeSurface(sdlscreenbuffer);
-	SDL_DestroyRenderer(windowrenderer);
-	SDL_DestroyWindow(window);
+	if(glcontext){
+		SDL_GL_DeleteContext(glcontext);
+	}
+	if(sdlscreenbuffer){
+		SDL_FreeSurface(sdlscreenbuffer);
+	}
+	if(usingopengl){
+		SDL_GL_UnloadLibrary();
+	}
+	if(windowrenderer){
+		SDL_DestroyRenderer(windowrenderer);
+	}
+	if(window){
+		SDL_DestroyWindow(window);
+	}
 	world.resources.UnloadSounds();
 	Audio::GetInstance().Close();
 	Mix_Quit();
@@ -143,9 +164,13 @@ bool Game::Load(char * cmdline){
 	//SDL_EnableKeyRepeat(SDL_DEFAULT_REPEAT_DELAY, SDL_DEFAULT_REPEAT_INTERVAL);
 	//screen = SDL_SetVideoMode(640, 480, 8, SDL_DOUBLEBUF | SDL_SWSURFACE);
 	window = SDL_CreateWindow("zSILENCER", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, screenbuffer.w, screenbuffer.h, SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | (Config::GetInstance().fullscreen ? SDL_WINDOW_FULLSCREEN : 0));
-	windowrenderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
-	sdlscreenbuffer = SDL_CreateRGBSurface(SDL_SWSURFACE, screenbuffer.w, screenbuffer.h, 8, 0, 0, 0, 0);
-	SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "2");
+	if(!SetupOpenGL()){
+		printf("Unable to setup OpenGL shaders, using SDL Renderer\n");
+		usingopengl = false;
+		windowrenderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
+		sdlscreenbuffer = SDL_CreateRGBSurface(SDL_SWSURFACE, screenbuffer.w, screenbuffer.h, 8, 0, 0, 0, 0);
+	}
+	SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "linear");
 	SetColors(renderer.palette.GetColors());
 	//SDL_Flip(screen);
 	printf("Loading resources...\n");
@@ -158,12 +183,160 @@ bool Game::Load(char * cmdline){
 	return true;
 }
 
-void Game::LoadProgressCallback(int progress, int totalprogressitems){
-	HandleSDLEvents();
-	if(SDL_GetTicks() - lasttick >= 100){
-		int width = 500;
-		int widthp = (float(progress) / totalprogressitems) * width;
-		renderer.DrawFilledRectangle(&screenbuffer, (640 - (width)) / 2, (480 - 20) / 2, (640 + (widthp)) / 2, (480 + 20) / 2, 123);
+bool Game::SetupOpenGL(void){
+	return false;
+	/*if(SDL_GL_LoadLibrary(0) == -1){
+		return false;
+	}
+	glcontext = SDL_GL_CreateContext(window);
+	if(!glcontext){
+		return false;
+	}
+	glViewport(0, 0, screenbuffer.w, screenbuffer.h);
+	//glGenFramebuffers(1, &fbo);
+	if(!glCreateProgram){
+		return false;
+	}
+	GLuint program = glCreateProgram();
+	if(!program){
+		return false;
+	}
+	
+	GLuint vertshader = glCreateShader(GL_VERTEX_SHADER);
+	if(!vertshader){
+		return false;
+	}
+	const GLchar * vertshadercode = "#version 110\n"
+	"varying vec2 texture_coordinate;"
+	"void main(){"
+	"	gl_Position = gl_ModelViewProjectionMatrix * gl_Vertex;"
+	"	texture_coordinate = vec2(gl_MultiTexCoord0);"
+	"}";
+	GLint shadercodelength = strlen(vertshadercode);
+	if(!glShaderSource){
+		return false;
+	}
+	glShaderSource(vertshader, 1, &vertshadercode, &shadercodelength);
+	if(!glCompileShader){
+		return false;
+	}
+	glCompileShader(vertshader);
+	char buffer[1024];
+	GLsizei length;
+	if(!glGetShaderiv){
+		return false;
+	}
+	glGetShaderiv(vertshader, GL_INFO_LOG_LENGTH, &length);
+	if(length > 0){
+		if(!glGetShaderInfoLog){
+			return false;
+		}
+		glGetShaderInfoLog(vertshader, sizeof(buffer), &length, buffer);
+		if(length > 0){
+			printf("vert ShaderInfo: %s\n", buffer);
+			return false;
+		}
+	}
+	if(!glAttachShader){
+		return false;
+	}
+	glAttachShader(program, vertshader);
+	
+	GLuint fragshader = glCreateShader(GL_FRAGMENT_SHADER);
+	const GLchar * fragshadercode = "#version 110\n"
+	"uniform sampler2D Palette;"
+	"uniform sampler2D IndexedColorTexture;"
+	"varying vec2 texture_coordinate;"
+	"void main(){"
+	"	vec4 index = texture2D(IndexedColorTexture, texture_coordinate);"
+	"	vec4 texel = texture2D(Palette, vec2(index.r, 0));"
+	"	gl_FragColor = texel;"
+	"}";
+	shadercodelength = strlen(fragshadercode);
+	glShaderSource(fragshader, 1, &fragshadercode, &shadercodelength);
+	glCompileShader(fragshader);
+	glGetShaderiv(fragshader, GL_INFO_LOG_LENGTH, &length);
+	if(length > 0){
+		glGetShaderInfoLog(fragshader, sizeof(buffer), &length, buffer);
+		if(length > 0){
+			printf("frag ShaderInfo: %s\n", buffer);
+			return false;
+		}
+	}
+	glAttachShader(program, fragshader);
+	if(!glLinkProgram){
+		return false;
+	}
+	glLinkProgram(program);
+	if(!glGetProgramiv){
+		return false;
+	}
+	glGetProgramiv(program, GL_INFO_LOG_LENGTH, &length);
+	if(length > 0){
+		if(!glGetProgramInfoLog){
+			return false;
+		}
+		glGetProgramInfoLog(program, sizeof(buffer), &length, buffer);
+		if(length > 0){
+			printf("ProgramInfo: %s\n", buffer);
+			return false;
+		}
+	}
+	if(!glUseProgram){
+		return false;
+	}
+	glUseProgram(program);
+	
+	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+	glEnable(GL_TEXTURE_2D);
+	glGenTextures(2, gltextures);
+	
+	glBindTexture(GL_TEXTURE_2D, gltextures[0]);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 256, 1, 0, GL_RGBA, GL_UNSIGNED_BYTE, renderer.palette.GetColors());
+	glBindTexture(GL_TEXTURE_2D, gltextures[1]);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexImage2D(GL_TEXTURE_2D, 0, 1, screenbuffer.w, screenbuffer.h, 0, GL_RED, GL_UNSIGNED_BYTE, screenbuffer.pixels);
+	
+	int palettesampler = glGetUniformLocation(program, "Palette");
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, gltextures[0]);
+	if(!glUniform1i){
+		return false;
+	}
+	glUniform1i(palettesampler, 0);
+	
+	int indexedtexturesampler = glGetUniformLocation(program, "IndexedColorTexture");
+	glActiveTexture(GL_TEXTURE0 + 1);
+	glBindTexture(GL_TEXTURE_2D, gltextures[1]);
+	glUniform1i(indexedtexturesampler, 1);
+	return true;*/
+}
+
+void Game::Present(void){
+	if(usingopengl){
+/*
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+		glBindTexture(GL_TEXTURE_2D, gltextures[1]);
+		glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+		glPixelStorei(GL_PACK_ALIGNMENT, 1);
+		glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, screenbuffer.w, screenbuffer.h, GL_RED, GL_UNSIGNED_BYTE, screenbuffer.pixels);
+		glLoadIdentity();
+		glBegin(GL_QUADS);
+		glTexCoord2f(0.0f, 1.0f);
+		glVertex3f( -1.0f, -1.0f, 0.0f);
+		glTexCoord2f(1.0f, 1.0f);
+		glVertex3f(1.0f,-1.0f, 0.0f);
+		glTexCoord2f(1.0f, 0.0f);
+		glVertex3f( 1.0f,1.0f, 0.0f);
+		glTexCoord2f(0.0f, 0.0f);
+		glVertex3f( -1.0f,1.0f, 0.0f);
+		glEnd();
+		SDL_GL_SwapWindow(window);
+*/
+	}else{
 		void * oldpixels = sdlscreenbuffer->pixels;
 		sdlscreenbuffer->pixels = screenbuffer.pixels;
 		SDL_Texture * texture = SDL_CreateTextureFromSurface(windowrenderer, sdlscreenbuffer);
@@ -171,12 +344,31 @@ void Game::LoadProgressCallback(int progress, int totalprogressitems){
 		SDL_RenderCopy(windowrenderer, texture, 0, 0);
 		SDL_DestroyTexture(texture);
 		SDL_RenderPresent(windowrenderer);
+	}
+}
+
+void Game::LoadProgressCallback(int progress, int totalprogressitems){
+	HandleSDLEvents();
+	if(SDL_GetTicks() - lasttick >= 100){
+		int width = 500;
+		int widthp = (float(progress) / totalprogressitems) * width;
+		//const char * text = "Loading...";
+		//renderer.DrawText(&screenbuffer, 320 - ((strlen(text) * 12) / 2), 200, text, 135, 12);
+		renderer.DrawFilledRectangle(&screenbuffer, (640 - (width)) / 2, (480 - 20) / 2, (640 + (widthp)) / 2, (480 + 20) / 2, 123);
+		Present();
 		lasttick = SDL_GetTicks();
 	}
 }
 
 void Game::SetColors(SDL_Color * colors){
-	SDL_SetPaletteColors(sdlscreenbuffer->format->palette, colors, 0, 256);
+	if(usingopengl){
+		/*glBindTexture(GL_TEXTURE_2D, gltextures[0]);
+		glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+		glPixelStorei(GL_PACK_ALIGNMENT, 4);
+		glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 256, 1, GL_RGBA, GL_UNSIGNED_BYTE, colors);*/
+	}else{
+		SDL_SetPaletteColors(sdlscreenbuffer->format->palette, colors, 0, 256);
+	}
 }
 
 Uint32 Game::TimerCallback(Uint32 interval, void * param){
@@ -215,6 +407,19 @@ bool Game::Loop(void){
 			return false;
 		}
 		renderer.Tick();
+		if(world.gameplaystate == World::INGAME){
+			Uint8 newambiencelevel = renderer.GetAmbienceLevel();
+			if(newambiencelevel != oldambiencelevel || fade_i <= 15){
+				SDL_Color * colors = renderer.palette.GetColors();
+				if(fade_i <= 15){
+					colors = renderer.palette.GetTempPalette();
+				}
+				SDL_Color * ambiencepalette = renderer.palette.CopyWithBrightness(colors, newambiencelevel, 2, 114);
+				SetColors(ambiencepalette);
+				renderer.palette.CalculateLighted(newambiencelevel);
+				oldambiencelevel = newambiencelevel;
+			}
+		}
 		fade_i++;
 		if(fade_i >= 16){
 			fade_i = 16;
@@ -223,10 +428,6 @@ bool Game::Loop(void){
 	}
 	world.DoNetwork();
 	if(!world.dedicatedserver.active){
-		/*SDL_FillRect(screen, 0, 0);
-		renderer.Draw(screen);
-		SDL_Flip(screen);*/
-		//SDL_FillRect(screenbuffer, 0, 0);
 		screenbuffer.Clear(0);
 		world.DoNetwork();
 		renderer.Draw(&screenbuffer, 1 - (float(tickcheck - lasttick) / wait));
@@ -237,17 +438,12 @@ bool Game::Loop(void){
 			SDL_Delay(wait);
 		}
 		world.DoNetwork();
-		void * oldpixels = sdlscreenbuffer->pixels;
-		sdlscreenbuffer->pixels = screenbuffer.pixels;
-		SDL_Texture * texture = SDL_CreateTextureFromSurface(windowrenderer, sdlscreenbuffer);
-		sdlscreenbuffer->pixels = oldpixels;
-		world.DoNetwork();
-		SDL_RenderCopy(windowrenderer, texture, 0, 0);
-		SDL_DestroyTexture(texture);
-		//SDL_UpdateWindowSurface(window);
-		SDL_RenderPresent(windowrenderer);
-		//SDL_BlitSurface(screenbuffer, 0, screen, 0);
-		//SDL_UpdateRect(screen, 0, 0, screen->w, screen->h);
+		//Uint32 drawtick = SDL_GetTicks();
+		Present();
+		//Uint32 afterdrawtick = SDL_GetTicks();
+		/*if(1 || afterdrawtick - drawtick > wait){
+			printf("frame took %d ms to present\n", afterdrawtick - drawtick);
+		}*/
 	}else{
 		SDL_Delay(1);
 	}
@@ -259,13 +455,6 @@ bool Game::Tick(void){
 	ProcessInGameInterfaces();
 	if(world.dedicatedserver.active){
 		if(world.dedicatedserver.nopeerstime >= 10 * 24){
-			/*for(std::vector<Uint32>::iterator it = world.users.begin(); it != world.users.end(); it++){
-				Uint32 accountid = *it;
-				User * user = world.lobby.GetUserInfo(accountid);
-				if(user){
-					world.lobby.RegisterStats(*user, 2);
-				}
-			}*/
 			world.dedicatedserver.SendHeartBeat(world, 2);
 			return false;
 		}
@@ -273,10 +462,7 @@ bool Game::Tick(void){
 			State * sharedstateobject = static_cast<State *>(world.GetObjectFromId(sharedstate));
 			if(sharedstateobject && sharedstateobject->state == 0 && world.peercount >= 1 && world.AllPeersReady(world.localpeerid) && world.AllPeersLoadedGameInfo()){
 				sharedstateobject->state = 1;
-				nextstate = INGAME;
-				state = FADEOUT;
-				fade_i = 0;
-				stateisnew = true;
+				GoToState(INGAME);
 			}
 		}
 	}
@@ -295,14 +481,13 @@ bool Game::Tick(void){
 		if(sharedstateobject && sharedstateobject->state != sharedstateobject->oldstate){
 			switch(sharedstateobject->state){
 				case 1:
-					nextstate = INGAME;
-					state = FADEOUT;
-					fade_i = 0;
-					stateisnew = true;
+					GoToState(INGAME);
 				break;
 				case 2:
-					state = INGAME;
-					stateisnew = true;
+					if(state != INGAME){
+						state = INGAME;
+						stateisnew = true;
+					}
 				break;
 			}
 			sharedstateobject->oldstate = sharedstateobject->state;
@@ -313,15 +498,11 @@ bool Game::Tick(void){
 		SDL_ShowCursor(SDL_DISABLE);
 	}else{
 		SDL_ShowCursor(SDL_ENABLE);
-		/*if(ambientbgchannel != -1){
-			Audio::GetInstance().Stop(ambientbgchannel, 500);
-			ambientbgchannel = -1;
-		}*/
 	}
 	switch(state){
 		case FADEOUT:{
 			world.intutorialmode = false;
-			SDL_Color * fadedpalette = renderer.palette.CopyWithBrightness(renderer.palette.GetColors(), (16 - fade_i) * 8);
+			SDL_Color * fadedpalette = renderer.palette.CopyWithBrightness(renderer.palette.GetColors(), (15 - fade_i) * 8);
 			SetColors(fadedpalette);
 			if(fade_i >= 16){
 				state = nextstate;
@@ -406,10 +587,7 @@ bool Game::Tick(void){
 				stateisnew = false;
 			}else{
 				if(world.lobby.state == Lobby::DISCONNECTED){
-					nextstate = LOBBYCONNECT;
-					state = FADEOUT;
-					fade_i = 0;
-					stateisnew = true;
+					GoToState(LOBBYCONNECT);
 					break;
 				}
 				if(lobbyinterface){
@@ -508,7 +686,6 @@ bool Game::Tick(void){
 							if(lobbygame){
 								char temp[256];
 								GetGameChannelName(*lobbygame, temp);
-								//printf("joining %s\n", temp);
 								strcpy(lastchannel, world.lobby.channel);
 								world.lobby.JoinChannel(temp);
 							}
@@ -543,16 +720,24 @@ bool Game::Tick(void){
 					}
 				}
 				screenbuffer.Clear(0);
-				char mapname[256];
+				char mapname[7 + 256];
 				sprintf(mapname, "level/%s", world.gameinfo.mapname);
-				LoadMap(mapname);
+				if(!LoadMap(mapname)){
+					world.Disconnect();
+					if(world.lobby.state == Lobby::AUTHENTICATED){
+						world.lobby.JoinChannel(lastchannel);
+						GoToState(LOBBY);
+					}else{
+						GoToState(MAINMENU);
+					}
+					break;
+				}
 				State * sharedstateobject = static_cast<State *>(world.GetObjectFromId(sharedstate));
 				if(sharedstateobject){
 					sharedstateobject->state = 2;
 				}
 				ShowDeployMessage();
 				Audio::GetInstance().StopMusic();
-				//world.GetAuthorityPeer()->controlledlist.clear();
 				world.gameplaystate = World::INGAME;
 				for(std::list<Object *>::iterator it = world.objectlist.begin(); it != world.objectlist.end(); it++){
 					Object * object = *it;
@@ -570,7 +755,7 @@ bool Game::Tick(void){
 								}
 								Player * player = (Player *)world.CreateObject(ObjectTypes::PLAYER);
 								if(player){
-									world.map.RandomPlayerStartLocation(&player->x, &player->y);
+									world.map.RandomPlayerStartLocation(player->x, player->y);
 									player->oldx = player->x;
 									player->oldy = player->y;
 									player->teamid = team->id;
@@ -592,66 +777,39 @@ bool Game::Tick(void){
 				stateisnew = false;
 			}
 			if(!deploymessageshown && world.messagetype == 1 && world.message_i == 63){
-				world.ShowMessage((char *)"Location : Base Arsia Mons, Surface Temperature : -7C", 64, 1);
+				world.ShowMessage((char *)"Location : Base Arsia Mons, Surface Temperature : -7C", 96, 1);
 				deploymessageshown = true;
 			}
 			if(CheckForQuit()){
 				world.Disconnect();
-				state = FADEOUT;
 				if(world.lobby.state == Lobby::AUTHENTICATED){
-					nextstate = LOBBY;
+					GoToState(LOBBY);
 					world.lobby.JoinChannel(lastchannel);
 				}else{
-					nextstate = MAINMENU;
+					GoToState(MAINMENU);
 				}
-				fade_i = 0;
-				stateisnew = true;
 			}
 			if(CheckForEndOfGame()){
-				state = FADEOUT;
 				if(world.lobby.state == Lobby::AUTHENTICATED){
-					nextstate = MISSIONSUMMARY;
-					//nextstate = LOBBY;
-					//world.lobby.JoinChannel(lastchannel);
+					GoToState(MISSIONSUMMARY);
 				}else{
-					nextstate = MAINMENU;
+					GoToState(MAINMENU);
 				}
-				fade_i = 0;
-				stateisnew = true;
 			}
 			if(CheckForConnectionLost()){
-				state = FADEOUT;
 				if(world.lobby.state == Lobby::AUTHENTICATED){
-					nextstate = LOBBY;
+					GoToState(LOBBY);
 					world.lobby.JoinChannel(lastchannel);
 				}else{
-					nextstate = MAINMENU;
+					GoToState(MAINMENU);
 				}
-				fade_i = 0;
-				stateisnew = true;
 			}
 		}break;
-		/*case JOINGAME:{
-			if(stateisnew){
-				world.GetAuthorityPeer()->controlledlist.clear();
-				world.DestroyAllObjects();
-				world.gameplaystate = World::INGAME;
-				currentinterface = 0;
-				palette.SetPalette(0);
-				palette.SetParallaxColors(world.map.parallax);
-				SDL_FillRect(screen, 0, 0);
-				SDL_SetPalette(screen, SDL_PHYSPAL, palette.GetColors(), 0, 256);
-				world.Connect(1, 1);
-				LoadMap("level/CRAN01h.SIL");
-				stateisnew = false;
-			}
-		}break;*/
 		case MISSIONSUMMARY:{
 			if(stateisnew){
 				UnloadGame();
 				gamesummaryinfoloaded = false;
 				world.Disconnect();
-				//world.lobby.ForgetUserInfo(world.lobby.accountid);
 				Audio::GetInstance().PlayMusic(world.resources.music);
 				renderer.camera.SetPosition(320, 240);
 				User * user = world.lobby.GetUserInfo(world.lobby.accountid);
@@ -694,7 +852,7 @@ bool Game::Tick(void){
 				//LoadMap("level/THET06e.SIL", 3);
 				//LoadMap("level/STAR72.SIL", 3);
 				//LoadMap("level/EASY05c.SIL", 3);
-				world.map.RandomPlayerStartLocation(&player->x, &player->y);
+				world.map.RandomPlayerStartLocation(player->x, player->y);
 				player->oldx = player->x;
 				player->oldy = player->y;
 				renderer.palette.SetPalette(0);
@@ -865,7 +1023,7 @@ bool Game::Tick(void){
 						if(!world.message_i){
 							char text[256];
 #ifdef OUYA
-							const char * button = GetKeyName(Config::GetInstance().keyusebinding[0]);
+							const char * button = "O";
 #else
 							const char * button = "Enter";
 #endif
@@ -1046,56 +1204,13 @@ bool Game::Tick(void){
 							player->state_i = 0;
 						}
 						if(world.message_i >= 128 - 1){
-							state = FADEOUT;
-							nextstate = MAINMENU;
-							fade_i = 0;
-							stateisnew = true;
+							GoToState(MAINMENU);
 						}
 					}break;
 				}
 			}
-			/*if(!world.message_i && singleplayermessage <= 7){
-				switch(singleplayermessage){
-					case 0:
-						world.ShowMessage("Welcome to zSILENCER\n\nUse single player mode to\ntest player movement\nand different weapons", 255, 3);
-					break;
-					case 1:
-						world.ShowMessage("If you haven't already,\ncheck the controls\nin the options", 255, 3);
-					break;
-					case 2:
-						world.ShowMessage("The goal of the game is\nto hack the active green\nterminals until a secret beams\ndown somewhere on the map", 255, 3);
-					break;
-					case 3:
-						world.ShowMessage("Collect the secret and\nbring it back to your base", 255, 3);
-					break;
-					case 4:
-						char text[256];
-						sprintf(text, "You can spawn your base\nby pressing %s", GetKeyName(Config::GetInstance().keyusebinding[0]));
-						world.ShowMessage(text, 255, 3);
-					break;
-					case 5:
-						world.ShowMessage("The team who successfully\ndelivers 3 secrets will win\n\nYou can also steal secrets", 255, 3);
-					break;
-					case 6:
-						world.ShowMessage("You are given 20000 credits\nhere to try all the items\n\nTry buying bombs and doing some\nthrowing practice", 255, 3);
-					break;
-					case 7:
-						world.ShowMessage("When you feel ready for\nreal challenge, connect to\nthe lobby and game with\nother players online", 255, 3);
-					break;
-				}
-				singleplayermessage++;
-			}*/
-			if(CheckForQuit()){
-				state = FADEOUT;
-				nextstate = MAINMENU;
-				fade_i = 0;
-				stateisnew = true;
-			}
-			if(CheckForEndOfGame()){
-				state = FADEOUT;
-				nextstate = MAINMENU;
-				fade_i = 0;
-				stateisnew = true;
+			if(CheckForQuit() || CheckForEndOfGame()){
+				GoToState(MAINMENU);
 			}
 		}break;
 		case OPTIONS:{
@@ -1113,16 +1228,10 @@ bool Game::Tick(void){
 						if(button && button->clicked){
 							switch(button->uid){
 								case 0:{
-									nextstate = MAINMENU;
-									state = FADEOUT;
-									fade_i = 0;
-									stateisnew = true;
+									GoToState(MAINMENU);
 								}break;
 								case 1:{
-									nextstate = OPTIONSCONTROLS;
-									state = FADEOUT;
-									fade_i = 0;
-									stateisnew = true;
+									GoToState(OPTIONSCONTROLS);
 								}break;
 							}
 							button->clicked = false;
@@ -1236,17 +1345,11 @@ bool Game::Tick(void){
 								switch(button->uid){
 									case 200:{
 										Config::GetInstance().Save();
-										nextstate = OPTIONS;
-										state = FADEOUT;
-										fade_i = 0;
-										stateisnew = true;
+										GoToState(OPTIONS);
 									}break;
 									case 201:{
 										Config::GetInstance().Load();
-										nextstate = OPTIONS;
-										state = FADEOUT;
-										fade_i = 0;
-										stateisnew = true;
+										GoToState(OPTIONS);
 									}break;
 								}
 								button->clicked = false;
@@ -1295,7 +1398,7 @@ bool Game::Tick(void){
 								for(int i = 0; i < team->numpeers; i++){
 									Player * player = (Player *)world.CreateObject(ObjectTypes::PLAYER);
 									if(player){
-										world.map.RandomPlayerStartLocation(&player->x, &player->y);
+										world.map.RandomPlayerStartLocation(player->x, player->y);
 										player->oldx = player->x;
 										player->oldy = player->y;
 										player->teamid = team->id;
@@ -1368,7 +1471,7 @@ bool Game::Tick(void){
 						botplayer->credits = 500;
 						botplayer->ai = new PlayerAI(*botplayer);
 						botpeer->controlledlist.push_back(botplayer->id);
-						world.map.RandomPlayerStartLocation(&botplayer->x, &botplayer->y);
+						world.map.RandomPlayerStartLocation(botplayer->x, botplayer->y);
 						botplayer->oldx = botplayer->x;
 						botplayer->oldy = botplayer->y;
 						botnum++;
@@ -1379,7 +1482,7 @@ bool Game::Tick(void){
 				for(std::list<Object *>::iterator it = world.objectlist.begin(); it != world.objectlist.end(); it++){
 					if((*it)->type == ObjectTypes::PLAYER){
 						Player * player = static_cast<Player *>(*it);
-						world.map.RandomPlayerStartLocation(&player->x, &player->y);
+						world.map.RandomPlayerStartLocation(player->x, player->y);
 					}
 				}
 				ShowDeployMessage();
@@ -1405,36 +1508,29 @@ bool Game::Tick(void){
 						}
 					}
 				}*/
-				if(CheckForQuit()){
-					state = FADEOUT;
-					nextstate = MAINMENU;
-					fade_i = 0;
-					stateisnew = true;
-				}
-				if(CheckForEndOfGame()){
-					state = FADEOUT;
-					nextstate = MAINMENU;
-					fade_i = 0;
-					stateisnew = true;
+				if(CheckForQuit() || CheckForEndOfGame()){
+					GoToState(MAINMENU);
 				}
 			}
 		}break;
 	}
 	if(fade_i < 16 && state != FADEOUT){
+		// Fade IN the palette
+		SDL_Color * fadedpalette = renderer.palette.CopyWithBrightness(renderer.palette.GetColors(), (fade_i) * 8);
 		if(fade_i == 15){
 			SetColors(renderer.palette.GetColors());
 		}else{
-			SDL_Color * fadedpalette = renderer.palette.CopyWithBrightness(renderer.palette.GetColors(), (fade_i) * 8);
 			SetColors(fadedpalette);
 		}
+	}
+	if(!nextstateprocessed){
+		nextstateprocessed = true;
+		return Tick();
 	}
 	return true;
 }
 
 void Game::UpdateInputState(Input & input){
-	//const Uint8 * keystateconst = SDL_GetKeyboardState(NULL);
-	//Uint8 keystate[SDL_NUM_SCANCODES];
-	//memcpy(keystate, keystateconst, sizeof(keystate));
 	int mousex;
 	int mousey;
 	Uint8 mousestate = SDL_GetMouseState(&mousex, &mousey);
@@ -1531,7 +1627,6 @@ bool Game::LoadMap(const char * name){
 }
 
 void Game::UnloadGame(void){
-	//world.GetAuthorityPeer()->controlledlist.clear();
 	Audio::GetInstance().StopAll(200);
 	for(int i = 0; i < sizeof(bgchannel) / sizeof(int); i++){
 		bgchannel[i] = -1;
@@ -1701,12 +1796,18 @@ void Game::JoinGame(LobbyGame & lobbygame, char * password){
 	peer->ip = ntohl(inet_addr(lobbygame.hostname));
 	//peer->ip = ntohl(inet_addr("127.0.0.1")); // temporary
 	peer->port = lobbygame.port;
-	//world.NATHolePunch(*peer);
-	//world.lobby.ConnectToGame(*lobbygame, GetSelectedAgency());
 	sharedstate = 0;
 	world.mode = World::REPLICA;
 	world.Connect(GetSelectedAgency(), world.lobby.accountid, password);
 	joininggame = true;
+}
+
+void Game::GoToState(Uint8 newstate){
+	nextstate = newstate;
+	state = FADEOUT;
+	fade_i = 0;
+	stateisnew = true;
+	nextstateprocessed = false;
 }
 
 Interface * Game::CreateMainMenuInterface(void){
@@ -1954,6 +2055,16 @@ Interface * Game::CreateLobbyConnectInterface(void){
 	passwordinput->password = true;
 	passwordinput->uid = 2;
 	Interface * iface = (Interface *)world.CreateObject(ObjectTypes::INTERFACE);
+#ifdef OUYA
+	Overlay * helptext = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
+	helptext->text = new char[256];
+	const char * helptextstring = "Use the trackpad to click on input boxes";
+	strcpy(helptext->text, helptextstring);
+	helptext->textbank = 134;
+	helptext->textwidth = 9;
+	helptext->x = 320 - ((strlen(helptextstring) * helptext->textwidth) / 2);
+	helptext->y = 400;
+#endif
 	
 	iface->AddObject(textbox->id);
 	iface->AddObject(usernameinput->id);
@@ -1987,7 +2098,6 @@ Interface * Game::CreateLobbyInterface(void){
 	Overlay * vertext = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
 	vertext->text = new char[64];
 	sprintf(vertext->text, "v.%s", world.version);
-	//strcpy(vertext->text, "v.00010");
 	vertext->textbank = 133;
 	vertext->textwidth = 6;
 	vertext->effectcolor = 189;
@@ -2440,7 +2550,11 @@ Interface * Game::CreateGameCreateInterface(void){
 	mapselect->height = 265;
 	mapselect->lineheight = 14;
 	mapselect->uid = 4;
-	mapselect->ListFiles("level");
+	//mapselect->ListFiles("level");
+	const char * maps[] = {"ALLY10c.sil", "CRAN01h.SIL", "EASY05c.SIL", "PIT16d.SIL", "STAR72.SIL", "THET06e.SIL"};
+	for(int i = 0; i < sizeof(maps) / sizeof(const char *); i++){
+		mapselect->AddItem(maps[i]);
+	}
 	ScrollBar * mapscrollbar = (ScrollBar *)world.CreateObject(ObjectTypes::SCROLLBAR);
 	mapscrollbar->res_index = 9;
 	mapscrollbar->scrollpixels = mapselect->lineheight;
@@ -2788,21 +2902,6 @@ Interface * Game::CreateGameSummaryInterface(Stats & stats, Uint8 agency){
 	}
 	
 	for(int i = 0; i < 6; i++){
-		/*if(upgradeavailable){
-			Button * button = (Button *)world.CreateObject(ObjectTypes::BUTTON);
-			button->y = -180 + (i * 46);
-			button->x = 62;
-			button->uid = 10 + i;
-			switch(i){
-				case 0: sprintf(button->text, "+1 Endurance"); break;
-				case 1: sprintf(button->text, "+1 Shield   "); break;
-				case 2: sprintf(button->text, "+1 Jetpack  "); break;
-				case 3: sprintf(button->text, "+1 Tech Slot"); break;
-				case 4: sprintf(button->text, "+1 Hacking  "); break;
-				case 5: sprintf(button->text, "+1 Contacts "); break;
-			}
-			iface->AddObject(button->id);
-		}*/
 		Overlay * text = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
 		Overlay * textlevel = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
 		text->text = new char[64];
@@ -2853,9 +2952,11 @@ Interface * Game::CreateModalDialog(const char * message, bool ok){
 	DestroyModalDialog();
 	// 40:4 model dialog background
 	Overlay * background = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
+	background->renderpass = 3;
 	background->res_bank = 40;
 	background->res_index = 4;
 	Overlay * text = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
+	text->renderpass = 3;
 	text->text = new char[strlen(message) + 1];
 	strcpy(text->text, message);
 	text->textbank = 134;
@@ -2865,6 +2966,7 @@ Interface * Game::CreateModalDialog(const char * message, bool ok){
 	Interface * dialoginterface = (Interface *)world.CreateObject(ObjectTypes::INTERFACE);
 	if(ok){
 		Button * okbutton = (Button *)world.CreateObject(ObjectTypes::BUTTON);
+		okbutton->renderpass = 3;
 		okbutton->x = 242;
 		okbutton->y = 230;
 		okbutton->SetType(Button::B156x21);
@@ -2908,12 +3010,14 @@ Interface * Game::CreatePasswordDialog(void){
 	// 40:2 model dialog password input
 	DestroyModalDialog();
 	Overlay * background = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
+	background->renderpass = 3;
 	background->res_bank = 40;
 	background->res_index = 2;
 	background->x = 320 - (world.resources.spritewidth[background->res_bank][background->res_index] / 2);
 	background->y = 240 - (world.resources.spriteheight[background->res_bank][background->res_index] / 2);
 	Interface * dialoginterface = (Interface *)world.CreateObject(ObjectTypes::INTERFACE);
 	Overlay * text = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
+	text->renderpass = 3;
 	text->text = new char[256];
 	strcpy(text->text, "This game requires a password");
 	text->textbank = 134;
@@ -2921,6 +3025,7 @@ Interface * Game::CreatePasswordDialog(void){
 	text->x = 320 - ((strlen(text->text) * 8) / 2);
 	text->y = 196;
 	TextInput * passwordinput = (TextInput *)world.CreateObject(ObjectTypes::TEXTINPUT);
+	passwordinput->renderpass = 3;
 	passwordinput->x = 210;
 	passwordinput->y = 243;
 	passwordinput->width = 180;
@@ -2933,6 +3038,7 @@ Interface * Game::CreatePasswordDialog(void){
 	passwordinput->uid = 1;
 	modaldialoghasok = true;
 	Button * okbutton = (Button *)world.CreateObject(ObjectTypes::BUTTON);
+	okbutton->renderpass = 3;
 	okbutton->x = 242;
 	okbutton->y = 267;
 	okbutton->SetType(Button::B156x21);
@@ -3023,10 +3129,7 @@ bool Game::GoBack(void){
 		currentinterface = iface->id;
 		return true;
 	}else{
-		nextstate = MAINMENU;
-		state = FADEOUT;
-		fade_i = 0;
-		stateisnew = true;
+		GoToState(MAINMENU);
 	}
 	return false;
 }
@@ -3039,44 +3142,25 @@ bool Game::ProcessMainMenuInterface(Interface * iface){
 			if(button->clicked){
 				switch(button->uid){
 					case 0:
-						nextstate = SINGLEPLAYERGAME;
-						state = FADEOUT;
-						fade_i = 0;
-						stateisnew = true;
+						GoToState(SINGLEPLAYERGAME);
 					break;
 					case 1:
-						nextstate = LOBBYCONNECT;
-						state = FADEOUT;
-						fade_i = 0;
-						stateisnew = true;
+						GoToState(LOBBYCONNECT);
 					break;
 					case 2:
-						nextstate = OPTIONS;
-						state = FADEOUT;
-						fade_i = 0;
-						stateisnew = true;
+						GoToState(OPTIONS);
 					break;
 					case 3:
 						return false;
 					break;
 					case 4:
-						nextstate = HOSTGAME;
-						//nextstate = MISSIONSUMMARY;
-						state = FADEOUT;
-						fade_i = 0;
-						stateisnew = true;
+						GoToState(HOSTGAME);
 					break;
 					case 5:
-						nextstate = JOINGAME;
-						state = FADEOUT;
-						fade_i = 0;
-						stateisnew = true;
+						GoToState(JOINGAME);
 					break;
 					case 6:
-						nextstate = TESTGAME;
-						state = FADEOUT;
-						fade_i = 0;
-						stateisnew = true;
+						GoToState(TESTGAME);
 					break;
 				}
 			}
@@ -3125,7 +3209,6 @@ void Game::ProcessLobbyConnectInterface(Interface * iface){
 					break;
 					case Lobby::CONNECTED:
 						textbox->AddLine("Connected");
-						//world.lobby.state = Lobby::AUTHENTICATING;
 						textbox->AddLine("Checking version...");
 						world.lobby.SendVersion();
 						world.lobby.state = Lobby::CHECKINGVERSION;
@@ -3157,10 +3240,7 @@ void Game::ProcessLobbyConnectInterface(Interface * iface){
 					break;
 					case Lobby::AUTHENTICATED:
 						textbox->AddLine("Authenticated");
-						nextstate = LOBBY;
-						state = FADEOUT;
-						fade_i = 0;
-						stateisnew = true;
+						GoToState(LOBBY);
 					break;
 					case Lobby::CONNECTIONFAILED:
 						textbox->AddLine("Connection failed");
@@ -3169,10 +3249,6 @@ void Game::ProcessLobbyConnectInterface(Interface * iface){
 					case Lobby::DISCONNECTED:
 						textbox->AddLine("Disconnected");
 						world.lobby.state = Lobby::IDLE;
-						/*nextstate = MAINMENU;
-						state = FADEOUT;
-						fade_i = 0;
-						stateisnew = true;*/
 					break;
 				}
 				if(world.lobby.motdreceived && !motdprinted){
@@ -3201,12 +3277,9 @@ void Game::ProcessLobbyConnectInterface(Interface * iface){
 							}
 						}
 					}break;
-					case 1:
-						nextstate = MAINMENU;
-						state = FADEOUT;
-						fade_i = 0;
-						stateisnew = true;
-						break;
+					case 1:{
+						GoToState(MAINMENU);
+					}break;
 				}
 				button->clicked = false;
 			}
@@ -3413,7 +3486,6 @@ bool Game::ProcessLobbyInterface(Interface * iface){
 								if(info.subsystem == SDL_SYSWM_COCOA){
 									NSWindow * nswindow = info.info.cocoa.window;
 									RequestUserAttention(nswindow);
-									//requestUserAttention();
 								}
 #endif
 							}
@@ -3450,11 +3522,6 @@ bool Game::ProcessLobbyInterface(Interface * iface){
 										strcpy(lastchannel, world.lobby.channel);
 									}
 									strcpy(overlay->text, world.lobby.channel);
-									//char * newmsg = new char[256];
-									//sprintf(newmsg, "You have joined channel %s", world.lobby.channel);
-									//newmsg[strlen(newmsg) + 1] = 209;
-									//newmsg[strlen(newmsg) + 2] = 140;
-									//world.lobby.chatmessages.push_back(newmsg);
 									world.lobby.channelchanged = false;
 								}
 							}break;
@@ -3596,29 +3663,13 @@ bool Game::ProcessLobbyInterface(Interface * iface){
 							}break;
 							case 30:{ // create game
 								if(gameselectinterface){
-									/*nextstate = MISSIONSUMMARY;
-									fade_i = 0;
-									state = FADEOUT;
-									stateisnew = true;
-									break;*/
 									Object * object = world.GetObjectFromId(currentinterface);
 									Interface * iface = static_cast<Interface *>(object);
-									/*for(std::vector<Uint16>::iterator it = iface->objects.begin(); it != iface->objects.end(); it++){
-										if((*it) == gameselectinterface->id){
-											iface->objects.erase(it);
-											break;
-										}
-									}
-									for(std::vector<Uint16>::iterator it = gameselectinterface->objects.begin(); it != gameselectinterface->objects.end(); it++){
-									 world.MarkDestroyObject((*it));
-									}
-									*/
 									if(gameselectinterface){
 										Interface * gameselectiface = static_cast<Interface *>(world.GetObjectFromId(gameselectinterface));
 										if(gameselectiface){
 											gameselectiface->DestroyInterface(world, iface);
 										}
-										//world.MarkDestroyObject(gameselectinterface->id);
 										gameselectinterface = 0;
 									}
 									gamecreateinterface = CreateGameCreateInterface()->id;
@@ -3631,13 +3682,6 @@ bool Game::ProcessLobbyInterface(Interface * iface){
 									iface->ActiveChanged(world, iface, false);
 									return false;
 								}
-								/*world.Listen();
-								world.GetAuthorityPeer()->accountid = world.lobby.accountid;
-								world.lobby.CreateGame("a test game", "THET06e.SIL");
-								Object * object = world.CreateObject(ObjectTypes::STATE);
-								sharedstate = static_cast<State *>(object);
-								sharedstate->state = 0;*/
-								//world.GetAuthorityPeer()->controlledlist.push_back(object->id);
 							}break;
 							case 35:{ // create game create
 								if(!creategameclicked){
@@ -3794,15 +3838,12 @@ void Game::ProcessGameSummaryInterface(Interface * iface){
 						User * user = world.lobby.GetUserInfo(world.lobby.accountid);
 						switch(button->uid){
 							case 0:{ // continue
-								state = FADEOUT;
 								if(world.lobby.state == Lobby::AUTHENTICATED){
-									nextstate = LOBBY;
+									GoToState(LOBBY);
 									world.lobby.JoinChannel(lastchannel);
 								}else{
-									nextstate = MAINMENU;
+									GoToState(MAINMENU);
 								}
-								fade_i = 0;
-								stateisnew = true;
 							}break;
 							case 10:{ // upgrade endurance
 								world.lobby.UpgradeStat(user->statsagency, 0);
@@ -4231,6 +4272,8 @@ void Game::IndexToConfigKey(int index, SDL_Scancode ** key1, SDL_Scancode ** key
 const char * Game::GetKeyName(SDL_Scancode sym){
 #ifdef OUYA // Custom scancodes for ouya controller
 	switch((int)sym){
+		case SDL_SCANCODE_LALT: return "L2"; break;
+		case SDL_SCANCODE_RALT: return "R2"; break;
 		case SDL_SCANCODE_HOME: return "Menu"; break;
 		case SDL_SCANCODE_RETURN: return "O"; break;
 		case SDL_SCANCODE_ESCAPE: return "A"; break;
@@ -4240,6 +4283,10 @@ const char * Game::GetKeyName(SDL_Scancode sym){
 		case 103: return "R1"; break;
 		case 106: return "L3"; break;
 		case 107: return "R3"; break;
+		case SDL_SCANCODE_KP_2: return "RUp"; break;
+		case SDL_SCANCODE_KP_4: return "RLeft"; break;
+		case SDL_SCANCODE_KP_6: return "RRight"; break;
+		case SDL_SCANCODE_KP_8: return "RDown"; break;
 	}
 #endif
 	switch(sym){
@@ -4395,8 +4442,8 @@ void Game::UpdateAmbienceChannels(void){
 			Audio::GetInstance().SetVolume(bgchannel[BG_OUTSIDE], 0);
 		}else{
 			Audio::GetInstance().SetVolume(bgchannel[BG_BASE], 0);
-			Audio::GetInstance().SetVolume(bgchannel[BG_AMBIENT], 24 * (1 - (outsideamount / float(maxamount))));
-			Audio::GetInstance().SetVolume(bgchannel[BG_OUTSIDE], 24 * (outsideamount / float(maxamount)));
+			Audio::GetInstance().SetVolume(bgchannel[BG_AMBIENT], 8 * (1 - (outsideamount / float(maxamount))));
+			Audio::GetInstance().SetVolume(bgchannel[BG_OUTSIDE], 8 * (outsideamount / float(maxamount)));
 		}
 	}
 }
@@ -4407,6 +4454,11 @@ bool Game::HandleSDLEvents(void){
 		switch(event.type){
 			case SDL_WINDOWEVENT:{
 				switch(event.window.event){
+					case SDL_WINDOWEVENT_RESIZED:{
+						if(usingopengl){
+							//glViewport(0, 0, event.window.data1, event.window.data2);
+						}
+					}break;
 					case SDL_WINDOWEVENT_FOCUS_GAINED:{
 						Audio::GetInstance().Unmute();
 						minimized = false;

@@ -98,7 +98,7 @@ void SelectBox::ListFiles(const char * directory){
 			strcat(filename, "/");
 			strcat(filename, info->d_name);
 			if(stat(filename, &st) == 0){
-				if(info->d_type != DT_DIR && !S_ISDIR(st.st_mode)){
+				if(info->d_type != DT_DIR && !S_ISDIR(st.st_mode) && info->d_name[0] != '.'){
 					AddItem(info->d_name);
 				}
 			}
