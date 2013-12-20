@@ -52,6 +52,9 @@ public:
 	void SendSound(const char * name, Peer * peer = 0);
 	void ChangeTeam(void);
 	void KillByGovt(Peer & peer);
+	void Explode(Object & object, Uint8 suitcolor, float hitx);
+	void SetRandomSeed(Uint32 seed);
+	Uint32 Random(void);
 	void SetTech(Uint32 techchoices);
 	int TechSlotsUsed(Peer & peer);
 	void SendPing(void);
@@ -196,6 +199,7 @@ private:
 	bool highlightsecrets;
 	bool highlightminimap;
 	bool intutorialmode;
+	Uint32 randomseed;
 };
 
 #endif

@@ -157,7 +157,7 @@ void Guard::Tick(World & world){
 			res_bank = 59;
 			res_index = 0;
 			if(state_i >= 48){
-				if(patrol && rand() % 3 == 0){
+				if(patrol && world.Random() % 3 == 0){
 					state = WALKING;
 				}else{
 					state = LOOKING;
@@ -547,36 +547,11 @@ void Guard::HandleHit(World & world, Uint8 x, Uint8 y, Object & projectile){
 	}else{
 		xv = -abs(speed) * (mirrored ? -1 : 1);
 	}*/
-	switch(projectile.type){
-		case ObjectTypes::BLASTERPROJECTILE:
-		case ObjectTypes::LASERPROJECTILE:{
-			if(rand() % 2 == 0){
-				EmitSound(world, world.resources.soundbank["strike03.wav"], 96);
-			}else{
-				EmitSound(world, world.resources.soundbank["strike04.wav"], 96);
-			}
-		}break;
-		case ObjectTypes::ROCKETPROJECTILE:{
-			if(health == 0 && state != DYINGEXPLODE){
-				draw = false;
-				state = DYINGEXPLODE;
-				state_i = 0;
-				res_bank = 0xFF;
-				for(int i = 0; i < 6; i++){
-					BodyPart * bodypart = (BodyPart *)world.CreateObject(ObjectTypes::BODYPART);
-					if(bodypart){
-						bodypart->x = Guard::x;
-						bodypart->y = Guard::y - 50;
-						bodypart->type = i;
-						bodypart->xv += (abs(xv) * 2) * xpcnt;
-						if(i == 0){
-							bodypart->xv = 0;
-							bodypart->yv = -20;
-						}
-					}
-				}
-			}
-		}break;
+	if(projectile.type == ObjectTypes::ROCKETPROJECTILE){
+		if(health == 0 && state != DYINGEXPLODE){
+			state = DYINGEXPLODE;
+			world.Explode(*this, 8, xpcnt);
+		}
 	}
 }
 

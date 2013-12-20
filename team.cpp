@@ -180,7 +180,7 @@ void Team::Tick(World & world){
 				}
 			}
 			if(terminals.size() > 0){
-				Terminal * terminal = terminals[rand() % terminals.size()];
+				Terminal * terminal = terminals[world.Random() % terminals.size()];
 				terminal->state = Terminal::SECRETBEAMING;
 				terminal->state_i = 0;
 				beamingterminalid = terminal->id;

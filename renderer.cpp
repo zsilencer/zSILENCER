@@ -1403,7 +1403,7 @@ void Renderer::DrawShadow(Surface * surface, Object * object){
 	int yv = 300;
 	Platform * platform = world.map.TestIncr(x, y - 1, x, y - 1, &xv, &yv, Platform::RECTANGLE | Platform::STAIRSUP | Platform::STAIRSDOWN);
 	if(platform && platform->XtoY(x) == y + yv){
-		int i = 0;
+		unsigned int i = 0;
 		int y2 = -1;
 		if(object->mirrored){
 			x -= (width - world.resources.spriteoffsetx[object->res_bank][object->res_index]);
@@ -1883,7 +1883,7 @@ void Renderer::EffectShieldDamage(Surface * dst, Rect * dstrect, Uint8 color){
 			Uint8 overlay = GetPixel(world.resources.spritebank[177][state_i % 8], x, y);
 			Uint8 pixel = GetPixel(dst, x, y);
 			if(overlay && pixel){
-				SetPixel(dst, x, y, palette.RampColorMin(pixel, color, 14));//SetPixel(dst, x, y, color);//palette.Mix(205, pixel));
+				SetPixel(dst, x, y, palette.RampColorMin(pixel, color, 8));//SetPixel(dst, x, y, color);//palette.Mix(205, pixel));
 			}
 		}
 	}
@@ -1895,7 +1895,7 @@ void Renderer::EffectWarp(Surface * dst, Rect * dstrect, Uint8 state_warp){
 	if(state_warp >= 12){
 		yoffset = (state_warp - 20) * -12;
 	}
-	int i = 0;
+	unsigned int i = 0;
 	for(int y = 0; y < dst->h; y++){
 		for(int x = 0; x < dst->w; x++){
 			Uint8 overlay = GetPixel(world.resources.spritebank[153][index], x, y + yoffset);
@@ -1998,12 +1998,10 @@ void Renderer::DrawLight(Surface * surface, Surface * src, Rect * rect){
 			unsigned int i = (y1 * srcw) + minx1;
 			unsigned int i2 = (y2 * surfacew) + minw;
 			for(int x2 = minw; x2 < maxw; x2++){
-				int lum = pixels[i];
-				if(lum){
-					Uint8 * surfacepixel = &surface->pixels[i2];
-					Uint8 newcolor = palette.Light(*surfacepixel, lum % 16);
-					*surfacepixel = newcolor;
-				}
+				Uint8 lum = pixels[i];
+				Uint8 * surfacepixel = &surface->pixels[i2];
+				Uint8 newcolor = palette.Light(*surfacepixel, lum);
+				*surfacepixel = newcolor;
 				/*
 				// Unoptimized lighting algorithm
 				int lum = pixels[i] % 16;
@@ -2462,11 +2460,11 @@ void Renderer::DrawHUD(Surface * surface, float frametime){
 							if(player->InBase(world) || player->hassecret){
 								Surface * effectsurface = CreateSurfaceCopy(world.resources.spritebank[103][index + i]);
 								Uint8 plus = 0;
-								Uint8 time = 6;
+								Uint8 time = 4;
 								Uint8 shift = 2;
 								Uint8 color = 210;
 								if(player->hassecret){
-									time = 6;
+									time = 8;
 									color = 114;
 									shift = 0;
 								}

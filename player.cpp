@@ -2086,7 +2086,7 @@ void Player::Tick(World & world){
 			//currentplatformid = 0;
 			collidable = false;
 			if(state_i == 0){
-				DropItems(world);
+				DropAllItems(world);
 			}
 			if(state_i >= 15){
 				state = DEAD;
@@ -2144,7 +2144,7 @@ void Player::Tick(World & world){
 						draw = true;
 						Sint16 x;
 						Sint16 y;
-						world.map.RandomPlayerStartLocation(x, y);
+						world.map.RandomPlayerStartLocation(world, x, y);
 						Warp(world, x, y);
 					}
 				}
@@ -2456,21 +2456,7 @@ void Player::HandleHit(World & world, Uint8 x, Uint8 y, Object & projectile){
 			world.ShowStatus(temp, 160, true);
 		}
 		if(projectile.type == ObjectTypes::ROCKETPROJECTILE){
-			draw = false;
-			for(int i = 0; i < 6; i++){
-				BodyPart * bodypart = (BodyPart *)world.CreateObject(ObjectTypes::BODYPART);
-				if(bodypart){
-					bodypart->suitcolor = suitcolor;
-					bodypart->x = Player::x;
-					bodypart->y = Player::y - 50;
-					bodypart->type = i;
-					bodypart->xv += (abs(xv) * 2) * xpcnt;
-					if(i == 0){
-						bodypart->xv = 0;
-						bodypart->yv = -20;
-					}
-				}
-			}
+			world.Explode(*this, suitcolor, xpcnt);
 		}
 		state = DYING;
 		state_i = 0;
@@ -3099,8 +3085,8 @@ void Player::KillByGovt(World & world){
 			if(plasmaprojectile){
 				plasmaprojectile->x = x;
 				plasmaprojectile->y = y - 10;
-				plasmaprojectile->xv = (rand() % 17) - 8;
-				plasmaprojectile->yv = -(rand() % 37);
+				plasmaprojectile->xv = (world.Random() % 17) - 8;
+				plasmaprojectile->yv = -(world.Random() % 37);
 				plasmaprojectile->ownerid = govtprojectile.ownerid;
 			}
 		}
@@ -4002,16 +3988,10 @@ void Player::SetToRespawnPosition(World & world){
 	}
 }
 
-void Player::DropItems(World & world){
+void Player::DropAllItems(World & world){
 	if(hassecret){
-		PickUp * pickup = (PickUp *)world.CreateObject(ObjectTypes::PICKUP);
+		PickUp * pickup = DropItem(world, PickUp::SECRET, secretteamid);
 		if(pickup){
-			pickup->type = PickUp::SECRET;
-			pickup->x = x;
-			pickup->y = y - 1;
-			pickup->xv = (rand() % 9) - 4;
-			pickup->yv = -15;
-			pickup->quantity = secretteamid;
 			pickup->tracetime = tracetime;
 			tracetime = 0;
 		}
@@ -4022,58 +4002,26 @@ void Player::DropItems(World & world){
 		hassecret = false;
 	}
 	if(files > 0){
-		PickUp * pickup = (PickUp *)world.CreateObject(ObjectTypes::PICKUP);
-		if(pickup){
-			pickup->type = PickUp::FILES;
-			pickup->quantity = files;
-			pickup->x = x;
-			pickup->y = y - 1;
-			pickup->xv = (rand() % 9) - 4;
-			pickup->yv = -15;
-		}
+		DropItem(world, PickUp::FILES, files);
 		files = 0;
 		oldfiles = 0;
 	}
 	if(laserammo > 0){
-		PickUp * pickup = (PickUp *)world.CreateObject(ObjectTypes::PICKUP);
-		if(pickup){
-			pickup->type = PickUp::LASERAMMO;
-			pickup->quantity = laserammo;
-			pickup->x = x;
-			pickup->y = y - 1;
-			pickup->xv = (rand() % 9) - 4;
-			pickup->yv = -15;
-		}
+		DropItem(world, PickUp::LASERAMMO, laserammo);
 		laserammo = 0;
 	}
 	if(rocketammo > 0){
-		PickUp * pickup = (PickUp *)world.CreateObject(ObjectTypes::PICKUP);
-		if(pickup){
-			pickup->type = PickUp::ROCKETAMMO;
-			pickup->quantity = rocketammo;
-			pickup->x = x;
-			pickup->y = y - 1;
-			pickup->xv = (rand() % 9) - 4;
-			pickup->yv = -15;
-		}
+		DropItem(world, PickUp::ROCKETAMMO, rocketammo);
 		rocketammo = 0;
 	}
 	if(flamerammo > 0){
-		PickUp * pickup = (PickUp *)world.CreateObject(ObjectTypes::PICKUP);
-		if(pickup){
-			pickup->type = PickUp::FLAMERAMMO;
-			pickup->quantity = flamerammo;
-			pickup->x = x;
-			pickup->y = y - 1;
-			pickup->xv = (rand() % 9) - 4;
-			pickup->yv = -15;
-		}
+		DropItem(world, PickUp::FLAMERAMMO, flamerammo);
 		flamerammo = 0;
 	}
 	for(int i = 3; i >= 0; i--){
 		if(inventoryitems[i]){
 			Uint8 num = inventoryitemsnum[i];
-			Uint8 dropnum = num;
+			Uint8 dropquantity = num;
 			Uint8 droptype = PickUp::NONE;
 			switch(inventoryitems[i]){
 				case INV_EMPBOMB:{
@@ -4102,15 +4050,7 @@ void Player::DropItems(World & world){
 				}break;
 			}
 			if(droptype != PickUp::NONE){
-				PickUp * pickup = (PickUp *)world.CreateObject(ObjectTypes::PICKUP);
-				if(pickup){
-					pickup->type = droptype;
-					pickup->quantity = dropnum;
-					pickup->x = x;
-					pickup->y = y - 1;
-					pickup->xv = (rand() % 9) - 4;
-					pickup->yv = -15;
-				}
+				DropItem(world, droptype, dropquantity);
 			}
 			Team * team = GetTeam(world);
 			if(!(inventoryitems[i] == INV_BASEDOOR && (team && !team->basedoorid))){
@@ -4120,6 +4060,19 @@ void Player::DropItems(World & world){
 			}
 		}
 	}
+}
+
+PickUp * Player::DropItem(World & world, Uint8 type, Uint16 quantity){
+	PickUp * pickup = (PickUp *)world.CreateObject(ObjectTypes::PICKUP);
+	if(pickup){
+		pickup->type = type;
+		pickup->x = x;
+		pickup->y = y - 1;
+		pickup->xv = (world.Random() % 9) - 4;
+		pickup->yv = -15;
+		pickup->quantity = quantity;
+	}
+	return pickup;
 }
 
 bool Player::BuyAvailable(World & world, Uint8 id){

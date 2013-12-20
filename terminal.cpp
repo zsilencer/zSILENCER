@@ -64,13 +64,6 @@ void Terminal::Tick(World & world){
 		case INACTIVE:{
 			beamingcount = 0;
 			res_index = (state_i / 4) % inactiveframes;
-			/*if(world.IsAuthority()){
-				if(rand() % 1440 == 0){
-					state = BEAMING;
-					state_i = ((beamingframes + inactiveframes) * 4) - 1;
-					break;
-				}
-			}*/
 		}break;
 		case SECRETREADY:
 			if(!secretreadynotified){

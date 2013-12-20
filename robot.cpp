@@ -37,13 +37,14 @@ void Robot::Serialize(bool write, Serializer & data, Serializer * old){
 void Robot::Tick(World & world){
 	Hittable::Tick(*this, world);
 	Bipedal::Tick(*this, world);
-	if(rand() % (24 * 15) == 0 && state != DEAD){
+	if(state != DEAD && rand() % (24 * 15) == 0){
 		StopAmbience();
 		EmitSound(world, world.resources.soundbank["airlokj.wav"], 64);
 	}
 	switch(state){
 		case NEW:{
 			draw = true;
+			currentplatformid = 0;
 			if(FindCurrentPlatform(*this, world)){
 				if(patrol){
 					state = WALKING;

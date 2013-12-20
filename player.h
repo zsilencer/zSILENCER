@@ -94,7 +94,8 @@ private:
 	bool HandleAgainstWall(World & world);
 	bool CanCreateBase(World & world);
 	void SetToRespawnPosition(World & world);
-	void DropItems(World & world);
+	void DropAllItems(World & world);
+	PickUp * DropItem(World & world, Uint8 type, Uint16 quantity);
 	bool BuyAvailable(World & world, Uint8 id);
 	Projectile * Fire(World & world, Uint8 direction);
 	bool ProcessJetpackState(World & world);

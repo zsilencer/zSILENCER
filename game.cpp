@@ -134,22 +134,16 @@ bool Game::Load(char * cmdline){
 					newstateobject->state = 0;
 					state = NONE;
 				}
-			}else
-			if(strncmp(cmdline, "-c", 2) == 0){
-				/*cmdline = strtok(0, " ");
-				 strncpy(serverconnect, cmdline, sizeof(serverconnect));
-				 cmdline = strtok(0, " ");
-				 serverconnectport = atoi(cmdline);*/
 			}
 		}while((cmdline = strtok(0, " ")));
 	}
 	Config::GetInstance().Load();
 	if(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_TIMER) == -1){
-		printf("Could not init SDL\n");
+		printf("Could not initialize SDL\n");
 		return false;
 	}
 	if(Mix_Init(MIX_INIT_MP3) == -1){
-		printf("Could not init SDL_mixer\n");
+		printf("Could not initialize SDL_mixer\n");
 		return false;
 	}
 	if(!Audio::GetInstance().Init()){
@@ -341,6 +335,11 @@ void Game::Present(void){
 		sdlscreenbuffer->pixels = screenbuffer.pixels;
 		SDL_Texture * texture = SDL_CreateTextureFromSurface(windowrenderer, sdlscreenbuffer);
 		sdlscreenbuffer->pixels = oldpixels;
+		SDL_Rect dstrect;
+		dstrect.w = 500;
+		dstrect.h = 300;
+		dstrect.x = 100;
+		dstrect.y = 100;
 		SDL_RenderCopy(windowrenderer, texture, 0, 0);
 		SDL_DestroyTexture(texture);
 		SDL_RenderPresent(windowrenderer);
@@ -755,7 +754,7 @@ bool Game::Tick(void){
 								}
 								Player * player = (Player *)world.CreateObject(ObjectTypes::PLAYER);
 								if(player){
-									world.map.RandomPlayerStartLocation(player->x, player->y);
+									world.map.RandomPlayerStartLocation(world, player->x, player->y);
 									player->oldx = player->x;
 									player->oldy = player->y;
 									player->teamid = team->id;
@@ -852,7 +851,7 @@ bool Game::Tick(void){
 				//LoadMap("level/THET06e.SIL", 3);
 				//LoadMap("level/STAR72.SIL", 3);
 				//LoadMap("level/EASY05c.SIL", 3);
-				world.map.RandomPlayerStartLocation(player->x, player->y);
+				world.map.RandomPlayerStartLocation(world, player->x, player->y);
 				player->oldx = player->x;
 				player->oldy = player->y;
 				renderer.palette.SetPalette(0);
@@ -1398,7 +1397,7 @@ bool Game::Tick(void){
 								for(int i = 0; i < team->numpeers; i++){
 									Player * player = (Player *)world.CreateObject(ObjectTypes::PLAYER);
 									if(player){
-										world.map.RandomPlayerStartLocation(player->x, player->y);
+										world.map.RandomPlayerStartLocation(world, player->x, player->y);
 										player->oldx = player->x;
 										player->oldy = player->y;
 										player->teamid = team->id;
@@ -1471,7 +1470,7 @@ bool Game::Tick(void){
 						botplayer->credits = 500;
 						botplayer->ai = new PlayerAI(*botplayer);
 						botpeer->controlledlist.push_back(botplayer->id);
-						world.map.RandomPlayerStartLocation(botplayer->x, botplayer->y);
+						world.map.RandomPlayerStartLocation(world, botplayer->x, botplayer->y);
 						botplayer->oldx = botplayer->x;
 						botplayer->oldy = botplayer->y;
 						botnum++;
@@ -1482,7 +1481,7 @@ bool Game::Tick(void){
 				for(std::list<Object *>::iterator it = world.objectlist.begin(); it != world.objectlist.end(); it++){
 					if((*it)->type == ObjectTypes::PLAYER){
 						Player * player = static_cast<Player *>(*it);
-						world.map.RandomPlayerStartLocation(player->x, player->y);
+						world.map.RandomPlayerStartLocation(world, player->x, player->y);
 					}
 				}
 				ShowDeployMessage();

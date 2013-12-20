@@ -145,13 +145,13 @@ void Civilian::Tick(World & world){
 				switch(rand() % 3){
 					case 0:
 						EmitSound(world, world.resources.soundbank["groan2.wav"], 128);
-						break;
+					break;
 					case 1:
 						EmitSound(world, world.resources.soundbank["groan2a.wav"], 128);
-						break;
+					break;
 					case 2:
 						EmitSound(world, world.resources.soundbank["grunt2a.wav"], 128);
-						break;
+					break;
 				}
 			}
 			collidable = false;
@@ -205,33 +205,9 @@ void Civilian::HandleHit(World & world, Uint8 x, Uint8 y, Object & projectile){
 	}else{
 		xv = speed * xpcnt;
 	}
-	switch(projectile.type){
-		case ObjectTypes::BLASTERPROJECTILE:
-		case ObjectTypes::LASERPROJECTILE:{
-			if(rand() % 2 == 0){
-				EmitSound(world, world.resources.soundbank["strike03.wav"], 96);
-			}else{
-				EmitSound(world, world.resources.soundbank["strike04.wav"], 96);
-			}
-		}break;
-		case ObjectTypes::ROCKETPROJECTILE:{
-			state = DYINGEXPLODE;
-			draw = false;
-			for(int i = 0; i < 6; i++){
-				BodyPart * bodypart = (BodyPart *)world.CreateObject(ObjectTypes::BODYPART);
-				if(bodypart){
-					bodypart->suitcolor = suitcolor;
-					bodypart->x = Civilian::x;
-					bodypart->y = Civilian::y - 50;
-					bodypart->type = i;
-					bodypart->xv += (abs(xv) * 2) * xpcnt;
-					if(i == 0){
-						bodypart->xv = 0;
-						bodypart->yv = -20;
-					}
-				}
-			}
-		}break;
+	if(projectile.type == ObjectTypes::ROCKETPROJECTILE){
+		state = DYINGEXPLODE;
+		world.Explode(*this, suitcolor, xpcnt);
 	}
 	Object * owner = world.GetObjectFromId(projectile.ownerid);
 	if(owner && owner->type == ObjectTypes::PLAYER){
@@ -281,20 +257,7 @@ bool Civilian::CheckTractVictim(World & world){
 	for(std::vector<Object *>::iterator it = objects.begin(); it != objects.end(); it++){
 		Player * player = static_cast<Player *>(*it);
 		if(player->teamid != tractteamid){
-			draw = false;
-			for(int i = 0; i < 6; i++){
-				BodyPart * bodypart = (BodyPart *)world.CreateObject(ObjectTypes::BODYPART);
-				if(bodypart){
-					bodypart->suitcolor = suitcolor;
-					bodypart->x = x;
-					bodypart->y = y - 50;
-					bodypart->type = i;
-					if(i == 0){
-						bodypart->xv = 0;
-						bodypart->yv = -20;
-					}
-				}
-			}
+			world.Explode(*this, suitcolor, 1);
 			state = DYINGEXPLODE;
 			EmitSound(world, world.resources.soundbank["seekexp1.wav"], 128);
 			Object tractprojectile(ObjectTypes::PLASMAPROJECTILE);

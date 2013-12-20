@@ -790,11 +790,11 @@ void Map::MiniMapCoords(int & x, int & y){
 	y = (y / float(height * 64)) * 62;
 }
 
-void Map::RandomPlayerStartLocation(Sint16 & x, Sint16 & y){
+void Map::RandomPlayerStartLocation(World & world, Sint16 & x, Sint16 & y){
 	if(playerstartlocations.size() == 0){
 		return;
 	}
-	int index = rand() % playerstartlocations.size();
+	int index = world.Random() % playerstartlocations.size();
 	int i = 0;
 	for(std::vector<XY>::iterator it = playerstartlocations.begin(); it != playerstartlocations.end(); it++){
 		if(i == index){

@@ -91,7 +91,7 @@ void SurveillanceMonitor::Tick(World & world){
 				surveillancecamera = -1;
 			}
 			if(surveillancecamera == -1){
-				surveillancecamera = rand() % world.map.surveillancecameras.size();
+				surveillancecamera = world.Random() % world.map.surveillancecameras.size();
 			}
 			camera.SetPosition(world.map.surveillancecameras[surveillancecamera].x, world.map.surveillancecameras[surveillancecamera].y);
 		}

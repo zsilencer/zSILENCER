@@ -80,10 +80,27 @@ void Hittable::HandleHit(Object & object, World & world, Uint8 x, Uint8 y, Objec
 	}
 	switch(projectile.type){
 		case ObjectTypes::BLASTERPROJECTILE:{
-			
+			if(rand() % 2 == 0){
+				object.EmitSound(world, world.resources.soundbank["strike03.wav"], 96);
+			}else{
+				object.EmitSound(world, world.resources.soundbank["strike04.wav"], 96);
+			}
 		}break;
+		case ObjectTypes::WALLPROJECTILE:
 		case ObjectTypes::LASERPROJECTILE:{
-			
+			if(damagedshield){
+				if(rand() % 2 == 0){
+					object.EmitSound(world, world.resources.soundbank["strike01.wav"], 96);
+				}else{
+					object.EmitSound(world, world.resources.soundbank["strike02.wav"], 96);
+				}
+			}else{
+				if(rand() % 2 == 0){
+					object.EmitSound(world, world.resources.soundbank["strike03.wav"], 96);
+				}else{
+					object.EmitSound(world, world.resources.soundbank["strike04.wav"], 96);
+				}
+			}
 		}break;
 		case ObjectTypes::ROCKETPROJECTILE:{
 			

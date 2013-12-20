@@ -10,6 +10,7 @@
 #include "terminal.h"
 #include "basedoor.h"
 #include "interface.h"
+#include "bodypart.h"
 #include <algorithm>
 
 #define DELTAENABLED 1
@@ -1068,9 +1069,9 @@ void World::ActivateTerminals(void){
 			if(terminal->state == Terminal::INACTIVE){
 				terminal->state = Terminal::BEAMING;
 				if(terminal->isbig){
-					terminal->beamingseconds = (rand() % 26) + 10;
+					terminal->beamingseconds = (Random() % 26) + 10;
 				}else{
-					terminal->beamingseconds = (rand() % 10) + 1;
+					terminal->beamingseconds = (Random() % 10) + 1;
 				}
 				numactivated++;
 				if(numactivated >= numtoactivate){
@@ -1631,6 +1632,33 @@ void World::KillByGovt(Peer & peer){
 			}
 		}
 	}
+}
+
+void World::Explode(Object & object, Uint8 suitcolor, float hitx){
+	object.draw = false;
+	for(int i = 0; i < 6; i++){
+		BodyPart * bodypart = (BodyPart *)CreateObject(ObjectTypes::BODYPART);
+		if(bodypart){
+			bodypart->suitcolor = suitcolor;
+			bodypart->x = object.x;
+			bodypart->y = object.y - 50;
+			bodypart->type = i;
+			bodypart->xv += (abs(object.xv) * 2) * hitx;
+			if(i == 0){
+				bodypart->xv = 0;
+				bodypart->yv = -20;
+			}
+		}
+	}
+}
+
+void World::SetRandomSeed(Uint32 seed){
+	randomseed = seed;
+}
+
+Uint32 World::Random(void){
+	randomseed = 69069 * randomseed + 1;
+	return randomseed & 0x7FFF;
 }
 
 void World::SetTech(Uint32 techchoices){

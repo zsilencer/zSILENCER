@@ -19,7 +19,7 @@ public:
 	bool LoadFile(const char * filename, class World & world, Team * team = 0);
 	void Unload(void);
 	void MiniMapCoords(int & x, int & y);
-	void RandomPlayerStartLocation(Sint16 & x, Sint16 & y);
+	void RandomPlayerStartLocation(World & world, Sint16 & x, Sint16 & y);
 	void CalculateRainPuddleLocations(void);
 	void CalculateAdjacentPlatforms(void);
 	void CalculatePlatformSets(void);
