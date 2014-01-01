@@ -38,7 +38,9 @@ void Lobby::Connect(const char * host, unsigned short port){
 	motdreceived = false;
 	versionchecked = false;
 	motd[0] = 0;
-	sockethandle = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+	if(!sockethandle){
+		sockethandle = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+	}
 	unsigned long iomode = 1;
     // set to nonblocking
     ioctl(sockethandle, FIONBIO, &iomode);
@@ -46,6 +48,7 @@ void Lobby::Connect(const char * host, unsigned short port){
 	if(strcmp(resolvehost, host) != 0){
 		he = 0;
 	}
+	lasttime = SDL_GetTicks();
 	if(strlen(serverip) > 0){
 		sockaddr_in addr;
 		addr.sin_family = AF_INET;
@@ -54,7 +57,6 @@ void Lobby::Connect(const char * host, unsigned short port){
 		connect(sockethandle, (sockaddr *)&addr, sizeof(addr));
 		//printf("%d\n", errno);
 		state = CONNECTING;
-		lasttime = SDL_GetTicks();
 	}else{
 		state = RESOLVING;
 		ResolveHostname(host);
@@ -72,6 +74,7 @@ void Lobby::Disconnect(void){
 	sendbufferoffset = 0;
     shutdown(sockethandle, SHUT_RDWR);
     closesocket(sockethandle);
+	sockethandle = 0;
 }
 
 void Lobby::DoNetwork(void){
@@ -421,10 +424,11 @@ void Lobby::JoinChannel(const char * channel){
 	char msg[256];
 	memset(msg, 0, sizeof(msg));
 	msg[0] = MSG_CHAT;
+	const char * joinstr = "/join ";
 	strcpy((char *)&msg[1], Lobby::channel);
-	strcpy((char *)&msg[1 + strlen(Lobby::channel) + 1], "/join ");
-	strcpy((char *)&msg[1 + strlen(Lobby::channel) + 1 + strlen("/join ")], channel);
-	Uint8 size = 1 + strlen(Lobby::channel) + 1 + strlen("/join ") + strlen(channel) + 1;
+	strcpy((char *)&msg[1 + strlen(Lobby::channel) + 1], joinstr);
+	strcpy((char *)&msg[1 + strlen(Lobby::channel) + 1 + strlen(joinstr)], channel);
+	Uint8 size = 1 + strlen(Lobby::channel) + 1 + strlen(joinstr) + strlen(channel) + 1;
 	SendMessage(msg, size);
 }
 
@@ -506,7 +510,6 @@ User * Lobby::GetUserInfo(Uint32 accountid){
 				"iPad", "0b4m4", "stevenson", "digitalcourtney", "juan valdez", "Rebdomine",
 				"willis", "spamloaf", "barnacle", "nodule", "samantha", "kyle"};
 			Uint32 index = 0xFFFFFFFF - accountid;
-			printf("index = %d\n", index);
 			strcpy(userinfo->name, botnames[index]);
 		}
 	}

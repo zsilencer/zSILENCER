@@ -3,10 +3,9 @@
 #include <sstream>
 
 Config::Config(){
-	if(!Load()){
-		LoadDefaults();
-		Save();
-	}
+	LoadDefaults();
+	Load();
+	Save();
 }
 
 Config & Config::GetInstance(void){
@@ -19,6 +18,7 @@ void Config::Save(void){
 	if(file){
 		char temp[256];
 		WriteString(file, "fullscreen", fullscreen ? "1" : "0");
+		WriteString(file, "scalefilter", scalefilter ? "1" : "0");
 		WriteString(file, "teamcolors", teamcolors ? "1" : "0");
 		sprintf(temp, "%d", defaultagency); WriteString(file, "defaultagency", temp);
 		WriteString(file, "defaultgamename", defaultgamename);
@@ -60,6 +60,7 @@ bool Config::Load(void){
 			char * data = strtok(NULL, "=");
 			if(variable && data){
 				if(CompareString(variable, "fullscreen")){ if(atoi(data) == 0){ fullscreen = false; }else{ fullscreen = true; } }
+				if(CompareString(variable, "scalefilter")){ if(atoi(data) == 0){ scalefilter = false; }else{ scalefilter = true; } }
 				if(CompareString(variable, "teamcolors")){ if(atoi(data) == 0){ teamcolors = false; }else{ teamcolors = true; } }
 				if(CompareString(variable, "defaultagency")){ defaultagency = atoi(data); }
 				if(CompareString(variable, "defaultgamename")){ ReadString(data, defaultgamename); }
@@ -97,7 +98,8 @@ bool Config::Load(void){
 }
 
 void Config::LoadDefaults(void){
-	fullscreen = false;
+	fullscreen = true;
+	scalefilter = true;
 	teamcolors = false;
 	defaultagency = Team::NOXIS;
 	strcpy(defaultgamename, "New Game");

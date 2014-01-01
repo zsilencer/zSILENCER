@@ -104,7 +104,7 @@ void Button::SetType(Uint8 type){
 		break;
 		case B220x33:
 			res_bank = 6;
-			width = 112;
+			width = 220;
 			height = 33;
 			textbank = 135;
 			textwidth = 11;

@@ -62,6 +62,8 @@ Game::Game() : renderer(world), screenbuffer(640, 480){
 	modaldialoghasok = false;
 	window = 0;
 	windowrenderer = 0;
+	streamingtexture = 0;
+	streamingtexturepixelformat = 0;
 	glcontext = 0;
 	fbo = 0;
 	gltextures[0] = 0;
@@ -90,6 +92,12 @@ Game::~Game(){
 	}
 	if(windowrenderer){
 		SDL_DestroyRenderer(windowrenderer);
+	}
+	if(streamingtexture){
+		SDL_DestroyTexture(streamingtexture);
+	}
+	if(streamingtexturepixelformat){
+		SDL_FreeFormat(streamingtexturepixelformat);
 	}
 	if(window){
 		SDL_DestroyWindow(window);
@@ -157,14 +165,14 @@ bool Game::Load(char * cmdline){
 	SDL_EventState(SDL_TEXTINPUT, SDL_TRUE); //SDL_EnableUNICODE(true);
 	//SDL_EnableKeyRepeat(SDL_DEFAULT_REPEAT_DELAY, SDL_DEFAULT_REPEAT_INTERVAL);
 	//screen = SDL_SetVideoMode(640, 480, 8, SDL_DOUBLEBUF | SDL_SWSURFACE);
-	window = SDL_CreateWindow("zSILENCER", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, screenbuffer.w, screenbuffer.h, SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | (Config::GetInstance().fullscreen ? SDL_WINDOW_FULLSCREEN : 0));
+	window = SDL_CreateWindow("zSILENCER", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, screenbuffer.w, screenbuffer.h, SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | (Config::GetInstance().fullscreen ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0));
 	if(!SetupOpenGL()){
 		printf("Unable to setup OpenGL shaders, using SDL Renderer\n");
 		usingopengl = false;
-		windowrenderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
+		CreateRenderer();
 		sdlscreenbuffer = SDL_CreateRGBSurface(SDL_SWSURFACE, screenbuffer.w, screenbuffer.h, 8, 0, 0, 0, 0);
+		CreateStreamingTexture();
 	}
-	SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "linear");
 	SetColors(renderer.palette.GetColors());
 	//SDL_Flip(screen);
 	printf("Loading resources...\n");
@@ -309,6 +317,45 @@ bool Game::SetupOpenGL(void){
 	return true;*/
 }
 
+void Game::CreateRenderer(void){
+	if(windowrenderer){
+		SDL_DestroyRenderer(windowrenderer);
+		windowrenderer = 0;
+	}
+	windowrenderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
+}
+
+void Game::CreateStreamingTexture(void){
+	const char * scalefilter = "nearest";
+	if(Config::GetInstance().scalefilter){
+		scalefilter = "linear";
+	}
+	SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, scalefilter);
+	if(streamingtexture){
+		SDL_DestroyTexture(streamingtexture);
+		streamingtexture = 0;
+	}
+	if(streamingtexturepixelformat){
+		SDL_FreeFormat(streamingtexturepixelformat);
+		streamingtexturepixelformat = 0;
+	}
+	SDL_RendererInfo rendererinfo;
+	SDL_GetRendererInfo(windowrenderer, &rendererinfo);
+	Uint32 pixelformat = 0;
+	for(int i = 0; i < rendererinfo.num_texture_formats; i++){
+		Uint32 format = rendererinfo.texture_formats[i];
+		if(!SDL_ISPIXELFORMAT_FOURCC(format) && !SDL_ISPIXELFORMAT_INDEXED(format) && (!pixelformat || SDL_BYTESPERPIXEL(format) < SDL_BYTESPERPIXEL(pixelformat))){
+			pixelformat = format;
+		}
+	}
+	if(pixelformat){
+		streamingtexture = SDL_CreateTexture(windowrenderer, pixelformat, SDL_TEXTUREACCESS_STREAMING, screenbuffer.w, screenbuffer.h);
+		Uint32 format;
+		SDL_QueryTexture(streamingtexture, &format, 0, 0, 0);
+		streamingtexturepixelformat = SDL_AllocFormat(format);
+	}
+}
+
 void Game::Present(void){
 	if(usingopengl){
 /*
@@ -331,18 +378,50 @@ void Game::Present(void){
 		SDL_GL_SwapWindow(window);
 */
 	}else{
-		void * oldpixels = sdlscreenbuffer->pixels;
-		sdlscreenbuffer->pixels = screenbuffer.pixels;
-		SDL_Texture * texture = SDL_CreateTextureFromSurface(windowrenderer, sdlscreenbuffer);
-		sdlscreenbuffer->pixels = oldpixels;
-		SDL_Rect dstrect;
-		dstrect.w = 500;
-		dstrect.h = 300;
-		dstrect.x = 100;
-		dstrect.y = 100;
-		SDL_RenderCopy(windowrenderer, texture, 0, 0);
-		SDL_DestroyTexture(texture);
-		SDL_RenderPresent(windowrenderer);
+		if(streamingtexture){
+			void * pixels;
+			int pitch;
+			if(SDL_LockTexture(streamingtexture, 0, &pixels, &pitch) == 0){
+				if(pitch == screenbuffer.w * 1){
+					Uint8 * src = screenbuffer.pixels;
+					Uint8 * dst = (Uint8 *)pixels;
+					for(int y = screenbuffer.h; y > 0; y--){
+						for(int x = screenbuffer.w; x > 0; x--){
+							*(dst++) = *(Uint8 *)(&streamingtexturepalette[*src++]);
+						}
+					}
+				}else
+				if(pitch == screenbuffer.w * 2){
+					Uint8 * src = screenbuffer.pixels;
+					Uint16 * dst = (Uint16 *)pixels;
+					for(int y = screenbuffer.h; y > 0; y--){
+						for(int x = screenbuffer.w; x > 0; x--){
+							*(dst++) = *(Uint16 *)(&streamingtexturepalette[*src++]);
+						}
+					}
+				}else
+				if(pitch == screenbuffer.w * 4){
+					Uint8 * src = screenbuffer.pixels;
+					Uint32 * dst = (Uint32 *)pixels;
+					for(int y = screenbuffer.h; y > 0; y--){
+						for(int x = screenbuffer.w; x > 0; x--){
+							*(dst++) = *(Uint32 *)(&streamingtexturepalette[*src++]);
+						}
+					}
+				}
+				SDL_UnlockTexture(streamingtexture);
+				SDL_RenderCopy(windowrenderer, streamingtexture, 0, 0);
+				SDL_RenderPresent(windowrenderer);
+			}
+		}else{
+			void * oldpixels = sdlscreenbuffer->pixels;
+			sdlscreenbuffer->pixels = screenbuffer.pixels;
+			SDL_Texture * texture = SDL_CreateTextureFromSurface(windowrenderer, sdlscreenbuffer);
+			sdlscreenbuffer->pixels = oldpixels;
+			SDL_RenderCopy(windowrenderer, texture, 0, 0);
+			SDL_DestroyTexture(texture);
+			SDL_RenderPresent(windowrenderer);
+		}
 	}
 }
 
@@ -367,6 +446,11 @@ void Game::SetColors(SDL_Color * colors){
 		glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 256, 1, GL_RGBA, GL_UNSIGNED_BYTE, colors);*/
 	}else{
 		SDL_SetPaletteColors(sdlscreenbuffer->format->palette, colors, 0, 256);
+		if(streamingtexture){
+			for(int i = 0; i < 256; i++){
+				streamingtexturepalette[i] = SDL_MapRGB(streamingtexturepixelformat, colors[i].r, colors[i].g, colors[i].b);
+			}
+		}
 	}
 }
 
@@ -1232,6 +1316,9 @@ bool Game::Tick(void){
 								case 1:{
 									GoToState(OPTIONSCONTROLS);
 								}break;
+								case 2:{
+									GoToState(OPTIONSDISPLAY);
+								}break;
 							}
 							button->clicked = false;
 						}
@@ -1342,6 +1429,90 @@ bool Game::Tick(void){
 									}
 								}
 								switch(button->uid){
+									case 200:{
+										Config::GetInstance().Save();
+										GoToState(OPTIONS);
+									}break;
+									case 201:{
+										Config::GetInstance().Load();
+										GoToState(OPTIONS);
+									}break;
+								}
+								button->clicked = false;
+							}
+						}
+					}
+				}
+			}
+		}break;
+		case OPTIONSDISPLAY:{
+			if(stateisnew){
+				world.DestroyAllObjects();
+				currentinterface = CreateOptionsDisplayInterface()->id;
+				stateisnew = false;
+			}
+			Interface * iface = (Interface *)world.GetObjectFromId(currentinterface);
+			if(iface){
+				iface->buttonenter = 200;
+				for(std::vector<Uint16>::iterator it = iface->objects.begin(); it != iface->objects.end(); it++){
+					Object * object = world.GetObjectFromId(*it);
+					if(object->type == ObjectTypes::OVERLAY){
+						Overlay * overlay = static_cast<Overlay *>(object);
+						if(overlay){
+							switch(overlay->uid){
+								case 20:{
+									if(Config::GetInstance().fullscreen){
+										overlay->res_index = 12;
+									}else{
+										overlay->res_index = 13;
+									}
+								}break;
+								case 21:{
+									if(Config::GetInstance().scalefilter){
+										overlay->res_index = 12;
+									}else{
+										overlay->res_index = 13;
+									}
+								}break;
+								case 40:{
+									if(Config::GetInstance().fullscreen){
+										overlay->res_index = 15;
+									}else{
+										overlay->res_index = 14;
+									}
+								}break;
+								case 41:{
+									if(Config::GetInstance().scalefilter){
+										overlay->res_index = 15;
+									}else{
+										overlay->res_index = 14;
+									}
+								}break;
+							}
+						}
+					}else
+					if(object->type == ObjectTypes::BUTTON){
+						Button * button = static_cast<Button *>(object);
+						if(button){
+							if(button->state == Button::ACTIVE || button->state == Button::ACTIVATING){
+								if(button->uid >= 0 && button->uid < 200){
+									iface->buttonenter = button->id;
+								}
+							}
+							if(button->clicked){
+								switch(button->uid){
+									case 0:{ // fullscreen
+										Config::GetInstance().fullscreen = Config::GetInstance().fullscreen ? false : true;
+										if(Config::GetInstance().fullscreen){
+											SDL_SetWindowFullscreen(window, SDL_WINDOW_FULLSCREEN_DESKTOP);
+										}else{
+											SDL_SetWindowFullscreen(window, 0);
+										}
+									}break;
+									case 1:{ // smooth scaling
+										Config::GetInstance().scalefilter = Config::GetInstance().scalefilter ? false : true;
+										CreateStreamingTexture();
+									}break;
 									case 200:{
 										Config::GetInstance().Save();
 										GoToState(OPTIONS);
@@ -1885,19 +2056,26 @@ Interface * Game::CreateOptionsInterface(void){
 	background->res_bank = 6;
 	background->res_index = 0;
 	Button * controlsbutton = (Button *)world.CreateObject(ObjectTypes::BUTTON);
-	controlsbutton->y = -90;
+	controlsbutton->y = -142;
 	controlsbutton->x = -89;
 	controlsbutton->uid = 1;
 	strcpy(controlsbutton->text, "Controls");
+	Button * displaybutton = (Button *)world.CreateObject(ObjectTypes::BUTTON);
+	displaybutton->y = -90;
+	displaybutton->x = -89;
+	displaybutton->uid = 2;
+	strcpy(displaybutton->text, "Display");
 	Button * gobackbutton = (Button *)world.CreateObject(ObjectTypes::BUTTON);
-	gobackbutton->y = -38;
+	gobackbutton->y = 15;
 	gobackbutton->x = -89;
 	gobackbutton->uid = 0;
 	strcpy(gobackbutton->text, "Go Back");
 	Interface * iface = (Interface *)world.CreateObject(ObjectTypes::INTERFACE);
 	iface->AddObject(controlsbutton->id);
+	iface->AddObject(displaybutton->id);
 	iface->AddObject(gobackbutton->id);
 	iface->AddTabObject(controlsbutton->id);
+	iface->AddTabObject(displaybutton->id);
 	iface->AddTabObject(gobackbutton->id);
 	iface->activeobject = 0;
 	iface->buttonescape = gobackbutton->id;
@@ -1972,6 +2150,68 @@ Interface * Game::CreateOptionsControlsInterface(void){
 	scrollbar->scrollmax = numkeys - 6;
 	iface->AddObject(scrollbar->id);
 	iface->scrollbar = scrollbar->id;
+	
+	Button * savebutton = (Button *)world.CreateObject(ObjectTypes::BUTTON);
+	savebutton->y = 117;
+	savebutton->x = -200;
+	savebutton->uid = 200;
+	strcpy(savebutton->text, "Save");
+	iface->AddObject(savebutton->id);
+	iface->AddTabObject(savebutton->id);
+	
+	Button * cancelbutton = (Button *)world.CreateObject(ObjectTypes::BUTTON);
+	cancelbutton->y = 117;
+	cancelbutton->x = 20;
+	cancelbutton->uid = 201;
+	strcpy(cancelbutton->text, "Cancel");
+	iface->AddObject(cancelbutton->id);
+	iface->AddTabObject(cancelbutton->id);
+	iface->activeobject = 0;
+	iface->buttonenter = savebutton->id;
+	iface->buttonescape = cancelbutton->id;
+	return iface;
+}
+
+Interface * Game::CreateOptionsDisplayInterface(void){
+	Overlay * background = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
+	background->res_bank = 6;
+	background->res_index = 0;
+	Overlay * title = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
+	title->text = new char[256];
+	strcpy(title->text, "Display Options");
+	title->textbank = 135;
+	title->textwidth = 12;
+	title->x = 320 - ((strlen(title->text) * 12) / 2);
+	title->y = 14;
+	Interface * iface = (Interface *)world.CreateObject(ObjectTypes::INTERFACE);
+	
+	const char * names[] = {"Fullscreen", "Smooth Scaling"};
+	for(int i = 0; i < 2; i++){
+		Button * c1button = (Button *)world.CreateObject(ObjectTypes::BUTTON);
+		c1button->SetType(Button::B220x33);
+		c1button->y = 50 + (i * 53);
+		c1button->x = 100;
+		c1button->uid = 0 + i;
+		strcpy(c1button->text, names[i]);
+		iface->AddObject(c1button->id);
+		iface->AddTabObject(c1button->id);
+		
+		Overlay * off = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
+		off->y = 137 + (i * 53);
+		off->x = 420;
+		off->res_bank = 6;
+		off->res_index = 12;
+		off->uid = 20 + i;
+		iface->AddObject(off->id);
+		
+		Overlay * on = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
+		on->y = 137 + (i * 53);
+		on->x = 450;
+		on->res_bank = 6;
+		on->res_index = 14;
+		on->uid = 40 + i;
+		iface->AddObject(on->id);
+	}
 	
 	Button * savebutton = (Button *)world.CreateObject(ObjectTypes::BUTTON);
 	savebutton->y = 117;

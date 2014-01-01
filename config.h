@@ -14,6 +14,7 @@ public:
 	bool KeyIsPressed(const Uint8 * keyboardstate, SDL_Scancode keybindings[2], bool keyoperator);
 	enum {OR, AND};
 	bool fullscreen;
+	bool scalefilter;
 	bool teamcolors;
 	Uint8 defaultagency;
 	char defaultgamename[64];

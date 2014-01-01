@@ -49,7 +49,7 @@ Renderer::Renderer(World & world) : world(world), camera(640, 480){
 
 void Renderer::Draw(Surface * surface, float frametime){
 	// Uncomment below to find and view individual sprites
-	/*SDL_FillRect(surface, 0, 112);
+	/*surface->Clear(112);
 	const Uint8 * keystate = SDL_GetKeyboardState(NULL);
 	if(keystate[SDL_SCANCODE_UP]){ ex++; }
 	if(keystate[SDL_SCANCODE_DOWN]){ ex--; }

@@ -26,6 +26,8 @@ private:
 	bool Tick(void);
 	void Present(void);
 	bool SetupOpenGL(void);
+	void CreateRenderer(void);
+	void CreateStreamingTexture(void);
 	static Uint32 TimerCallback(Uint32 interval, void * param);
 	void SetColors(SDL_Color * colors);
 	void UpdateInputState(Input & input);
@@ -41,6 +43,7 @@ private:
 	Interface * CreateMainMenuInterface(void);
 	Interface * CreateOptionsInterface(void);
 	Interface * CreateOptionsControlsInterface(void);
+	Interface * CreateOptionsDisplayInterface(void);
 	Interface * CreateLobbyConnectInterface(void);
 	Interface * CreateLobbyInterface(void);
 	Interface * CreateCharacterInterface(void);
@@ -85,7 +88,7 @@ private:
 	static const int numkeys = 20;
 	const char * keynames[numkeys];
 	Uint8 keystate[SDL_NUM_SCANCODES];
-	enum {NONE, FADEOUT, MAINMENU, LOBBYCONNECT, LOBBY, INGAME, MISSIONSUMMARY, SINGLEPLAYERGAME, OPTIONS, OPTIONSCONTROLS, HOSTGAME, JOINGAME, TESTGAME};
+	enum {NONE, FADEOUT, MAINMENU, LOBBYCONNECT, LOBBY, INGAME, MISSIONSUMMARY, SINGLEPLAYERGAME, OPTIONS, OPTIONSCONTROLS, OPTIONSDISPLAY, HOSTGAME, JOINGAME, TESTGAME};
 	Uint8 state;
 	Uint8 nextstate;
 	Uint8 fade_i;
@@ -101,6 +104,9 @@ private:
 	SDL_Renderer * windowrenderer;
 	Surface screenbuffer;
 	SDL_Surface * sdlscreenbuffer;
+	SDL_Texture * streamingtexture;
+	SDL_PixelFormat * streamingtexturepixelformat;
+	Uint32 streamingtexturepalette[256];
 	int frames;
 	int fps;
 	Uint32 lasttick;
