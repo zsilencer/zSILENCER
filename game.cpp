@@ -137,6 +137,12 @@ bool Game::Load(char * cmdline){
 					}while(user->retrieving);
 					printf("name: %s, techslots: %d\n", user->name, user->agency[0].techslots);*/
 					world.dedicatedserver.Start(lobbyaddress, atoi(lobbyport), atoi(gameid), atoi(accountid));
+					char filename[256];
+					sprintf(filename, "replays/%d.zsr", atoi(gameid));
+					world.replay.BeginRecording(filename);
+					if(world.replay.IsRecording()){
+						world.replay.WriteHeader(world);
+					}
 					State * newstateobject = static_cast<State *>(world.CreateObject(ObjectTypes::STATE));
 					sharedstate = newstateobject->id;
 					newstateobject->state = 0;
@@ -482,12 +488,14 @@ bool Game::Loop(void){
 		//printf("%d\n", tickcheck - lasttick);
 		world.systemcameraactive[0] = false;
 		world.systemcameraactive[1] = false;
-		world.DoNetwork();
+		//world.DoNetwork();
 		UpdateInputState(world.localinput);
 		world.SendInput();
-		world.Tick();
 		if(!Tick()){
 			return false;
+		}
+		if(!world.replay.IsPlaying() || (world.replay.IsPlaying() && world.gameplaystate == World::INGAME)){
+			world.Tick();
 		}
 		renderer.Tick();
 		if(world.gameplaystate == World::INGAME){
@@ -509,10 +517,10 @@ bool Game::Loop(void){
 		}
 		lasttick += wait;
 	}
-	world.DoNetwork();
+	//world.DoNetwork();
 	if(!world.dedicatedserver.active){
 		screenbuffer.Clear(0);
-		world.DoNetwork();
+		//world.DoNetwork();
 		renderer.Draw(&screenbuffer, 1 - (float(tickcheck - lasttick) / wait));
 		/*char fpstext[16];
 		sprintf(fpstext, "%d", fps);
@@ -520,7 +528,7 @@ bool Game::Loop(void){
 		if(minimized){
 			SDL_Delay(wait);
 		}
-		world.DoNetwork();
+		//world.DoNetwork();
 		//Uint32 drawtick = SDL_GetTicks();
 		Present();
 		//Uint32 afterdrawtick = SDL_GetTicks();
@@ -568,8 +576,9 @@ bool Game::Tick(void){
 				break;
 				case 2:
 					if(state != INGAME){
-						state = INGAME;
-						stateisnew = true;
+						GoToState(INGAME);
+						//state = INGAME;
+						//stateisnew = true;
 					}
 				break;
 			}
@@ -788,7 +797,7 @@ bool Game::Tick(void){
 			}
 		}break;
 		case INGAME:{
-			if(!world.map.loaded && stateisnew){
+			if(/*!world.map.loaded && */stateisnew){
 				for(std::list<Object *>::iterator it = world.objectlist.begin(); it != world.objectlist.end(); it++){
 					Object * object = *it;
 					switch(object->type){
@@ -819,6 +828,9 @@ bool Game::Tick(void){
 				if(sharedstateobject){
 					sharedstateobject->state = 2;
 				}
+				if(world.replay.IsRecording()){
+					world.replay.WriteStart();
+				}
 				ShowDeployMessage();
 				Audio::GetInstance().StopMusic();
 				world.gameplaystate = World::INGAME;
@@ -834,18 +846,19 @@ bool Game::Tick(void){
 									User * user = world.lobby.GetUserInfo(peer->accountid);
 									if(user){
 										user->statsagency = team->agency;
+										user->teamnumber = team->number;
 									}
-								}
-								Player * player = (Player *)world.CreateObject(ObjectTypes::PLAYER);
-								if(player){
-									world.map.RandomPlayerStartLocation(world, player->x, player->y);
-									player->oldx = player->x;
-									player->oldy = player->y;
-									player->teamid = team->id;
-									Uint8 teamcolor = team->GetColor();
-									player->suitcolor = teamcolor;//(((teamcolor >> 4) - i) << 4) + (teamcolor & 0xF);
-									world.peerlist[team->peers[i]]->controlledlist.clear();
-									world.peerlist[team->peers[i]]->controlledlist.push_back(player->id);
+									Player * player = (Player *)world.CreateObject(ObjectTypes::PLAYER);
+									if(player){
+										world.map.RandomPlayerStartLocation(world, player->x, player->y);
+										player->oldx = player->x;
+										player->oldy = player->y;
+										player->teamid = team->id;
+										Uint8 teamcolor = team->GetColor();
+										player->suitcolor = teamcolor;//(((teamcolor >> 4) - i) << 4) + (teamcolor & 0xF);
+										peer->controlledlist.clear();
+										peer->controlledlist.push_back(player->id);
+									}
 								}
 							}
 						}break;
@@ -858,33 +871,60 @@ bool Game::Tick(void){
 				screenbuffer.Clear(0);
 				SetColors(renderer.palette.GetColors());
 				stateisnew = false;
-			}
-			if(!deploymessageshown && world.messagetype == 1 && world.message_i == 63){
-				world.ShowMessage((char *)"Location : Base Arsia Mons, Surface Temperature : -7C", 96, 1);
-				deploymessageshown = true;
-			}
-			if(CheckForQuit()){
-				world.Disconnect();
-				if(world.lobby.state == Lobby::AUTHENTICATED){
-					GoToState(LOBBY);
-					world.lobby.JoinChannel(lastchannel);
-				}else{
-					GoToState(MAINMENU);
+			}else{
+				if(world.replay.IsPlaying()){
+					if(world.localinput.keymoveleft){
+						world.localpeerid--;
+					}
+					if(world.localinput.keymoveright){
+						world.localpeerid++;
+					}
+					if(!world.peerlist[world.localpeerid] || world.localpeerid == world.authoritypeer){
+						for(int i = 0; i < world.maxpeers; i++){
+							if(world.peerlist[i] && i != world.authoritypeer){
+								world.localpeerid = i;
+								break;
+							}
+						}
+					}
+					if(!world.replay.ReadToNextTick(world)){
+						world.replay.EndPlaying();
+						GoToState(MAINMENU);
+					}
 				}
-			}
-			if(CheckForEndOfGame()){
-				if(world.lobby.state == Lobby::AUTHENTICATED){
-					GoToState(MISSIONSUMMARY);
-				}else{
-					GoToState(MAINMENU);
+				if(!deploymessageshown && world.messagetype == 1 && world.message_i == 63){
+					world.ShowMessage((char *)"Location : Base Arsia Mons, Surface Temperature : -7C", 96, 1);
+					deploymessageshown = true;
 				}
-			}
-			if(CheckForConnectionLost()){
-				if(world.lobby.state == Lobby::AUTHENTICATED){
-					GoToState(LOBBY);
-					world.lobby.JoinChannel(lastchannel);
-				}else{
-					GoToState(MAINMENU);
+				if(CheckForQuit()){
+					world.Disconnect();
+					if(world.lobby.state == Lobby::AUTHENTICATED){
+						GoToState(LOBBY);
+						world.lobby.JoinChannel(lastchannel);
+					}else{
+						if(world.replay.IsPlaying()){
+							world.replay.EndPlaying();
+						}
+						GoToState(MAINMENU);
+					}
+				}
+				if(CheckForEndOfGame()){
+					if(world.lobby.state == Lobby::AUTHENTICATED){
+						GoToState(MISSIONSUMMARY);
+					}else{
+						if(world.replay.IsPlaying()){
+							world.replay.EndPlaying();
+						}
+						GoToState(MAINMENU);
+					}
+				}
+				if(CheckForConnectionLost()){
+					if(world.lobby.state == Lobby::AUTHENTICATED){
+						GoToState(LOBBY);
+						world.lobby.JoinChannel(lastchannel);
+					}else{
+						GoToState(MAINMENU);
+					}
 				}
 			}
 		}break;
@@ -1540,6 +1580,11 @@ bool Game::Tick(void){
 				State * newsharedstateobject = static_cast<State *>(world.CreateObject(ObjectTypes::STATE));
 				sharedstate = newsharedstateobject->id;
 				newsharedstateobject->state = 0;
+				world.replay.BeginRecording("testrecording.zsr");
+				if(world.replay.IsRecording()){
+					world.replay.WriteHeader(world);
+					world.replay.WriteGameInfo(world.gameinfo);
+				}
 				stateisnew = false;
 			}
 			/*if(world.tickcount % 48 == 0){
@@ -1547,6 +1592,9 @@ bool Game::Tick(void){
 			}*/
 			if(!world.map.loaded && world.peercount >= 2){
 				screenbuffer.Clear(0);
+				if(world.replay.IsRecording()){
+					world.replay.WriteStart();
+				}
 				char mapname[256];
 				sprintf(mapname, "level/%s", world.gameinfo.mapname);
 				LoadMap(mapname);
@@ -1572,11 +1620,11 @@ bool Game::Tick(void){
 										player->oldx = player->x;
 										player->oldy = player->y;
 										player->teamid = team->id;
-										player->AddInventoryItem(Player::INV_VIRUS);
-										player->credits = 2000;
+										//player->AddInventoryItem(Player::INV_VIRUS);
+										//player->credits = 2000;
 										Uint8 teamcolor = team->GetColor();
 										player->suitcolor = (((teamcolor >> 4) - i) << 4) + (teamcolor & 0xF);
-										world.peerlist[team->peers[i]]->techchoices = 0xFFFFFFFF;
+										//world.peerlist[team->peers[i]]->techchoices = 0xFFFFFFFF;
 										world.peerlist[team->peers[i]]->controlledlist.clear();
 										world.peerlist[team->peers[i]]->controlledlist.push_back(player->id);
 									}
@@ -1679,6 +1727,32 @@ bool Game::Tick(void){
 					}
 				}*/
 				if(CheckForQuit() || CheckForEndOfGame()){
+					GoToState(MAINMENU);
+				}
+			}
+		}break;
+		case REPLAYGAME:{
+			if(stateisnew){
+				world.DestroyAllObjects();
+				world.gameplaystate = World::INLOBBY;
+				world.replay.BeginPlaying("testrecording.zsr");
+				if((world.replay.IsPlaying() && !world.replay.ReadHeader(world)) || !world.replay.IsPlaying()){
+					printf("Replay error\n");
+					world.replay.EndPlaying();
+					GoToState(MAINMENU);
+				}else{
+					stateisnew = false;
+				}
+			}else{
+				while(world.replay.ReadToNextTick(world)){
+					if(world.replay.GameStarted()){
+						GoToState(INGAME);
+						break;
+					}
+					world.Tick();
+				}
+				if(!world.replay.GameStarted()){
+					world.replay.EndPlaying();
 					GoToState(MAINMENU);
 				}
 			}
@@ -1828,6 +1902,9 @@ bool Game::CheckForEndOfGame(void){
 	if(world.winningteamid){
 		if(world.message_i == 24 * 3){
 			if(world.IsAuthority()){
+				if(world.replay.IsRecording()){
+					world.replay.EndRecording();
+				}
 				for(std::vector<Uint32>::iterator it = world.ingameusers.begin(); it != world.ingameusers.end(); it++){
 					Uint32 accountid = *it;
 					User * user = world.lobby.GetUserInfo(accountid);
@@ -1840,6 +1917,7 @@ bool Game::CheckForEndOfGame(void){
 									Team * team = world.GetPeerTeam(peer->id);
 									user->statscopy = peer->stats;
 									user->statsagency = team->agency;
+									user->teamnumber = team->number;
 									world.SendStats(*peer);
 									if(team && team->id == world.winningteamid){
 										won = 1;
@@ -1847,7 +1925,7 @@ bool Game::CheckForEndOfGame(void){
 								}
 							}
 						}
-						world.lobby.RegisterStats(*user, won);
+						world.lobby.RegisterStats(*user, won, world.gameinfo.id);
 					}
 				}
 			}
@@ -1860,6 +1938,9 @@ bool Game::CheckForEndOfGame(void){
 }
 
 bool Game::CheckForConnectionLost(void){
+	if(world.replay.IsPlaying()){
+		return false;
+	}
 	if(world.state == World::IDLE && world.message_i >= 48){
 		return true;
 	}
@@ -2029,6 +2110,12 @@ Interface * Game::CreateMainMenuInterface(void){
 		joinbutton->uid = 5;
 		strcpy(joinbutton->text, "Join Game");
 		
+		Button * replaybutton = (Button *)world.CreateObject(ObjectTypes::BUTTON);
+		replaybutton->y = -270;
+		replaybutton->x = -40;
+		replaybutton->uid = 7;
+		strcpy(replaybutton->text, "Test Replay");
+		
 		Button * testbutton = (Button *)world.CreateObject(ObjectTypes::BUTTON);
 		testbutton->y = -201;
 		testbutton->x = 0;
@@ -2037,6 +2124,7 @@ Interface * Game::CreateMainMenuInterface(void){
 		
 		iface->AddObject(hostbutton->id);
 		iface->AddObject(joinbutton->id);
+		iface->AddObject(replaybutton->id);
 		iface->AddObject(testbutton->id);
 		iface->AddTabObject(testbutton->id);
 	}
@@ -3063,7 +3151,7 @@ Interface * Game::CreateGameSummaryInterface(Stats & stats, Uint8 agency){
 	AddSummaryLine(*textbox, "  Returned:", stats.secretsreturned);
 	AddSummaryLine(*textbox, "  Stolen:", stats.secretsstolen);
 	AddSummaryLine(*textbox, "  Picked up:", stats.secretspickedup);
-	AddSummaryLine(*textbox, "  Dropped:", stats.secretsdropped);
+	AddSummaryLine(*textbox, "  Fumbled:", stats.secretsdropped);
 	textbox->AddLine("");
 	AddSummaryLine(*textbox, "Civilians killed:", stats.civilianskilled);
 	AddSummaryLine(*textbox, "Guards killed:", stats.guardskilled);
@@ -3400,6 +3488,9 @@ bool Game::ProcessMainMenuInterface(Interface * iface){
 					break;
 					case 6:
 						GoToState(TESTGAME);
+					break;
+					case 7:
+						GoToState(REPLAYGAME);
 					break;
 				}
 			}
@@ -4160,9 +4251,9 @@ void Game::UpdateTechInterface(void){
 								Button * button = static_cast<Button *>(gametechiface->GetObjectWithUid(world, uid));
 								if(button){
 									if(peer && peer->techchoices & buyableitem->techchoice){
-										button->res_index = 18;
+										button->res_index = 18; // on
 									}else{
-										button->res_index = 19;
+										button->res_index = 19; // off
 									}
 									if(team->peers[i] == world.localpeerid){
 										if(!usable){
@@ -4793,7 +4884,16 @@ bool Game::HandleSDLEvents(void){
 						ascii = 0x1B;
 						skip = false;
 					break;
-					default: break;
+					default:{
+						if(Config::GetInstance().KeyIsPressed(keystate, Config::GetInstance().keymoveupbinding, Config::GetInstance().keymoveupoperator)){
+							ascii = 3;
+							skip = false;
+						}
+						if(Config::GetInstance().KeyIsPressed(keystate, Config::GetInstance().keymovedownbinding, Config::GetInstance().keymovedownoperator)){
+							ascii = 4;
+							skip = false;
+						}
+					}break;
 				}
 				Interface * iface = (Interface *)world.GetObjectFromId(currentinterface);
 				if(iface){

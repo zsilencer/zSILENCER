@@ -18,7 +18,7 @@ Lobby::Lobby(World * world){
 	channelchanged = false;
 	channel[0] = 0;
 	serverip[0] = 0;
-	sockethandle = 0;
+	sockethandle = -1;
 	statupgraded = false;
 }
 
@@ -38,7 +38,7 @@ void Lobby::Connect(const char * host, unsigned short port){
 	motdreceived = false;
 	versionchecked = false;
 	motd[0] = 0;
-	if(!sockethandle){
+	if(sockethandle == -1){
 		sockethandle = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 	}
 	unsigned long iomode = 1;
@@ -74,11 +74,11 @@ void Lobby::Disconnect(void){
 	sendbufferoffset = 0;
     shutdown(sockethandle, SHUT_RDWR);
     closesocket(sockethandle);
-	sockethandle = 0;
+	sockethandle = -1;
 }
 
 void Lobby::DoNetwork(void){
-	if(state == IDLE || state == WAITING || !sockethandle){
+	if(state == IDLE || state == WAITING || sockethandle == -1){
 		return;
 	}
 	LockMutex();
@@ -104,7 +104,7 @@ void Lobby::DoNetwork(void){
 		result = 0;
 		FD_ZERO(&readset);
 		FD_ZERO(&writeset);
-		if(sockethandle){
+		if(sockethandle != -1){
 			FD_SET(sockethandle, &readset);
 		}
 		if(state == CONNECTING || sendbufferoffset > 0){
@@ -532,10 +532,12 @@ void Lobby::UpgradeStat(Uint8 agency, Uint8 stat){
 	SendMessage(msg, sizeof(msg));
 }
 
-void Lobby::RegisterStats(User & user, Uint8 won){
+void Lobby::RegisterStats(User & user, Uint8 won, Uint32 gameid){
 	Serializer msg;
 	Uint8 code = MSG_REGISTERSTATS;
 	msg.Put(code);
+	msg.Put(gameid);
+	msg.Put(user.teamnumber);
 	msg.Put(user.accountid);
 	msg.Put(user.statsagency);
 	msg.Put(won);

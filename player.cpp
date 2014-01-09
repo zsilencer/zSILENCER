@@ -171,24 +171,26 @@ void Player::Tick(World & world){
 		ai->Tick(world);
 	}
 	if(input.keychat && !chatinterfaceid && !buyinterfaceid && !techinterfaceid && this == world.GetPeerPlayer(world.localpeerid)){
-		Interface * iface = (Interface *)world.CreateObject(ObjectTypes::INTERFACE);
-		if(iface){
-			TextInput * textinput = (TextInput *)world.CreateObject(ObjectTypes::TEXTINPUT);
-			if(textinput){
-				textinput->x = 100;
-				textinput->y = 100;
-				textinput->res_bank = 133;
-				textinput->fontwidth = 6;
-				textinput->draw = false;
-				textinput->uid = 1;
-				textinput->maxchars = 100;
-				textinput->maxwidth = 28;
-				//strcpy(textinput->text, "sdfsdf");
-				iface->AddObject(textinput->id);
-				iface->activeobject = textinput->id;
-				iface->ActiveChanged(world, iface, false);
+		if(!world.replay.IsPlaying()){
+			Interface * iface = (Interface *)world.CreateObject(ObjectTypes::INTERFACE);
+			if(iface){
+				TextInput * textinput = (TextInput *)world.CreateObject(ObjectTypes::TEXTINPUT);
+				if(textinput){
+					textinput->x = 100;
+					textinput->y = 100;
+					textinput->res_bank = 133;
+					textinput->fontwidth = 6;
+					textinput->draw = false;
+					textinput->uid = 1;
+					textinput->maxchars = 100;
+					textinput->maxwidth = 28;
+					//strcpy(textinput->text, "sdfsdf");
+					iface->AddObject(textinput->id);
+					iface->activeobject = textinput->id;
+					iface->ActiveChanged(world, iface, false);
+				}
+				chatinterfaceid = iface->id;
 			}
-			chatinterfaceid = iface->id;
 		}
 	}
 	if(state_warp){
@@ -1869,7 +1871,7 @@ void Player::Tick(World & world){
 				}
 				if(state_i >= 14 && state_i <= 16){
 					if(hacksoundchannel == -1){
-						hacksoundchannel = EmitSound(world, world.resources.soundbank["ambloop5.wav"], 50, true);
+						hacksoundchannel = EmitSound(world, world.resources.soundbank["ambloop5.wav"], 40, true);
 					}
 				}
 			}
@@ -1948,6 +1950,7 @@ void Player::Tick(World & world){
 			}
 			if(state_i >= 17){
 				effecthacking = false;
+				effecthackingcontinue = 0;
 				res_index = (17 - state_i) + 16;
 				if(state_i - 17 == 16){
 					state = STANDING;
@@ -2405,6 +2408,17 @@ void Player::HandleHit(World & world, Uint8 x, Uint8 y, Object & projectile){
 					}break;
 					case ObjectTypes::FIXEDCANNON:{
 						killedby = "a Fixed Cannon";
+						FixedCannon * fixedcannon = static_cast<FixedCannon *>(world.GetObjectFromId(owner->id));
+						if(fixedcannon){
+							Object * fixedcannonowner = world.GetObjectFromId(fixedcannon->ownerid);
+							if(fixedcannonowner && fixedcannonowner->type == ObjectTypes::PLAYER){
+								Player * fixedcannonownerplayer = static_cast<Player *>(fixedcannonowner);
+								Peer * fixedcannonownerpeer = fixedcannonownerplayer->GetPeer(world);
+								if(fixedcannonownerpeer){
+									fixedcannonownerpeer->stats.kills++;
+								}
+							}
+						}
 					}break;
 					case ObjectTypes::ROBOT:{
 						killedby = "a Robot";
@@ -2495,6 +2509,7 @@ void Player::HandleDisconnect(World & world, Uint8 peerid){
 				if(team){
 					user->statscopy = peer->stats;
 					user->statsagency = team->agency;
+					user->teamnumber = team->number;
 				}
 			}
 		}
@@ -2999,7 +3014,7 @@ bool Player::RepairItem(World & world, Uint8 id){
 	}
 	if(buyableitem && credits >= buyableitem->repairprice){
 		Team * team = GetTeam(world);
-		if(team && team->disabledtech & buyableitem->techchoice){
+		if(team && (team->disabledtech & buyableitem->techchoice)){
 			int x1, y1, x2, y2;
 			GetAABB(world.resources, &x1, &y1, &x2, &y2);
 			std::vector<Uint8> types;
@@ -3055,7 +3070,7 @@ void Player::LoadAbilities(World & world){
 	if(peer){
 		Team * team = GetTeam(world);
 		User * user = world.lobby.GetUserInfo(peer->accountid);
-		if(team && user){
+		if(team && user && !user->retrieving){
 			maxfuel += user->agency[team->agency].jetpack * 10;
 			fuel = maxfuel;
 			maxshield += user->agency[team->agency].shield * 20;

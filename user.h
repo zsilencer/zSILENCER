@@ -36,6 +36,7 @@ public:
 	// local only
 	Stats statscopy;
 	Uint8 statsagency;
+	Uint8 teamnumber;
 };
 
 #endif

@@ -31,7 +31,7 @@ public:
 	User * GetUserInfo(Uint32 accountid);
 	void ForgetUserInfo(Uint32 accountid);
 	void UpgradeStat(Uint8 agency, Uint8 stat);
-	void RegisterStats(User & user, Uint8 won);
+	void RegisterStats(User & user, Uint8 won, Uint32 gameid);
 	char failmessage[256];
 	Uint32 accountid;
 	char motd[2048];

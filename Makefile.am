@@ -12,6 +12,7 @@ zSILENCERlinux_SOURCES = audio.cpp basedoor.cpp baseexit.cpp terminal.cpp bipeda
 					minimap.cpp object.cpp objecttypes.cpp overlay.cpp palette.cpp \
 					peer.cpp physical.cpp platform.cpp platformset.cpp player.cpp playerai.cpp \
 					plasmaprojectile.cpp plume.cpp projectile.cpp pickup.cpp renderer.cpp \
+					replay.cpp \
 					resources.cpp robot.cpp rocketprojectile.cpp scrollbar.cpp secretreturn.cpp \
 					selectbox.cpp serializer.cpp sha1.cpp shrapnel.cpp \
 					sprite.cpp stats.cpp state.cpp surface.cpp surveillancemonitor.cpp team.cpp \

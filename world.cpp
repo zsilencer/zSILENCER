@@ -112,6 +112,9 @@ void World::Tick(void){
 		ActivateTerminals();
 	}
 	tickcount++;
+	if(replay.IsRecording()){
+		replay.WriteTick();
+	}
 	if(message_i){
 		message_i++;
 		if(message_i >= messagetime){
@@ -247,16 +250,22 @@ void World::DoNetwork_Authority(void){
 							}
 							response.PutBit(true);
 							response.Put(newpeer->id);
+							if(!newpeer->ishost){
+								SendGameInfo(newpeer->id);
+							}
+							if(replay.IsRecording()){
+								replay.WriteNewPeer(agency, accountid);
+							}
 						}else{
 							printf("couldnt add peer\n");
 							response.PutBit(false);
 						}
-						if(newpeer){
+						/*if(newpeer){
 							SendPeerList();
 							if(!newpeer->ishost){
 								SendGameInfo(newpeer->id);
 							}
-						}
+						}*/
 					}else{
 						response.PutBit(false);
 					}
@@ -269,11 +278,14 @@ void World::DoNetwork_Authority(void){
 				SendPacket(&temppeer, response.data, response.BitsToBytes(response.offset));
 			}break;
 			case MSG_INPUT:{ // client sending input
-				if(peer){
+				if(peer && gameplaystate == INGAME){
 					totalinputpackets++;
 					Serializer * inputcopy = new Serializer;
 					inputcopy->Copy(data);
 					inputqueue[peer->id].push_back(inputcopy);
+					if(replay.IsRecording()){
+						replay.WriteInputCommand(*this, peer->id, data);
+					}
 				}
 			}break;
 			case MSG_PEERLIST:{ // peerlist requested
@@ -307,6 +319,9 @@ void World::DoNetwork_Authority(void){
 					if(peer->ishost){
 						printf("loading game info from host\n");
 						gameinfo.Serialize(Serializer::READ, data);
+						if(replay.IsRecording()){
+							replay.WriteGameInfo(gameinfo);
+						}
 						Peer * localpeer = peerlist[localpeerid];
 						if(localpeer){
 							localpeer->gameinfoloaded = true;
@@ -345,9 +360,14 @@ void World::DoNetwork_Authority(void){
 					Uint8 code = MSG_CHAT;
 					response.Put(code);
 					response.Put(peer->accountid);
+					data.data[256] = 0;
 					char * msg = &data.data[data.BitsToBytes(data.readoffset)];
 					for(int i = 0; i < strlen(msg); i++){
 						response.Put(msg[i]);
+					}
+					msg[strlen(msg)] = 0;
+					if(replay.IsRecording()){
+						replay.WriteChat(peer->id, to, msg);
 					}
 					char nullend = 0;
 					response.Put(nullend);
@@ -379,6 +399,9 @@ void World::DoNetwork_Authority(void){
 					if(player){
 						player->BuyItem(*this, id);
 					}
+					if(replay.IsRecording()){
+						replay.WriteStation(peer->id, Replay::STA_BUY, id);
+					}
 				}
 			}break;
 			case MSG_REPAIR:{
@@ -388,6 +411,9 @@ void World::DoNetwork_Authority(void){
 					Player * player = GetPeerPlayer(peer->id);
 					if(player){
 						player->RepairItem(*this, id);
+					}
+					if(replay.IsRecording()){
+						replay.WriteStation(peer->id, Replay::STA_REPAIR, id);
 					}
 				}
 			}break;
@@ -399,18 +425,16 @@ void World::DoNetwork_Authority(void){
 					if(player){
 						player->VirusItem(*this, id);
 					}
+					if(replay.IsRecording()){
+						replay.WriteStation(peer->id, Replay::STA_VIRUS, id);
+					}
 				}
 			}break;
 			case MSG_CHANGETEAM:{
 				if(peer && gameplaystate == INLOBBY){
-					Team * peerteam = GetPeerTeam(peer->id);
-					if(peerteam){
-						int start = peerteam->number + 1;
-						if(FindTeamForPeer(*peer, peerteam->agency, start)){
-							peerteam->RemovePeer(peer->id);
-							peer->isready = false;
-							SendPeerList();
-						}
+					ChangeTeam(peer->id);
+					if(replay.IsRecording()){
+						replay.WriteChangeTeam(peer->id);
 					}
 				}
 			}break;
@@ -418,18 +442,21 @@ void World::DoNetwork_Authority(void){
 				if(peer && gameplaystate == INLOBBY){
 					Uint32 techchoices;
 					data.Get(techchoices);
-					lobby.GetUserInfo(peer->accountid);
-					peer->wantedtechchoices = techchoices;
-					ApplyWantedTech(*peer);
+					SetTech(peer->id, techchoices);
+					if(replay.IsRecording()){
+						replay.WriteSetTech(peer->id, techchoices);
+					}
 				}
 			}break;
 		}
 	}
-	Uint32 tickcheck = SDL_GetTicks();
-	for(int i = 0; i < maxpeers; i++){
-		if(peerlist[i]){
-			if(i != localpeerid && !peerlist[i]->isbot && peerlist[i]->lastpacket < tickcheck && tickcheck - peerlist[i]->lastpacket >= peertimeout){
-				HandleDisconnect(i);
+	if(!replay.IsPlaying()){
+		Uint32 tickcheck = SDL_GetTicks();
+		for(int i = 0; i < maxpeers; i++){
+			if(peerlist[i]){
+				if(i != localpeerid && !peerlist[i]->isbot && peerlist[i]->lastpacket < tickcheck && tickcheck - peerlist[i]->lastpacket >= peertimeout){
+					HandleDisconnect(i);
+				}
 			}
 		}
 	}
@@ -524,10 +551,10 @@ void World::DoNetwork_Replica(void){
 				}
 			}break;
 			case MSG_CHAT:{
-				//printf("Received MSG_CHAT\n");
 				Uint32 accountid;
 				data.Get(accountid);
-				std::string chatmsg(lobby.GetUserInfo(accountid)->name);
+				DisplayChatMessage(accountid, &data.data[1 + 4]);
+				/*std::string chatmsg(lobby.GetUserInfo(accountid)->name);
 				chatmsg.append(":\xA0");
 				chatmsg.append(&data.data[1 + 4]);
 				
@@ -542,7 +569,7 @@ void World::DoNetwork_Replica(void){
 				showchat_i = 255;
 				while(chatlines.size() > 5){
 					chatlines.pop_front();
-				}
+				}*/
 			}break;
 			case MSG_STATUS:{
 				int size = data.BitsToBytes(data.offset - data.readoffset);
@@ -573,6 +600,7 @@ void World::DoNetwork_Replica(void){
 							strcpy(user->name, namecopy);
 							user->statscopy = localpeer->stats;
 							user->statsagency = team->agency;
+							user->teamnumber = team->number;
 						}
 
 					}
@@ -638,7 +666,8 @@ Peer * World::AddPeer(char * address, unsigned short port, Uint8 agency, Uint32 
 		}
 	}else{
 		printf("existing peer added, peer id: %d\n", peer->id);
-		return peer;
+		return 0;
+		//return peer;
 	}
 	return 0;
 }
@@ -707,6 +736,7 @@ bool World::ProcessInputQueue(Peer & peer){
 					object->HandleInput(peer.input);
 					object->Tick(*this);
 					object->lasttick = tickcount;
+					//printf("Processed input for peer %d at tick %d\n", peer.id, tickcount);
 				}
 			}
 		}
@@ -818,7 +848,6 @@ void World::ClearSnapshotQueue(void){
 }
 
 void World::ReadPeerList(Serializer & data){
-	//printf("reading peerlist\n");
 	for(unsigned int i = 0; i < maxpeers; i++){
 		if(i == authoritypeer){
 			continue;
@@ -849,6 +878,9 @@ void World::ReadPeerList(Serializer & data){
 }
 
 void World::SendPacket(Peer * peer, char * data, unsigned int size){
+	if(replay.IsPlaying()){
+		return;
+	}
 	if(peer){
 		if(lagsimulator.Active()){
 			lagsimulator.QueuePacket(peer, data, size);
@@ -899,6 +931,9 @@ void World::DeleteOldSnapshots(Uint8 peerid){
 
 void World::HandleDisconnect(Uint8 peerid){
 	printf("peer %d disconnected\n", peerid);
+	if(replay.IsRecording()){
+		replay.WriteDisconnect(peerid);
+	}
 	for(std::list<Uint16>::iterator i = peerlist[peerid]->controlledlist.begin(); i != peerlist[peerid]->controlledlist.end(); i++){
 		Object * object = GetObjectFromId((*i));
 		if(object){
@@ -1043,7 +1078,14 @@ void World::ActivateTerminals(void){
 			}
 		}
 	}
-	std::random_shuffle(terminallist.begin(), terminallist.end());
+	//std::random_shuffle(terminallist.begin(), terminallist.end());
+	for(int i = 0; i < terminallist.size(); i++){
+		int r = Random() % terminallist.size();
+		Terminal * temp = terminallist[i];
+		terminallist[i] = terminallist[r];
+		terminallist[r] = temp;
+	}
+	
 	int numused = 0;
 	int numsecret = 0;
 	for(int i = 0; i < terminallist.size(); i++){
@@ -1131,6 +1173,49 @@ void World::VirusItem(Uint8 id){
 	SendPacket(GetAuthorityPeer(), msg, sizeof(msg));
 }
 
+void World::ChangeTeam(Uint8 peerid){
+	Peer * peer = peerlist[peerid];
+	if(peer){
+		Team * peerteam = GetPeerTeam(peer->id);
+		if(peerteam){
+			int start = peerteam->number + 1;
+			if(FindTeamForPeer(*peer, peerteam->agency, start)){
+				peerteam->RemovePeer(peer->id);
+				peer->isready = false;
+				SendPeerList();
+			}
+		}
+	}
+}
+
+void World::SetTech(Uint8 peerid, Uint32 techchoices){
+	Peer * peer = peerlist[peerid];
+	if(peer){
+		lobby.GetUserInfo(peer->accountid);
+		peer->wantedtechchoices = techchoices;
+		ApplyWantedTech(*peer);
+	}
+}
+
+void World::DisplayChatMessage(Uint32 accountid, const char * msg){
+	std::string chatmsg(lobby.GetUserInfo(accountid)->name);
+	chatmsg.append(":\xA0");
+	chatmsg.append(msg);
+	
+	char * wrapped = Interface::WordWrap(chatmsg.c_str(), 36);
+	char * line = strtok(wrapped, "\n");
+	while(line){
+		chatlines.push_back(line);
+		line = strtok(NULL, "\n");
+	}
+	delete[] wrapped;
+	
+	showchat_i = 255;
+	while(chatlines.size() > 5){
+		chatlines.pop_front();
+	}
+}
+
 void World::SendStats(Peer & peer){
 	Serializer msg;
 	Uint8 code = MSG_STATS;
@@ -1140,6 +1225,9 @@ void World::SendStats(Peer & peer){
 }
 
 void World::UserInfoReceived(Peer & peer){
+	if(replay.IsRecording()){
+		replay.WriteUserInfo(*lobby.GetUserInfo(peer.accountid));
+	}
 	ApplyWantedTech(peer);
 }
 
@@ -1255,7 +1343,7 @@ void World::Disconnect(void){
 void World::SendInput(void){
 	Peer * peer = 0;
 	localinputhistory[tickcount % maxlocalinputhistory] = localinput;
-	if(mode == REPLICA && state == CONNECTED){
+	if(mode == REPLICA && state == CONNECTED && gameplaystate == INGAME){
 		peer = peerlist[localpeerid];
 		if(peer){
 			peer->input = localinput;

@@ -28,6 +28,7 @@ User::User(){
 	agency[Team::BLACKROSE].defaultbonuses += 2;
 	strcpy(name, "");
 	statsagency = 0;
+	teamnumber = 0;
 }
 
 void User::Serialize(bool write, Serializer & data){

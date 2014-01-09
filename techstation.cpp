@@ -52,7 +52,13 @@ void TechStation::HandleHit(World & world, Uint8 x, Uint8 y, Object & projectile
 		if(team){
 			Uint32 tech = team->GetAvailableTech(world);
 			std::vector<BuyableItem *> buyablecopy = world.buyableitems;
-			std::random_shuffle(buyablecopy.begin(), buyablecopy.end());
+			//std::random_shuffle(buyablecopy.begin(), buyablecopy.end());
+			for(int i = 0; i < buyablecopy.size(); i++){
+				int r = world.Random() % buyablecopy.size();
+				BuyableItem * temp = buyablecopy[i];
+				buyablecopy[i] = buyablecopy[r];
+				buyablecopy[r] = temp;
+			}
 			for(std::vector<BuyableItem *>::iterator it = buyablecopy.begin(); it != buyablecopy.end(); it++){
 				BuyableItem * buyableitem = *it;
 				if((buyableitem->techchoice & tech) && !(buyableitem->techchoice & team->disabledtech)){

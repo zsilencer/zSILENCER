@@ -1001,17 +1001,19 @@ void Renderer::DrawMiniMap(Object * object){
 			}
 			if(player->hassecret){
 				Team * team = player->GetTeam(world);
-				Uint8 color;
-				if(Config::GetInstance().teamcolors){
-					if(localplayer && player->GetTeam(world) != localplayer->GetTeam(world)){
-						color = enemycolor;
+				if(team){
+					Uint8 color;
+					if(Config::GetInstance().teamcolors){
+						if(localplayer && player->GetTeam(world) != localplayer->GetTeam(world)){
+							color = enemycolor;
+						}else{
+							color = teamcolor;
+						}
 					}else{
-						color = teamcolor;
+						color = team->GetColor();
 					}
-				}else{
-					color = team->GetColor();
+					MiniMapCircle(player->x, player->y, TeamColorToIndex(color));
 				}
-				MiniMapCircle(player->x, player->y, TeamColorToIndex(color));
 			}
 			bool onteam = false;
 			if(localplayer && player != localplayer && player->GetTeam(world) == localplayer->GetTeam(world)){

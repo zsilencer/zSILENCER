@@ -525,7 +525,7 @@ void Guard::HandleHit(World & world, Uint8 x, Uint8 y, Object & projectile){
 				}
 				pickup->x = Guard::x;
 				pickup->y = Guard::y - 1;
-				pickup->xv = (rand() % 9) - 4;
+				pickup->xv = (world.Random() % 9) - 4;
 				pickup->yv = -15;
 			}
 		}

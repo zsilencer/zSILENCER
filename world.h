@@ -18,6 +18,7 @@
 #include "lagsimulator.h"
 #include "dedicatedserver.h"
 #include "buyableitem.h"
+#include "replay.h"
 
 class World
 {
@@ -104,6 +105,7 @@ public:
 	friend class BaseDoor;
 	friend class Terminal;
 	friend class PlayerAI;
+	friend class Replay;
 	
 protected:
 	std::list<class Object *> objectlist;
@@ -144,6 +146,9 @@ private:
 	void BuyItem(Uint8 id);
 	void RepairItem(Uint8 id);
 	void VirusItem(Uint8 id);
+	void ChangeTeam(Uint8 peerid);
+	void SetTech(Uint8 peerid, Uint32 techchoices);
+	void DisplayChatMessage(Uint32 accountid, const char * msg);
 	void SendStats(Peer & peer);
 	void UserInfoReceived(Peer & peer);
 	void ApplyWantedTech(Peer & peer);
@@ -200,6 +205,7 @@ private:
 	bool highlightminimap;
 	bool intutorialmode;
 	Uint32 randomseed;
+	class Replay replay;
 };
 
 #endif

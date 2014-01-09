@@ -56,7 +56,7 @@ void Team::Tick(World & world){
 	if(secretprogress - oldsecretprogress >= 20){
 		Player * localplayer = world.GetPeerPlayer(world.localpeerid);
 		if(localplayer && this == localplayer->GetTeam(world)){
-			Audio::GetInstance().Play(world.resources.soundbank["select2.wav"], 64);
+			Audio::GetInstance().Play(world.resources.soundbank["select2.wav"], 32);
 		}
 		oldsecretprogress = secretprogress;
 	}
@@ -74,7 +74,7 @@ void Team::Tick(World & world){
 				}
 				int remaining = 3 - secrets;
 				char text[128];
-				sprintf(text, "%s returned a %s\n(%d remaining)\n\nTeam awarded 1000 credits", user->name, stolen ? "stolen secret" : "secret", remaining);
+				sprintf(text, "%s returned a %s\n( %d remaining )\n\nTeam awarded 1000 credits", user->name, stolen ? "stolen secret" : "secret", remaining);
 				if(!world.intutorialmode){
 					world.ShowMessage(text, 128, 0, true);
 				}
@@ -133,19 +133,6 @@ void Team::Tick(World & world){
 					}
 				}
 				world.ShowMessage(message, 255, type);
-				/*if(!world.IsAuthority()){
-					Peer * peer = world.peerlist[world.localpeerid];
-					if(peer){
-						Team * team = world.GetPeerTeam(peer->id);
-						if(team){
-							User * user = world.lobby.GetUserInfo(peer->accountid);
-							world.lobby.ForgetUserInfo(peer->accountid);
-							user = world.lobby.GetUserInfo(peer->accountid);
-							user->statscopy = peer->stats;
-							user->statsagency = team->agency;
-						}
-					}
-				}*/
 			}
 		}
 		secretdelivered = 0;

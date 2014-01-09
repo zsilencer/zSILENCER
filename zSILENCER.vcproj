@@ -387,6 +387,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\replay.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\resources.cpp"
 				>
 			</File>
@@ -738,6 +742,10 @@
 			</File>
 			<File
 				RelativePath=".\renderer.h"
+				>
+			</File>
+			<File
+				RelativePath=".\replay.h"
 				>
 			</File>
 			<File

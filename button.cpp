@@ -39,10 +39,10 @@ void Button::Tick(World & world){
 	}
 	switch(state){
 		case INACTIVE:{
-			if(type == BCHECKBOX){
+			/*if(type == BCHECKBOX){
 				res_index = 19;
 				break;
-			}
+			}*/
 		}break;
 		case ACTIVATING:{
 			if(type == BCHECKBOX){
@@ -77,7 +77,7 @@ void Button::Tick(World & world){
 		}break;
 		case ACTIVE:{
 			if(type == BCHECKBOX){
-				res_index = 18;
+				//res_index = 18;
 				break;
 			}
 			if(type != B156x21){

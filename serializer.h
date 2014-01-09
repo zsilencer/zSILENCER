@@ -13,7 +13,7 @@ public:
 	void Copy(Serializer & from);
 	bool MoreToRead(void);
 	bool MoreBytesToRead(void);
-	unsigned int BitsToBytes(unsigned int bits);
+	static unsigned int BitsToBytes(unsigned int bits);
 	template <class type>
 	void Serialize(bool write, type & value, Serializer * old){
 		if(old){
