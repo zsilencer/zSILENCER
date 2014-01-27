@@ -1,11 +1,12 @@
 #include "audio.h"
 #include "world.h"
+#include "config.h"
 #include <math.h>
 
 Audio::Audio(){
 	enabled = true;
 	effectvolume = 1;
-	musicenabled = false;
+	musicvolume = MIX_MAX_VOLUME;
 }
 
 Audio::~Audio(){
@@ -38,7 +39,7 @@ void Audio::Close(void){
 	}
 }
 
-int Audio::Play(Mix_Chunk * chunk, Uint8 volume, bool loop){
+int Audio::Play(Mix_Chunk * chunk, int volume, bool loop){
 	if(enabled && chunk){
 		int loops = 0;
 		if(loop){
@@ -80,7 +81,7 @@ bool Audio::Paused(int channel){
 	return Mix_Paused(channel);
 }
 
-int Audio::EmitSound(World & world, Uint16 objectid, Mix_Chunk * chunk, Uint8 volume, bool loop){
+int Audio::EmitSound(World & world, Uint16 objectid, Mix_Chunk * chunk, int volume, bool loop){
 	int channel = Play(chunk, volume * effectvolume, loop);
 	if(channel != -1){
 		//Mix_Volume(channel, 0);
@@ -120,11 +121,11 @@ void Audio::UpdateAllVolumes(World & world, Sint16 x, Sint16 y, int radius){
 	}
 }
 
-void Audio::SetVolume(int channel, Uint8 volume){
+void Audio::SetVolume(int channel, int volume){
 	Mix_Volume(channel, volume * effectvolume);
 }
 
-void Audio::Mute(Uint8 volume){
+void Audio::Mute(int volume){
 	float percent = volume / 128.0;
 	effectvolume = percent;
 	for(int i = 0; i < maxchannels; i++){
@@ -144,19 +145,30 @@ void Audio::Unmute(void){
 }
 
 void Audio::PlayMusic(Mix_Music * music){
-	if(!musicenabled){
+	if(!Config::GetInstance().music){
 		return;
 	}
-	if(!Mix_PlayingMusic()){
+	if(!Mix_PlayingMusic() || Mix_FadingMusic() == MIX_FADING_OUT){
 		Mix_PlayMusic(music, -1);
+		SetMusicVolume(musicvolume);
 	}
 }
 
 void Audio::StopMusic(void){
-	if(!musicenabled){
-		return;
-	}
 	Mix_FadeOutMusic(700);
+}
+
+void Audio::PauseMusic(void){
+	Mix_PauseMusic();
+}
+
+void Audio::ResumeMusic(void){
+	Mix_ResumeMusic();
+}
+
+void Audio::SetMusicVolume(int volume){
+	Mix_VolumeMusic(volume);
+	musicvolume = volume;
 }
 
 void Audio::ChannelFinished(int channel){

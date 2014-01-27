@@ -16,6 +16,7 @@ public:
 	bool fullscreen;
 	bool scalefilter;
 	bool teamcolors;
+	bool music;
 	Uint8 defaultagency;
 	char defaultgamename[64];
 	Uint32 defaulttechchoices[5];

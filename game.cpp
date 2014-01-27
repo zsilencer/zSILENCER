@@ -156,13 +156,21 @@ bool Game::Load(char * cmdline){
 		printf("Could not initialize SDL\n");
 		return false;
 	}
-	if(Mix_Init(MIX_INIT_MP3) == -1){
+	int mixinitted;
+	if((mixinitted = Mix_Init(MIX_INIT_MP3 | MIX_INIT_MOD | MIX_INIT_MODPLUG)) == -1){
 		printf("Could not initialize SDL_mixer\n");
 		return false;
+	}
+	if(!(mixinitted & MIX_INIT_MOD) && !(mixinitted & MIX_INIT_MODPLUG)){
+		printf("Could not initialize MOD support\n");
+	}
+	if(!(mixinitted & MIX_INIT_MP3)){
+		printf("Could not initialize MP3 support\n");
 	}
 	if(!Audio::GetInstance().Init()){
 		printf("Could not initialize audio\n");
 	}
+	Audio::GetInstance().SetMusicVolume(64);
 	printf("Loading palette...\n");
 	if(!renderer.palette.SetPalette(0)){
 		return false;
@@ -607,7 +615,6 @@ bool Game::Tick(void){
 				world.Disconnect();
 				world.gameplaystate = World::NONE;
 				world.lobby.Disconnect();
-				Audio::GetInstance().PlayMusic(world.resources.music);
 				UnloadGame();
 				world.GetAuthorityPeer()->controlledlist.clear();
 				world.DestroyAllObjects();
@@ -619,6 +626,9 @@ bool Game::Tick(void){
 				SetColors(renderer.palette.GetColors());
 				stateisnew = false;
 			}else{
+				if(FadedIn()){
+					Audio::GetInstance().PlayMusic(world.resources.menumusic);
+				}
 				Interface * iface = (Interface *)world.GetObjectFromId(currentinterface);
 				if(iface){
 					if(!ProcessMainMenuInterface(iface)){
@@ -636,13 +646,13 @@ bool Game::Tick(void){
 				world.GetAuthorityPeer()->controlledlist.push_back(currentinterface);
 				renderer.palette.SetPalette(2);
 				world.lobby.state = Lobby::WAITING;
-				Audio::GetInstance().PlayMusic(world.resources.music);
 				motdprinted = false;
 				screenbuffer.Clear(0);
 				SetColors(renderer.palette.GetColors());
 				stateisnew = false;
 			}else{
-				if(fade_i == 16){
+				if(FadedIn()){
+					Audio::GetInstance().PlayMusic(world.resources.menumusic);
 					Interface * iface = (Interface *)world.GetObjectFromId(currentinterface);
 					if(iface){
 						ProcessLobbyConnectInterface(iface);
@@ -656,7 +666,6 @@ bool Game::Tick(void){
 				agencychanged = true;
 				UnloadGame();
 				world.Disconnect();
-				Audio::GetInstance().PlayMusic(world.resources.music);
 				renderer.camera.SetPosition(320, 240);
 				lobbyinterface = 0;
 				characterinterface = 0;
@@ -678,6 +687,9 @@ bool Game::Tick(void){
 				SetColors(renderer.palette.GetColors());
 				stateisnew = false;
 			}else{
+				if(FadedIn()){
+					Audio::GetInstance().PlayMusic(world.resources.menumusic);
+				}
 				if(world.lobby.state == Lobby::DISCONNECTED){
 					GoToState(LOBBYCONNECT);
 					break;
@@ -870,8 +882,12 @@ bool Game::Tick(void){
 				renderer.palette.SetParallaxColors(world.map.parallax);
 				screenbuffer.Clear(0);
 				SetColors(renderer.palette.GetColors());
+				LoadRandomGameMusic();
 				stateisnew = false;
 			}else{
+				if(FadedIn()){
+					Audio::GetInstance().PlayMusic(world.resources.gamemusic);
+				}
 				if(world.replay.IsPlaying()){
 					if(world.localinput.keymoveleft){
 						world.localpeerid--;
@@ -933,7 +949,6 @@ bool Game::Tick(void){
 				UnloadGame();
 				gamesummaryinfoloaded = false;
 				world.Disconnect();
-				Audio::GetInstance().PlayMusic(world.resources.music);
 				renderer.camera.SetPosition(320, 240);
 				User * user = world.lobby.GetUserInfo(world.lobby.accountid);
 				gamesummaryinterface = CreateGameSummaryInterface(user->statscopy, user->statsagency)->id;
@@ -943,6 +958,9 @@ bool Game::Tick(void){
 				SetColors(renderer.palette.GetColors());
 				stateisnew = false;
 			}else{
+				if(FadedIn()){
+					Audio::GetInstance().PlayMusic(world.resources.menumusic);
+				}
 				Interface * gamesummaryiface = static_cast<Interface *>(world.GetObjectFromId(gamesummaryinterface));
 				if(gamesummaryiface){
 					ProcessGameSummaryInterface(gamesummaryiface);
@@ -956,7 +974,6 @@ bool Game::Tick(void){
 				world.gameplaystate = World::INGAME;
 				world.intutorialmode = true;
 				currentinterface = 0;
-				Audio::GetInstance().StopMusic();
 				world.GetAuthorityPeer()->techchoices = World::BUY_LASER | World::BUY_ROCKET;
 				//world.Listen(23456);
 				Team * team = (Team *)world.CreateObject(ObjectTypes::TEAM);
@@ -971,10 +988,10 @@ bool Game::Tick(void){
 				ShowDeployMessage();
 				world.GetAuthorityPeer()->controlledlist.push_back(player->id);
 				world.gameinfo.securitylevel = LobbyGame::SECNONE;
-				LoadMap("level/ALLY10c.sil");
-				//LoadMap("level/THET06e.SIL", 3);
-				//LoadMap("level/STAR72.SIL", 3);
-				//LoadMap("level/EASY05c.SIL", 3);
+				if(!LoadMap("level/ALLY10c.sil")){
+					GoToState(MAINMENU);
+				}
+				Audio::GetInstance().StopMusic();
 				world.map.RandomPlayerStartLocation(world, player->x, player->y);
 				player->oldx = player->x;
 				player->oldy = player->y;
@@ -984,6 +1001,10 @@ bool Game::Tick(void){
 				SetColors(renderer.palette.GetColors());
 				singleplayermessage = 0;
 				stateisnew = false;
+				LoadRandomGameMusic();
+			}
+			if(FadedIn()){
+				Audio::GetInstance().PlayMusic(world.resources.gamemusic);
 			}
 			Player * player = world.GetPeerPlayer(world.localpeerid);
 			if(player){
@@ -1359,6 +1380,9 @@ bool Game::Tick(void){
 								case 2:{
 									GoToState(OPTIONSDISPLAY);
 								}break;
+								case 3:{
+									GoToState(OPTIONSAUDIO);
+								}break;
 							}
 							button->clicked = false;
 						}
@@ -1559,6 +1583,12 @@ bool Game::Tick(void){
 									}break;
 									case 201:{
 										Config::GetInstance().Load();
+										CreateStreamingTexture();
+										if(Config::GetInstance().fullscreen){
+											SDL_SetWindowFullscreen(window, SDL_WINDOW_FULLSCREEN_DESKTOP);
+										}else{
+											SDL_SetWindowFullscreen(window, 0);
+										}
 										GoToState(OPTIONS);
 									}break;
 								}
@@ -1566,6 +1596,77 @@ bool Game::Tick(void){
 							}
 						}
 					}
+				}
+			}
+		}break;
+		case OPTIONSAUDIO:{
+			if(stateisnew){
+				world.DestroyAllObjects();
+				currentinterface = CreateOptionsAudioInterface()->id;
+				stateisnew = false;
+			}
+			Interface * iface = (Interface *)world.GetObjectFromId(currentinterface);
+			if(iface){
+				iface->buttonenter = 200;
+				for(std::vector<Uint16>::iterator it = iface->objects.begin(); it != iface->objects.end(); it++){
+					Object * object = world.GetObjectFromId(*it);
+					if(object->type == ObjectTypes::OVERLAY){
+						Overlay * overlay = static_cast<Overlay *>(object);
+						if(overlay){
+							switch(overlay->uid){
+								case 20:{
+									if(Config::GetInstance().music){
+										overlay->res_index = 12;
+									}else{
+										overlay->res_index = 13;
+									}
+								}break;
+								case 40:{
+									if(Config::GetInstance().music){
+										overlay->res_index = 15;
+									}else{
+										overlay->res_index = 14;
+									}
+								}break;
+							}
+						}
+					}else
+						if(object->type == ObjectTypes::BUTTON){
+							Button * button = static_cast<Button *>(object);
+							if(button){
+								if(button->state == Button::ACTIVE || button->state == Button::ACTIVATING){
+									if(button->uid >= 0 && button->uid < 200){
+										iface->buttonenter = button->id;
+									}
+								}
+								if(button->clicked){
+									switch(button->uid){
+										case 0:{ // music
+											Config::GetInstance().music = Config::GetInstance().music ? false : true;
+											if(Config::GetInstance().music){
+												Audio::GetInstance().ResumeMusic();
+											}else{
+												Audio::GetInstance().PauseMusic();
+											}
+										}break;
+										case 200:{
+											Config::GetInstance().Save();
+											GoToState(OPTIONS);
+										}break;
+										case 201:{
+											Config::GetInstance().Load();
+											if(Config::GetInstance().music){
+												Audio::GetInstance().ResumeMusic();
+											}else{
+												Audio::GetInstance().PauseMusic();
+											}
+											GoToState(OPTIONS);
+										}break;
+									}
+									button->clicked = false;
+								}
+							}
+						}
 				}
 			}
 		}break;
@@ -1876,6 +1977,9 @@ void Game::UnloadGame(void){
 		bgchannel[i] = -1;
 	}
 	world.SwitchToLocalAuthorityMode();
+	if(world.map.loaded){ // if the map was loaded, then the music was played
+		Audio::GetInstance().StopMusic();
+	}
 	world.map.Unload();
 	world.message_i = 0;
 	world.winningteamid = 0;
@@ -2153,6 +2257,11 @@ Interface * Game::CreateOptionsInterface(void){
 	displaybutton->x = -89;
 	displaybutton->uid = 2;
 	strcpy(displaybutton->text, "Display");
+	Button * audiobutton = (Button *)world.CreateObject(ObjectTypes::BUTTON);
+	audiobutton->y = -38;
+	audiobutton->x = -89;
+	audiobutton->uid = 3;
+	strcpy(audiobutton->text, "Audio");
 	Button * gobackbutton = (Button *)world.CreateObject(ObjectTypes::BUTTON);
 	gobackbutton->y = 15;
 	gobackbutton->x = -89;
@@ -2161,9 +2270,11 @@ Interface * Game::CreateOptionsInterface(void){
 	Interface * iface = (Interface *)world.CreateObject(ObjectTypes::INTERFACE);
 	iface->AddObject(controlsbutton->id);
 	iface->AddObject(displaybutton->id);
+	iface->AddObject(audiobutton->id);
 	iface->AddObject(gobackbutton->id);
 	iface->AddTabObject(controlsbutton->id);
 	iface->AddTabObject(displaybutton->id);
+	iface->AddTabObject(audiobutton->id);
 	iface->AddTabObject(gobackbutton->id);
 	iface->activeobject = 0;
 	iface->buttonescape = gobackbutton->id;
@@ -2275,6 +2386,68 @@ Interface * Game::CreateOptionsDisplayInterface(void){
 	
 	const char * names[] = {"Fullscreen", "Smooth Scaling"};
 	for(int i = 0; i < 2; i++){
+		Button * c1button = (Button *)world.CreateObject(ObjectTypes::BUTTON);
+		c1button->SetType(Button::B220x33);
+		c1button->y = 50 + (i * 53);
+		c1button->x = 100;
+		c1button->uid = 0 + i;
+		strcpy(c1button->text, names[i]);
+		iface->AddObject(c1button->id);
+		iface->AddTabObject(c1button->id);
+		
+		Overlay * off = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
+		off->y = 137 + (i * 53);
+		off->x = 420;
+		off->res_bank = 6;
+		off->res_index = 12;
+		off->uid = 20 + i;
+		iface->AddObject(off->id);
+		
+		Overlay * on = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
+		on->y = 137 + (i * 53);
+		on->x = 450;
+		on->res_bank = 6;
+		on->res_index = 14;
+		on->uid = 40 + i;
+		iface->AddObject(on->id);
+	}
+	
+	Button * savebutton = (Button *)world.CreateObject(ObjectTypes::BUTTON);
+	savebutton->y = 117;
+	savebutton->x = -200;
+	savebutton->uid = 200;
+	strcpy(savebutton->text, "Save");
+	iface->AddObject(savebutton->id);
+	iface->AddTabObject(savebutton->id);
+	
+	Button * cancelbutton = (Button *)world.CreateObject(ObjectTypes::BUTTON);
+	cancelbutton->y = 117;
+	cancelbutton->x = 20;
+	cancelbutton->uid = 201;
+	strcpy(cancelbutton->text, "Cancel");
+	iface->AddObject(cancelbutton->id);
+	iface->AddTabObject(cancelbutton->id);
+	iface->activeobject = 0;
+	iface->buttonenter = savebutton->id;
+	iface->buttonescape = cancelbutton->id;
+	return iface;
+}
+
+Interface * Game::CreateOptionsAudioInterface(void){
+	Overlay * background = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
+	background->res_bank = 6;
+	background->res_index = 0;
+	Overlay * title = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
+	title->text = new char[256];
+	strcpy(title->text, "Audio Options");
+	title->textbank = 135;
+	title->textwidth = 12;
+	title->x = 320 - ((strlen(title->text) * 12) / 2);
+	title->y = 14;
+	Interface * iface = (Interface *)world.CreateObject(ObjectTypes::INTERFACE);
+	
+	const char * names[] = {"Music"};
+	for(int i = 0; i < 1; i++){
 		Button * c1button = (Button *)world.CreateObject(ObjectTypes::BUTTON);
 		c1button->SetType(Button::B220x33);
 		c1button->y = 50 + (i * 53);
@@ -4774,6 +4947,74 @@ void Game::UpdateAmbienceChannels(void){
 			Audio::GetInstance().SetVolume(bgchannel[BG_BASE], 0);
 			Audio::GetInstance().SetVolume(bgchannel[BG_AMBIENT], 8 * (1 - (outsideamount / float(maxamount))));
 			Audio::GetInstance().SetVolume(bgchannel[BG_OUTSIDE], 8 * (outsideamount / float(maxamount)));
+		}
+	}
+}
+
+bool Game::FadedIn(void){
+	if(fade_i == 16){
+		return true;
+	}
+	return false;
+}
+
+std::vector<std::string> Game::ListFiles(const char * directory){
+	std::vector<std::string> files;
+#ifdef POSIX
+	DIR * dir = opendir(directory);
+	if(dir){
+		dirent * info;
+		while((info = readdir(dir))){
+			struct stat st;
+			char filename[PATH_MAX];
+			strcpy(filename, directory);
+			strcat(filename, "/");
+			strcat(filename, info->d_name);
+			if(stat(filename, &st) == 0){
+				if(info->d_type != DT_DIR && !S_ISDIR(st.st_mode) && info->d_name[0] != '.'){
+					files.push_back(std::string(info->d_name));
+				}
+			}
+		}
+		closedir(dir);
+	}
+#elif _WIN32
+	WIN32_FIND_DATA info;
+	char directory2[MAX_PATH];
+	strcpy(directory2, directory);
+	strcat(directory2, "\\*");
+	HANDLE dir = FindFirstFile(directory2, &info);
+	if(dir){
+		do{
+			char fullname[MAX_PATH];
+			sprintf(fullname, "%s\\%s", directory, info.cFileName);
+			if(!(GetFileAttributes(fullname) & FILE_ATTRIBUTE_DIRECTORY)){
+				files.push_back(std::string(info.cFileName));
+			}
+		}while(FindNextFile(dir, &info));
+		FindClose(dir);
+	}
+#endif
+	return files;
+}
+
+void Game::LoadRandomGameMusic(void){
+	if(!Config::GetInstance().music){
+		return;
+	}
+	if(world.resources.gamemusic){
+		Mix_FreeMusic(world.resources.gamemusic);
+		world.resources.gamemusic = 0;
+	}
+	if(!world.resources.gamemusic){
+		const char * directory = "music";
+		std::vector<std::string> files = ListFiles(directory);
+		if(files.size() > 0){
+			char filename[1024];
+			strcpy(filename, directory);
+			strcat(filename, "/");
+			strcat(filename, files[rand() % (files.size() - 1)].c_str());
+			world.resources.gamemusic = Mix_LoadMUS(filename);
 		}
 	}
 }

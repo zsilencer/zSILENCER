@@ -26,7 +26,8 @@ public:
 	std::vector<std::vector<unsigned int> > spritewidth;
 	std::vector<std::vector<unsigned int> > spriteheight;
 	std::map<std::string, Mix_Chunk *> soundbank;
-	Mix_Music * music;
+	Mix_Music * menumusic;
+	Mix_Music * gamemusic;
 
 private:
 	void MirrorY(Surface * surface);

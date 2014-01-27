@@ -10,7 +10,8 @@ Resources::Resources(){
 	spriteoffsety.assign(256, std::vector<int>(256, 0));
 	spritewidth.assign(256, std::vector<unsigned int>(256, 0));
 	spriteheight.assign(256, std::vector<unsigned int>(256, 0));
-	music = 0;
+	menumusic = 0;
+	gamemusic = 0;
 }
 
 Resources::~Resources(){
@@ -362,11 +363,7 @@ bool Resources::LoadSounds(Game & game, bool dedicatedserver){
 		}
 	}
 	SDL_RWclose(file);
-	// commented out because the SDL_Mixer MP3 system crashes randomly on Windows with this particular MP3
-	/*music = Mix_LoadMUS("CLOSER2.MP3");
-	if(!music){
-		return false;
-	}*/
+	menumusic = Mix_LoadMUS("CLOSER2.MP3");
 	return true;
 }
 
@@ -375,9 +372,13 @@ void Resources::UnloadSounds(void){
 		Mix_FreeChunk((*it).second);
 	}
 	soundbank.clear();
-	if(music){
-		Mix_FreeMusic(music);
-		music = 0;
+	if(menumusic){
+		Mix_FreeMusic(menumusic);
+		menumusic = 0;
+	}
+	if(gamemusic){
+		Mix_FreeMusic(gamemusic);
+		gamemusic = 0;
 	}
 }
 

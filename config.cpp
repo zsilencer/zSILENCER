@@ -20,6 +20,7 @@ void Config::Save(void){
 		WriteString(file, "fullscreen", fullscreen ? "1" : "0");
 		WriteString(file, "scalefilter", scalefilter ? "1" : "0");
 		WriteString(file, "teamcolors", teamcolors ? "1" : "0");
+		WriteString(file, "music", music ? "1" : "0");
 		sprintf(temp, "%d", defaultagency); WriteString(file, "defaultagency", temp);
 		WriteString(file, "defaultgamename", defaultgamename);
 		sprintf(temp, "%d", defaulttechchoices[0]); WriteString(file, "defaulttechchoices0", temp);
@@ -62,6 +63,7 @@ bool Config::Load(void){
 				if(CompareString(variable, "fullscreen")){ if(atoi(data) == 0){ fullscreen = false; }else{ fullscreen = true; } }
 				if(CompareString(variable, "scalefilter")){ if(atoi(data) == 0){ scalefilter = false; }else{ scalefilter = true; } }
 				if(CompareString(variable, "teamcolors")){ if(atoi(data) == 0){ teamcolors = false; }else{ teamcolors = true; } }
+				if(CompareString(variable, "music")){ if(atoi(data) == 0){ music = false; }else{ music = true; } }
 				if(CompareString(variable, "defaultagency")){ defaultagency = atoi(data); }
 				if(CompareString(variable, "defaultgamename")){ ReadString(data, defaultgamename); }
 				if(CompareString(variable, "defaulttechchoices0")){ defaulttechchoices[0] = atoi(data); }
@@ -101,6 +103,7 @@ void Config::LoadDefaults(void){
 	fullscreen = true;
 	scalefilter = true;
 	teamcolors = false;
+	music = true;
 	defaultagency = Team::NOXIS;
 	strcpy(defaultgamename, "New Game");
 	defaulttechchoices[0] = World::BUY_LASER | World::BUY_ROCKET;

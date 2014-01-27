@@ -41,7 +41,7 @@ void Terminal::Tick(World & world){
 	if(!sizeset){
 		SetSize(isbig);
 	}
-	if(state == READY){
+	if(state == READY || state == HACKING || state == HACKERGONE){
 		if(soundchannel == -1){
 			soundchannel = EmitSound(world, world.resources.soundbank["ambloop4.wav"], isbig ? 45 : 32, true);
 		}

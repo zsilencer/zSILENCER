@@ -44,6 +44,7 @@ private:
 	Interface * CreateOptionsInterface(void);
 	Interface * CreateOptionsControlsInterface(void);
 	Interface * CreateOptionsDisplayInterface(void);
+	Interface * CreateOptionsAudioInterface(void);
 	Interface * CreateLobbyConnectInterface(void);
 	Interface * CreateLobbyInterface(void);
 	Interface * CreateCharacterInterface(void);
@@ -85,10 +86,13 @@ private:
 	void GetGameChannelName(LobbyGame & lobbygame, char * name);
 	void CreateAmbienceChannels(void);
 	void UpdateAmbienceChannels(void);
+	bool FadedIn(void);
+	std::vector<std::string> ListFiles(const char * directory);
+	void LoadRandomGameMusic(void);
 	static const int numkeys = 20;
 	const char * keynames[numkeys];
 	Uint8 keystate[SDL_NUM_SCANCODES];
-	enum {NONE, FADEOUT, MAINMENU, LOBBYCONNECT, LOBBY, INGAME, MISSIONSUMMARY, SINGLEPLAYERGAME, OPTIONS, OPTIONSCONTROLS, OPTIONSDISPLAY, HOSTGAME, JOINGAME, REPLAYGAME, TESTGAME};
+	enum {NONE, FADEOUT, MAINMENU, LOBBYCONNECT, LOBBY, INGAME, MISSIONSUMMARY, SINGLEPLAYERGAME, OPTIONS, OPTIONSCONTROLS, OPTIONSDISPLAY, OPTIONSAUDIO, HOSTGAME, JOINGAME, REPLAYGAME, TESTGAME};
 	Uint8 state;
 	Uint8 nextstate;
 	Uint8 fade_i;
