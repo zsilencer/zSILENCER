@@ -5013,7 +5013,7 @@ void Game::LoadRandomGameMusic(void){
 			char filename[1024];
 			strcpy(filename, directory);
 			strcat(filename, "/");
-			strcat(filename, files[rand() % (files.size() - 1)].c_str());
+			strcat(filename, files[rand() % files.size()].c_str());
 			world.resources.gamemusic = Mix_LoadMUS(filename);
 		}
 	}
