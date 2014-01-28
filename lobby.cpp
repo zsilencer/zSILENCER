@@ -104,7 +104,7 @@ void Lobby::DoNetwork(void){
 		result = 0;
 		FD_ZERO(&readset);
 		FD_ZERO(&writeset);
-		if(sockethandle != -1){
+		if(sockethandle != -1 && (state != CONNECTING && state != RESOLVED && state != RESOLVING)){
 			FD_SET(sockethandle, &readset);
 		}
 		if(state == CONNECTING || sendbufferoffset > 0){

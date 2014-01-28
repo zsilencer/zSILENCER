@@ -153,19 +153,19 @@ bool Game::Load(char * cmdline){
 	}
 	Config::GetInstance().Load();
 	if(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_TIMER) == -1){
-		printf("Could not initialize SDL\n");
+		printf("Could not initialize SDL %s\n", SDL_GetError());
 		return false;
 	}
 	int mixinitted;
 	if((mixinitted = Mix_Init(MIX_INIT_MP3 | MIX_INIT_MOD | MIX_INIT_MODPLUG)) == -1){
-		printf("Could not initialize SDL_mixer\n");
+		printf("Could not initialize SDL_mixer %s\n", Mix_GetError());
 		return false;
 	}
 	if(!(mixinitted & MIX_INIT_MOD) && !(mixinitted & MIX_INIT_MODPLUG)){
-		printf("Could not initialize MOD support\n");
+		printf("Could not initialize MOD support %s\n", Mix_GetError());
 	}
 	if(!(mixinitted & MIX_INIT_MP3)){
-		printf("Could not initialize MP3 support\n");
+		printf("Could not initialize MP3 support %s\n", Mix_GetError());
 	}
 	if(!Audio::GetInstance().Init()){
 		printf("Could not initialize audio\n");
