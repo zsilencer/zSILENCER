@@ -22,6 +22,7 @@ private:
 	Object * Look(World & world, Uint8 direction);
 	void Fire(World & world, Uint8 direction);
 	bool CooledDown(World & world);
+	bool ShouldTarget(Object & object);
 	enum {NEW, STANDING, CROUCHING, CROUCHED, SHOOTCROUCHED, UNCROUCHING, LOOKING, WALKING, SHOOTSTANDING,
 		SHOOTUP, SHOOTDOWN, SHOOTUPANGLE, SHOOTDOWNANGLE, SHOOTLADDERUP, SHOOTLADDERDOWN, LADDER, DYING,
 		DYINGEXPLODE, DEAD};
@@ -29,8 +30,8 @@ private:
 	Uint8 state_i;
 	Uint8 speed;
 	Uint16 chasing;
-	Uint8 maxhealth;
-	Uint8 maxshield;
+	Uint16 maxhealth;
+	Uint16 maxshield;
 	Uint8 respawnseconds;
 	Uint32 lastspoke;
 	Uint32 lastshot;

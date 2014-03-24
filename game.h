@@ -38,6 +38,7 @@ private:
 	bool CheckForConnectionLost(void);
 	void ProcessInGameInterfaces(void);
 	void ShowDeployMessage(void);
+	void GiveDefaultItems(Player & player);
 	void JoinGame(LobbyGame & lobbygame, char * password = 0);
 	void GoToState(Uint8 newstate);
 	Interface * CreateMainMenuInterface(void);

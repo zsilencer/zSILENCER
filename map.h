@@ -25,6 +25,7 @@ public:
 	void CalculatePlatformSets(void);
 	void CalculatePlatformSetConnections(void);
 	void CalculateNodes(void);
+	int TeamNumberFromY(Sint16 y);
 	int AdjacentPlatformsLength(Platform & platform);
 	Platform & GetLeftmostPlatform(Platform & platform);
 	Platform & GetRightmostPlatform(Platform & platform);

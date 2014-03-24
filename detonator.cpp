@@ -1,6 +1,7 @@
 #include "detonator.h"
 #include "plasmaprojectile.h"
 #include "plume.h"
+#include "grenade.h"
 
 Detonator::Detonator() : Object(ObjectTypes::DETONATOR){
 	requiresauthority = true;
@@ -9,7 +10,7 @@ Detonator::Detonator() : Object(ObjectTypes::DETONATOR){
 	ownerid = 0;
 	res_bank = 182;
 	res_index = 0;
-	originaly = y;
+	lowestypos = y;
 	renderpass = 1;
 	iscamera = false;
 }
@@ -18,20 +19,30 @@ void Detonator::Serialize(bool write, Serializer & data, Serializer * old){
 	Object::Serialize(write, data, old);
 	data.Serialize(write, state_i, old);
 	data.Serialize(write, ownerid, old);
-	data.Serialize(write, originaly, old);
 	data.Serialize(write, iscamera, old);
 }
 
 void Detonator::Tick(World & world){
+	WarpTick();
+	if(state_i <= (4 * 4) + 6){
+		Grenade::Move(*this, world);
+	}
+	if(y > lowestypos){
+		lowestypos = y;
+	}
 	// 182:0-3 det/camera
 	if(state_i == 0){
 		EmitSound(world, world.resources.soundbank["shield2.wav"], 96);
+		state_warp = 12;
 	}
 	res_index = (state_i / 4) % 4;
 	if(state_i == 4 * 4){
 		state_i = 0;
 	}
 	if(state_i > 4 * 4){
+		if(state_i == (4 * 4) + 1){
+			yv = -15;
+		}
 		if(state_i >= (4 * 4) + 6){
 			if(state_i == (4 * 4) + 6){
 				// explode
@@ -86,13 +97,13 @@ void Detonator::Tick(World & world){
 			if(state_i >= (4 * 4) + 50){
 				world.MarkDestroyObject(id);
 			}
-		}else{
+		}/*else{
 			int velocity = (((4 * 4) - (state_i)) * 2) + 20;
 			if(velocity < 0){
 				velocity = 0;
 			}
 			y -= velocity;
-		}
+		}*/
 	}
 	state_i++;
 }

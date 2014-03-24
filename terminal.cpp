@@ -76,7 +76,9 @@ void Terminal::Tick(World & world){
 								Peer * peer = world.peerlist[team->peers[i]];
 								if(peer){
 									if(!world.intutorialmode){
-										world.ShowMessage("TOP SECRET AVAILABLE\n\nGovernment will be able to trace in 120 seconds", 255, 0, true, peer);
+										char text[256];
+										sprintf(text, "TOP SECRET AVAILABLE\n\nGovernment will be able to trace in %d seconds", tracetime);
+										world.ShowMessage(text, 255, 0, true, peer);
 									}
 								}
 							}
@@ -151,7 +153,24 @@ void Terminal::Tick(World & world){
 		if(beamingtime == 0){
 			state = SECRETREADY;
 			if(!world.intutorialmode){
-				tracetime = 120;
+				tracetime = 90;
+				for(std::vector<Uint16>::iterator it = world.objectsbytype[ObjectTypes::TEAM].begin(); it != world.objectsbytype[ObjectTypes::TEAM].end(); it++){
+					Team * team = static_cast<Team *>(world.GetObjectFromId(*it));
+					if(team && team->beamingterminalid == id){
+						switch(team->secrets){
+							case 0:
+								tracetime = 150;
+							break;
+							case 1:
+								tracetime = 120;
+							break;
+							case 2:
+								tracetime = 90;
+							break;
+						}
+						break;
+					}
+				}
 			}
 		}
 	}

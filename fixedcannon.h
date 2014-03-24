@@ -18,7 +18,7 @@ public:
 	Uint16 teamid;
 	
 private:
-	bool Look(World & world, bool up);
+	bool Look(World & world, bool up, bool behind = false);
 	enum {NEW, UP, DOWN, SHOOTING_UP, SHOOTING_DOWN, MOVING_UP, MOVING_DOWN, DYING};
 	Uint8 state;
 	Uint8 state_i;

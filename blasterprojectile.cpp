@@ -46,7 +46,7 @@ void BlasterProjectile::Tick(World & world){
 	if(yv < 0 && xv < 0){ // up left
 		res_bank = 161;
 	}
-	Uint8 life = 3;
+	Uint8 life = 6;
 	if(state_i == 4){
 		EmitSound(world, world.resources.soundbank["!laserme.wav"], 128);
 	}

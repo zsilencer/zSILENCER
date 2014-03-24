@@ -44,6 +44,8 @@ void DedicatedServer::Tick(World & world){
 	}
 	if(world.peercount < 1){
 		nopeerstime++;
+	}else{
+		nopeerstime = 0;
 	}
 	if(state_i == 100){
 		Uint8 state = 0;

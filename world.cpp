@@ -1,6 +1,8 @@
 #include "world.h"
 #include "serializer.h"
 #include "player.h"
+#include "civilian.h"
+#include "robot.h"
 #include "fixedcannon.h"
 #include "walldefense.h"
 #include "techstation.h"
@@ -1044,6 +1046,18 @@ bool World::BelongsToTeam(Object & object, Uint16 teamid){
 				return true;
 			}
 		}break;
+		case ObjectTypes::CIVILIAN:{
+			Civilian * civilian = static_cast<Civilian *>(&object);
+			if(civilian->tractteamid == teamid){
+				return true;
+			}
+		}break;
+		case ObjectTypes::ROBOT:{
+			Robot * robot = static_cast<Robot *>(&object);
+			if(robot->virusplanter == teamid){
+				return true;
+			}
+		}break;
 		case ObjectTypes::FIXEDCANNON:{
 			FixedCannon * fixedcannon = static_cast<FixedCannon *>(&object);
 			Player * player = static_cast<Player *>(GetObjectFromId(fixedcannon->ownerid));
@@ -1865,20 +1879,29 @@ void World::SaveSnapshot(Serializer & data, Uint8 peerid){
 		
 		// Find deleted objects
 		std::vector<Uint16> deletedobjects;
-		if(*deltasnapshotptr){
-			(*deltasnapshotptr)->readoffset = 0;
-			while((*deltasnapshotptr)->MoreBytesToRead()){
-				Uint8 type;
-				Uint16 id;
-				int oldreadoffset = (*deltasnapshotptr)->readoffset;
-				(*deltasnapshotptr)->Get(type);
-				(*deltasnapshotptr)->Get(id);
-				(*deltasnapshotptr)->readoffset = oldreadoffset;
-				Object * object = GetObjectFromId(id);
-				if(!object){
-					deletedobjects.push_back(id);
+		for(int i = peerlist[peerid]->lasttick; i < tickcount; i++){
+			// Go through all the snapshots sent to the peer since the last acknowledged one
+			// and find objects that no longer exist.  Alternative is to create a reliable
+			// packet and just send them when objects are deleted - TODO
+			Serializer ** tempdeltasnapshotptr = &oldsnapshots[peerid][(tickcount - i) % maxoldsnapshots];
+			if(*tempdeltasnapshotptr){
+				(*tempdeltasnapshotptr)->readoffset = 0;
+				while((*tempdeltasnapshotptr)->MoreBytesToRead()){
+					Uint8 type;
+					Uint16 id;
+					int oldreadoffset = (*tempdeltasnapshotptr)->readoffset;
+					(*tempdeltasnapshotptr)->Get(type);
+					(*tempdeltasnapshotptr)->Get(id);
+					(*tempdeltasnapshotptr)->readoffset = oldreadoffset;
+					Object * object = GetObjectFromId(id);
+					if(!object && std::find(deletedobjects.begin(), deletedobjects.end(), id) == deletedobjects.end()){
+						deletedobjects.push_back(id);
+					}
+					(*tempdeltasnapshotptr)->readoffset += objecttypes.SerializedSize(type);
 				}
-				(*deltasnapshotptr)->readoffset += objecttypes.SerializedSize(type);
+			}
+			if(i > maxoldsnapshots){
+				break;
 			}
 		}
 		Uint16 deletedobjectscount = deletedobjects.size();
@@ -1936,18 +1959,18 @@ void World::SaveSnapshot(Serializer & data, Uint8 peerid){
 			//
 		}
 	}else
-		if(mode == REPLICA){
-			Uint32 nulltickcount = 0;
-			data.Put(nulltickcount);
-			Uint16 nulldeletedobjectscount = 0;
-			data.Put(nulldeletedobjectscount);
-			for(std::list<Object *>::iterator i = objectlist.begin(); i != objectlist.end(); i++){
-				if((*i)->RequiresAuthority()){
-					data.PutBit(0);
-					(*i)->Serialize(Serializer::WRITE, data);
-				}
+	if(mode == REPLICA){
+		Uint32 nulltickcount = 0;
+		data.Put(nulltickcount);
+		Uint16 nulldeletedobjectscount = 0;
+		data.Put(nulldeletedobjectscount);
+		for(std::list<Object *>::iterator i = objectlist.begin(); i != objectlist.end(); i++){
+			if((*i)->RequiresAuthority()){
+				data.PutBit(0);
+				(*i)->Serialize(Serializer::WRITE, data);
 			}
 		}
+	}
 }
 
 void World::LoadSnapshot(Serializer & data, bool create, Serializer * delta, Uint16 objectid){

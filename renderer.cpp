@@ -31,6 +31,7 @@
 #include "grenade.h"
 #include "walldefense.h"
 #include "wallprojectile.h"
+#include "detonator.h"
 #include "config.h"
 #include <math.h>
 
@@ -224,17 +225,17 @@ void Renderer::DrawWorld(Surface * surface, Camera & camera, bool drawminimap, b
 			if(oldy == 0){
 				oldy = object->y;
 			}
-			int nudgex = (oldx - object->x) * frametime;
-			int nudgey = (oldy - object->y) * frametime;
+			object->nudgex = (oldx - object->x) * frametime;
+			object->nudgey = (oldy - object->y) * frametime;
 			// stop objects from nudging back and forth when they havent been updated
 			if(world.tickcount - 1 > object->lasttick){
-				nudgex = 0;
-				nudgey = 0;
+				object->nudgex = 0;
+				object->nudgey = 0;
 			}
 			if(object->issprite && object->draw && camera.IsVisible(world, *object)){
 				if(object->renderpass == renderpass){
-					object->x += nudgex;
-					object->y += nudgey;
+					object->x += object->nudgex;
+					object->y += object->nudgey;
 					Surface * src = world.resources.spritebank[object->res_bank][object->res_index];
 					Rect dstrect;
 					if(src){
@@ -245,7 +246,11 @@ void Renderer::DrawWorld(Surface * surface, Camera & camera, bool drawminimap, b
 							case ObjectTypes::PLAYER:{
 								Player * player = static_cast<Player *>(object);
 								effectsurface = CreateSurfaceCopy(src);
-								EffectTeamColor(effectsurface, 0, player->suitcolor);
+								Uint8 suitcolor = Civilian::defaultsuitcolor;
+								if(!player->IsDisguised() || (localplayer && player->GetTeam(world) == localplayer->GetTeam(world) && localplayer->id != player->id)){
+									suitcolor = player->suitcolor;
+								}
+								EffectTeamColor(effectsurface, 0, suitcolor);
 								if(player->state_hit){
 									EffectHit(effectsurface, 0, player->hitx, player->hity, player->state_hit);
 								}
@@ -286,6 +291,9 @@ void Renderer::DrawWorld(Surface * surface, Camera & camera, bool drawminimap, b
 									}
 								}
 							}break;
+							case ObjectTypes::ROCKETPROJECTILE:{
+								DrawShadow(surface, object);
+							}break;
 							case ObjectTypes::CIVILIAN:{
 								Civilian * civilian = static_cast<Civilian *>(object);
 								effectsurface = CreateSurfaceCopy(src);
@@ -322,6 +330,17 @@ void Renderer::DrawWorld(Surface * surface, Camera & camera, bool drawminimap, b
 								if(fixedcannon->state_hit){
 									EffectHit(effectsurface, 0, fixedcannon->hitx, fixedcannon->hity, fixedcannon->state_hit);
 								}
+								if(fixedcannon->state_warp){
+									EffectWarp(effectsurface, 0, fixedcannon->state_warp);
+								}
+								DrawShadow(surface, object);
+							}break;
+							case ObjectTypes::DETONATOR:{
+								Detonator * detonator = static_cast<Detonator *>(object);
+								if(detonator->state_warp){
+									effectsurface = CreateSurfaceCopy(src);
+									EffectWarp(effectsurface, 0, detonator->state_warp);
+								}
 								DrawShadow(surface, object);
 							}break;
 							case ObjectTypes::BODYPART:{
@@ -349,6 +368,12 @@ void Renderer::DrawWorld(Surface * surface, Camera & camera, bool drawminimap, b
 								effectsurface = CreateSurfaceCopy(src);
 								if(robot->state_hit){
 									EffectHit(effectsurface, 0, robot->hitx, robot->hity, robot->state_hit);
+								}
+								if(robot->virusplanter){
+									Team * team = static_cast<Team *>(world.GetObjectFromId(robot->virusplanter));
+									if(team){
+										EffectTeamColor(effectsurface, 0, team->GetColor(), true);
+									}
 								}
 								if(robot->damaging){
 									EffectShieldDamage(effectsurface, 0, 120);
@@ -400,6 +425,21 @@ void Renderer::DrawWorld(Surface * surface, Camera & camera, bool drawminimap, b
 								dstrect.x = object->x - world.resources.spriteoffsetx[172][index] + camera.GetXOffset();
 								dstrect.y = object->y - world.resources.spriteoffsety[172][index] + camera.GetYOffset();
 								BlitSurface(world.resources.spritebank[172][index], 0, surface, &dstrect);
+							}break;
+							case ObjectTypes::CREDITMACHINE:{
+								CreditMachine * creditmachine = static_cast<CreditMachine *>(object);
+								Team * creditmachineteam = 0;
+								for(std::vector<Uint16>::iterator it = world.objectsbytype[ObjectTypes::TEAM].begin(); it != world.objectsbytype[ObjectTypes::TEAM].end(); it++){
+									Team * team = static_cast<Team *>(world.GetObjectFromId(*it));
+									if(team->number == world.map.TeamNumberFromY(creditmachine->y)){
+										creditmachineteam = team;
+									}
+								}
+								if(creditmachineteam){
+									effectsurface = CreateSurfaceCopy(src);
+									EffectTeamColor(effectsurface, 0, creditmachineteam->GetColor());
+									src = 0;
+								}
 							}break;
 							case ObjectTypes::TEAMBILLBOARD:{
 								TeamBillboard * teambillboard = static_cast<TeamBillboard *>(object);
@@ -609,7 +649,7 @@ void Renderer::DrawWorld(Surface * surface, Camera & camera, bool drawminimap, b
 									BlitSurface(world.resources.spritebank[decalres_bank][decalres_index], 0, surface, &dstrect);
 								}
 							}
-							if(localplayer && player->GetTeam(world) == localplayer->GetTeam(world) && player != localplayer){
+							if((localplayer && player->GetTeam(world) == localplayer->GetTeam(world) && player != localplayer) || (world.replay.IsPlaying() && world.replay.ShowAllNames())){
 								Peer * peer = player->GetPeer(world);
 								if(peer){
 									User * user = world.lobby.GetUserInfo(peer->accountid);
@@ -809,8 +849,8 @@ void Renderer::DrawWorld(Surface * surface, Camera & camera, bool drawminimap, b
 							delete src;
 						}
 					}
-					object->x -= nudgex;
-					object->y -= nudgey;
+					object->x -= object->nudgex;
+					object->y -= object->nudgey;
 				}
 			}
 			if(object->type == ObjectTypes::OVERLAY && object->draw){
@@ -844,8 +884,8 @@ void Renderer::DrawWorld(Surface * surface, Camera & camera, bool drawminimap, b
 			if(object->type == ObjectTypes::WALLPROJECTILE && renderpass == object->renderpass){
 				WallProjectile * wallprojectile = static_cast<WallProjectile *>(object);
 				if(wallprojectile->state_i > 8){
-					object->x += nudgex;
-					object->y += nudgey;
+					object->x += object->nudgex;
+					object->y += object->nudgey;
 					for(int i = 1; i <= 3; i++){
 						int x1 = (object->x - (object->xv * (i / float(3))));
 						int y1 = (object->y - (object->yv * (i / float(3))));
@@ -853,8 +893,8 @@ void Renderer::DrawWorld(Surface * surface, Camera & camera, bool drawminimap, b
 						int y2 = object->y;
 						DrawLine(surface, x1 + camera.GetXOffset(), y1 + camera.GetYOffset(), x2 + camera.GetXOffset(), y2 + camera.GetYOffset(), 203, 4 - i);
 					}
-					object->x -= nudgex;
-					object->y -= nudgey;
+					object->x -= object->nudgex;
+					object->y -= object->nudgey;
 				}
 			}
 			if(object->issprite && object->renderpass == renderpass){
@@ -1528,20 +1568,17 @@ void Renderer::DrawMessage(Surface * surface){
 	int textbank = 135;
 	int lineheight = 20;
 	switch(world.messagetype){
-		case 1:
+		case 1: // deploy message
 			color = 128;
 			liney = 190;
 			textbank = 134;
 			textwidth = 10;
-		case 2:
-			
 		break;
-		case 3:
-			color = 208;
-			liney = 10;
-			textbank = 134;
-			textwidth = 10;
-			lineheight = 14;
+		case 2: // secret picked up
+			color = 128;
+		break;
+		case 3: // secret dropped
+			color = 192;
 		break;
 		case 10: // won
 			color = 224;
@@ -1737,24 +1774,36 @@ void Renderer::EffectHacking(Surface * dst, Rect * dstrect, Uint8 color){
 	}
 }
 
-void Renderer::EffectTeamColor(Surface * dst, Rect * dstrect, Uint8 values){
+void Renderer::EffectTeamColor(Surface * dst, Rect * dstrect, Uint8 values, bool robot){
 	Uint8 brightness = (values >> 4) * 16;
 	Uint8 color = (values & 0x0F) * 16;
 	int dstw = dst->w;
 	int dsth = dst->h;
-	for(int y = 0; y < dsth; y++){
-		for(int x = 0; x < dstw; x++){
-			Uint8 * pixel = &((Uint8 *)dst->pixels)[x + (y * dstw)];
-			if(*pixel >= 195 && *pixel <= 208){
-				*pixel = palette.Color(*pixel/* - 195 + 114*/, color);
-				*pixel = palette.Brightness(*pixel/* - 195 + 114*/, brightness);
-            }else
-            if(*pixel >= 81 && *pixel <= 92){
-				*pixel = palette.Color(*pixel + 128/* - 81 + 114*/, color);
-				*pixel = palette.Brightness(*pixel/* - 195 + 114*/, brightness);
-            }
-        }
-    }
+	if(robot){
+		for(int y = 0; y < dsth; y++){
+			for(int x = 0; x < dstw; x++){
+				Uint8 * pixel = &((Uint8 *)dst->pixels)[x + (y * dstw)];
+				if(*pixel >= 130){
+					*pixel = palette.Color(*pixel - 16, color);
+					*pixel = palette.Brightness(*pixel, brightness);
+				}
+			}
+		}
+	}else{
+		for(int y = 0; y < dsth; y++){
+			for(int x = 0; x < dstw; x++){
+				Uint8 * pixel = &((Uint8 *)dst->pixels)[x + (y * dstw)];
+				if(*pixel >= 195 && *pixel <= 208){
+					*pixel = palette.Color(*pixel/* - 195 + 114*/, color);
+					*pixel = palette.Brightness(*pixel/* - 195 + 114*/, brightness);
+				}else
+				if(*pixel >= 81 && *pixel <= 92){
+					*pixel = palette.Color(*pixel + 128/* - 81 + 114*/, color);
+					*pixel = palette.Brightness(*pixel/* - 195 + 114*/, brightness);
+				}
+			}
+		}
+	}
 }
 
 Uint8 Renderer::TeamColorToIndex(Uint8 values){
@@ -1846,14 +1895,17 @@ void Renderer::EffectHit(Surface * dst, Rect * dstrect, Uint8 hitx, Uint8 hity, 
 	if(index <= 7){
 		Uint8 color = 0;
 		switch(hit_type){
-			case 0:{
+			case 0:{ // health only
 				color = 146;
 			}break;
-			case 1:{
+			case 1:{ // shield + health
 				color = 146;
 			}break;
-			case 2:{
+			case 2:{ // shield only
 				color = 194;
+			}break;
+			case 3:{ // poison
+				color = 210;
 			}break;
 		}
 		int xoffset = ((float(hitx) / 100) * dst->w) - world.resources.spriteoffsetx[153][index];
@@ -2215,8 +2267,8 @@ void Renderer::DrawHUD(Surface * surface, float frametime){
 			int px = 0;
 			int py = 0;
 			if(followobject){
-				px = followobject->x + ((followobject->oldx - followobject->x) * frametime);
 				py = followobject->y + ((followobject->oldy - followobject->y) * frametime);
+				px = followobject->x + ((followobject->oldx - followobject->x) * frametime);
 			}
 			camera.Follow(world, px + world.systemcamerax[0], py + world.systemcameray[0], 0, 0, 0, 0);
 			DrawWorldScaled(&systemscreen, camera, 3, frametime);
@@ -2238,6 +2290,12 @@ void Renderer::DrawHUD(Surface * surface, float frametime){
 			if(followobject){
 				px = followobject->x + ((followobject->oldx - followobject->x) * frametime);
 				py = followobject->y + ((followobject->oldy - followobject->y) * frametime);
+				if(followobject->type == ObjectTypes::DETONATOR){
+					Detonator * detonator = static_cast<Detonator *>(followobject);
+					if(detonator->HasDetonated() && py < detonator->lowestypos){
+						py = detonator->lowestypos;
+					}
+				}
 			}
 			camera.Follow(world, px + world.systemcamerax[1], py + world.systemcameray[1], 0, 0, 0, 0);
 			DrawWorldScaled(&systemscreen, camera, 3, frametime);
@@ -2403,16 +2461,19 @@ void Renderer::DrawHUD(Surface * surface, float frametime){
 			int yoffsets[] = {13, 13, 11, 7};
 			for(int i = 0; i < 4; i++){
 				Uint8 invindex = InvIdToResIndex(player->inventoryitems[i]);
+				const char * invletter = InvIdToLetter(player->inventoryitems[i]);
 				dstrect.x = -world.resources.spriteoffsetx[97][invindex] + xoffsets[i];
 				dstrect.y = -world.resources.spriteoffsety[97][invindex] + yoffsets[i];
 				if(player->currentinventoryitem == i){
 					BlitSurface(world.resources.spritebank[97][invindex], 0, surface, &dstrect);
+					DrawTinyText(surface, xoffsets[i], yoffsets[i], invletter);
 				}else{
 					if(world.resources.spritebank[97][invindex]){
 						Surface * effectsurface = CreateSurfaceCopy(world.resources.spritebank[97][invindex]);
 						EffectBrightness(effectsurface, 0, 32);
 						BlitSurface(effectsurface, 0, surface, &dstrect);
 						delete effectsurface;
+						DrawTinyText(surface, xoffsets[i], yoffsets[i], invletter, 0, 32);
 					}
 				}
 				
@@ -2484,11 +2545,34 @@ void Renderer::DrawHUD(Surface * surface, float frametime){
 						}
 					}
 				}
+				int playerswithsecret = 0;
+				for(int i = 0; i < 4; i++){
+					Peer * peer = world.peerlist[team->peers[i]];
+					if(peer){
+						Player * peerplayer = world.GetPeerPlayer(peer->id);
+						if(peerplayer && peerplayer->hassecret){
+							playerswithsecret++;
+						}
+					}
+				}
 				for(int i = 0; i < 3; i++){
 					Uint8 index = team->secrets > i ? 2 : 3;
+					Uint8 color = 0;
+					if(index == 3 && playerswithsecret > i - team->secrets && world.tickcount % 12 < 6){
+						index = 2;
+					}
+					if(team->beamingterminalid && team->secrets == i && index == 3){
+						color = 224;
+						index = 3;
+					}
 					dstrect.x = -world.resources.spriteoffsetx[103][index] - (9 * (3 - i)) + 11;
 					dstrect.y = -world.resources.spriteoffsety[103][index] + teamyoffset;
-					BlitSurface(world.resources.spritebank[103][index], 0, surface, &dstrect);
+					Surface * newsurface = CreateSurfaceCopy(world.resources.spritebank[103][index]);
+					if(color){
+						EffectRampColor(newsurface, 0, color);
+					}
+					BlitSurface(newsurface, 0, surface, &dstrect);
+					delete newsurface;
 				}
 				teamyoffset += 20;
 			}
@@ -2986,6 +3070,32 @@ Uint8 Renderer::InvIdToResIndex(Uint8 id){
 		break;
 		case Player::INV_BASEDOOR:
 			return 0;
+		break;
+	}
+}
+
+const char * Renderer::InvIdToLetter(Uint8 id){
+	switch(id){
+		case Player::INV_PLASMABOMB:
+			return "P";
+		break;
+		case Player::INV_SHAPEDBOMB:
+			return "S";
+		break;
+		case Player::INV_NEUTRONBOMB:
+			return "N";
+		break;
+		case Player::INV_EMPBOMB:
+			return "E";
+		break;
+		case Player::INV_PLASMADET:
+			return "D";
+		break;
+		case Player::INV_FLARE:
+			return "F";
+		break;
+		default:
+			return "";
 		break;
 	}
 }

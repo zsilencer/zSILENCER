@@ -15,6 +15,7 @@ public:
 	Uint8 suitcolor;
 	Uint8 speed;
 	Uint16 tractteamid;
+	static const Uint8 defaultsuitcolor = (7 << 4) + 11;
 
 private:
 	bool Look(World & world);

@@ -37,6 +37,12 @@ bool Projectile::TestCollision(Object & object, World & world, Platform ** colli
 			if(!walldefense->teamid){
 				issecurity = true;
 			}
+		}else
+		if(owner->type == ObjectTypes::ROBOT){
+			Robot * robot = static_cast<Robot *>(owner);
+			if(!robot->virusplanter){
+				issecurity = true;
+			}
 		}else{
 			issecurity = true;
 		}
@@ -61,7 +67,10 @@ bool Projectile::TestCollision(Object & object, World & world, Platform ** colli
 		switch(owner->type){
 			case ObjectTypes::PLAYER:{
 				Player * player = static_cast<Player *>(owner);
-				teamid = player->teamid;
+				Team * team = player->GetTeam(world);
+				if(team){
+					teamid = team->id;
+				}
 			}break;
 			case ObjectTypes::ROBOT:{
 				Robot * robot = static_cast<Robot *>(owner);
@@ -123,10 +132,11 @@ bool Projectile::TestCollision(Object & object, World & world, Platform ** colli
 				if(thecollidedobject->type == ObjectTypes::PLAYER){
 					Player * collidedplayer = static_cast<Player *>(thecollidedobject);
 					if(poisonous && collidedplayer->id != ownerid){
-						if(collidedplayer->Poison(ownerid)){
-							if(peer){
+						// poison a little bit 4 times per second
+						if(world.tickcount % 6 == 0 && collidedplayer->Poison(world, ownerid, 1)){
+							/*if(peer){
 								peer->stats.poisons++;
-							}
+							}*/
 						}
 					}
 				}

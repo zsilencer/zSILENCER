@@ -24,6 +24,11 @@ void PlayerAI::Tick(World & world){
 	if(player.state == Player::RESPAWNING){
 		SetState(EXITBASE);
 	}
+	if(player.state == Player::DEAD){
+		if(world.tickcount % 2 == 0){
+			player.input.keyactivate = true;
+		}
+	}
 	if(player.hassecret){
 		if(player.InBase(world)){
 			if(player.InOwnBase(world)){
@@ -55,6 +60,9 @@ void PlayerAI::Tick(World & world){
 	}
 	
 	if(state == HACK){
+		if(rand() % 50 == 0){
+			player.input.keydisguise = true;
+		}
 		std::vector<Uint8> types;
 		types.push_back(ObjectTypes::TERMINAL);
 		std::vector<Object *> collided = world.TestAABB(player.x, player.y - player.height, player.x, player.y, types);

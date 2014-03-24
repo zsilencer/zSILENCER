@@ -31,8 +31,11 @@ public:
 	bool IsRecording(void);
 	bool IsPlaying(void);
 	bool GameStarted(void);
+	bool ShowAllNames(void);
 	enum {RPL_GAMEINFO, RPL_NEWPEER, RPL_START, RPL_USERINFO, RPL_CHANGETEAM, RPL_TECH, RPL_CHAT, RPL_STATION, RPL_TICK, RPL_INPUT, RPL_DISCONNECT};
 	enum {STA_BUY, STA_REPAIR, STA_VIRUS};
+	
+	friend class Game;
 	
 private:
 	int GetInputSize(void);
@@ -40,6 +43,7 @@ private:
 	bool isrecording;
 	bool isplaying;
 	bool gamestarted;
+	bool showallnames;
 	unsigned short uniqueport;
 	int inputsize;
 };

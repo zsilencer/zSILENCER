@@ -22,9 +22,11 @@ public:
 	void OnDestroy(World & world);
 	bool InBase(World & world);
 	bool InOwnBase(World & world);
+	Team * TeamOfCurrentBase(World & world);
 	bool IsDisguised(void);
 	void UnDisguise(World & world);
-	bool Poison(Uint16 playerid);
+	bool Poison(World & world, Uint16 playerid, Uint8 amount);
+	void UnPoison(void);
 	bool HasSecurityPass(void);
 	Team * GetTeam(World & world);
 	bool AddInventoryItem(Uint8 id, bool settocurrent = false);
@@ -42,7 +44,7 @@ public:
 	enum {INV_NONE, INV_HEALTHPACK, INV_LAZARUSTRACT, INV_SECURITYPASS, INV_VIRUS,
 		INV_POISON, INV_NEUTRONBOMB, INV_EMPBOMB, INV_SHAPEDBOMB, INV_PLASMABOMB, INV_PLASMADET,
 		INV_FIXEDCANNON, INV_FLARE, INV_POISONFLARE, INV_BASEDOOR, INV_CAMERA};
-	Uint8 maxhealth;
+	Uint16 maxhealth;
 	Uint16 maxshield;
 	Uint8 laserammo;
 	Uint8 rocketammo;
@@ -62,7 +64,6 @@ public:
 	bool oldhassecret;
 	Uint16 secretteamid;
 	Uint8 suitcolor;
-	Uint16 teamid;
 	Uint16 chatinterfaceid;
 	bool chatwithteam;
 	Sint8 fallingnudge;
@@ -98,6 +99,7 @@ private:
 	PickUp * DropItem(World & world, Uint8 type, Uint16 quantity);
 	bool BuyAvailable(World & world, Uint8 id);
 	Projectile * Fire(World & world, Uint8 direction);
+	bool FireDelayPassed(World & world);
 	bool ProcessJetpackState(World & world);
 	bool ProcessFallingState(World & world);
 	bool ProcessStandingState(World & world);
@@ -141,7 +143,9 @@ private:
 	Uint8 tracetime;
 	int secondcounter;
 	Uint16 poisonedby;
+	Uint8 poisonedamount;
 	Uint32 lastweaponchangesound;
+	Uint16 teamid;
 };
 
 #endif

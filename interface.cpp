@@ -425,13 +425,13 @@ char * Interface::WordWrap(const char * text, unsigned int maxlength){
 		if (linelength > 0) {
 			chk = (int)(textlen/linelength + 1);
 			//newtext = safe_emalloc(chk, breakcharlen, textlen + 1);
-			newtext = new char[textlen + 1];
+			newtext = new char[(chk * breakcharlen) + textlen + 1];
 			alloced = textlen + chk * breakcharlen + 1;
 		} else {
 			chk = textlen;
 			alloced = textlen * (breakcharlen + 1) + 1;
 			//newtext = safe_emalloc(textlen, (breakcharlen + 1), 1);
-			newtext = new char[1];
+			newtext = new char[(textlen * (breakcharlen + 1)) + 1];
 		}
 		
 		/* now keep track of the actual new text length */

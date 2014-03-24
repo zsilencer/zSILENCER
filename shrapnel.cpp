@@ -73,7 +73,9 @@ void Shrapnel::Tick(World & world){
 			return;
 		}
 	}
-	state_i++;
+	if(rand() % 3 != 0){
+		state_i++;
+	}
 }
 
 Uint8 Shrapnel::GetBrightness(void){

@@ -42,7 +42,7 @@ public:
 	void DrawAlphaed(Surface * src, Rect * srcrect, Surface * dst, Rect * dstrect);
 	Surface * CreateSurfaceCopy(Surface * src);
 	void EffectHacking(Surface * dst, Rect * dstrect, Uint8 color);
-	void EffectTeamColor(Surface * dst, Rect * dstrect, Uint8 values);
+	void EffectTeamColor(Surface * dst, Rect * dstrect, Uint8 values, bool robot = false);
 	Uint8 TeamColorToIndex(Uint8 values);
 	void EffectBrightness(Surface * dst, Rect * dstrect, Uint8 brightness);
 	void EffectColor(Surface * dst, Rect * dstrect, Uint8 color);
@@ -57,6 +57,7 @@ public:
 	void DrawLine(Surface * surface, int x1, int y1, int x2, int y2, Uint8 color, int thickness = 1);
 	void DrawCircle(Surface * surface, int x, int y, int radius, Uint8 color);
 	Uint8 InvIdToResIndex(Uint8 id);
+	static const char * InvIdToLetter(Uint8 id);
 	static bool BlitSurfaceUpper(Surface * src, Rect * srcrect, Surface * dst, Rect * dstrect);
 	static void BlitSurfaceSlow(Surface * src, Rect * srcrect, Surface * dst, Rect * dstrect);
 	static void BlitSurfaceFast(Surface * src, Rect * srcrect, Surface * dst, Rect * dstrect);

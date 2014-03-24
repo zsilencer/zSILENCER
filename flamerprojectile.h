@@ -15,7 +15,7 @@ public:
 	
 private:
 	Uint8 state_i;
-	static const int plumecount = 4;
+	static const int plumecount = 7;
 	Uint16 plumeids[plumecount];
 	int soundplaying;
 	bool hitonce;

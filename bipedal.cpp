@@ -21,6 +21,12 @@ void Bipedal::Tick(Object & object, World & world){
 		}else{
 			object.collidable = true;
 		}
+	}
+	WarpTick();
+}
+
+void Bipedal::WarpTick(void){
+	if(state_warp){
 		if(state_warp < 40){
 			state_warp++;
 		}

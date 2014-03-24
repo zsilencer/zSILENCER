@@ -10,6 +10,7 @@ Replay::Replay(){
 	uniqueport = 0;
 	inputsize = 0;
 	gamestarted = false;
+	showallnames = false;
 }
 
 Replay::~Replay(){
@@ -305,6 +306,10 @@ bool Replay::IsPlaying(void){
 
 bool Replay::GameStarted(void){
 	return gamestarted;
+}
+
+bool Replay::ShowAllNames(void){
+	return showallnames;
 }
 
 int Replay::GetInputSize(void){

@@ -1,6 +1,8 @@
 #include "robot.h"
 #include "rocketprojectile.h"
+#include "plasmaprojectile.h"
 #include "player.h"
+#include "Fixedcannon.h"
 #include "plume.h"
 
 Robot::Robot() : Object(ObjectTypes::ROBOT){
@@ -9,9 +11,9 @@ Robot::Robot() : Object(ObjectTypes::ROBOT){
 	state_i = 0;
 	res_bank = 47;
 	res_index = 0;
-	maxhealth = 100;
+	maxhealth = 200;
 	health = maxhealth;
-	maxshield = 50;
+	maxshield = 400;
 	shield = maxshield;
 	renderpass = 2;
 	ishittable = true;
@@ -23,6 +25,7 @@ Robot::Robot() : Object(ObjectTypes::ROBOT){
 	damaging = 0;
 	soundchannel = -1;
 	patrol = false;
+	shootcooldown = 0;
 }
 
 void Robot::Serialize(bool write, Serializer & data, Serializer * old){
@@ -32,11 +35,15 @@ void Robot::Serialize(bool write, Serializer & data, Serializer * old){
 	data.Serialize(write, damaging, old);
 	data.Serialize(write, virusplanter, old);
 	data.Serialize(write, patrol, old);
+	data.Serialize(write, shootcooldown, old);
 }
 
 void Robot::Tick(World & world){
 	Hittable::Tick(*this, world);
 	Bipedal::Tick(*this, world);
+	if(shootcooldown){
+		shootcooldown++;
+	}
 	if(state != DEAD && rand() % (24 * 15) == 0){
 		StopAmbience();
 		EmitSound(world, world.resources.soundbank["airlokj.wav"], 64);
@@ -141,7 +148,7 @@ void Robot::Tick(World & world){
 					Team * team = player->GetTeam(world);
 					if(!player->IsDisguised() && (team && team->id != virusplanter) && !player->HasSecurityPass()){
 						damaging = 1;
-						Object damageprojectile(ObjectTypes::PLASMAPROJECTILE);
+						Object damageprojectile(ObjectTypes::FLAMERPROJECTILE);
 						damageprojectile.healthdamage = 60;
 						damageprojectile.shielddamage = 60;
 						damageprojectile.ownerid = id;
@@ -174,6 +181,13 @@ void Robot::Tick(World & world){
 			}else{
 				res_index = (18 * 2) - state_i - 1;
 			}
+			if(state_i == 0){
+				if(Look(world, 0)){
+					if(shootcooldown < 50 && shootcooldown){
+						state_i--;
+					}
+				}
+			}
 			if(state_i == 11){
 				RocketProjectile * rocketprojectile = (RocketProjectile *)world.CreateObject(ObjectTypes::ROCKETPROJECTILE);
 				if(rocketprojectile){
@@ -188,12 +202,24 @@ void Robot::Tick(World & world){
 						rocketprojectile->xv = 25;
 					}
 				}
+				shootcooldown = 1;
 			}
 			/*if(state_i == 18){
 				Audio::GetInstance().EmitSound(id, world.resources.soundbank["rocket4.wav"], 128);
 			}*/
 		}break;
 		case DYING:{
+			if(state_i == 0){
+				PickUp * pickup = (PickUp *)world.CreateObject(ObjectTypes::PICKUP);
+				if(pickup){
+					pickup->type = PickUp::FILES;
+					pickup->quantity = 250;
+					pickup->x = x;
+					pickup->y = y - 1;
+					pickup->xv = (world.Random() % 9) - 4;
+					pickup->yv = -15;
+				}
+			}
 			if(state_i % 2 == 0 && state_i >= 5){
 				Plume * plume = (Plume *)world.CreateObject(ObjectTypes::PLUME);
 				if(plume){
@@ -204,18 +230,36 @@ void Robot::Tick(World & world){
 					plume->state_i = 0;
 				}
 			}
-			if(state_i == 4 * 4){
+			if(state_i == 4 * 2){
 				StopAmbience();
 				EmitSound(world, world.resources.soundbank["seekexp1.wav"], 128);
 			}
 			collidable = false;
-			if(state_i >= 16 * 4){
+			if(state_i >= 48 * 2){
+				EmitSound(world, world.resources.soundbank["seekexp1.wav"], 128);
+				Sint8 xvs[] = {-14, 14, -10, 10, -10, 10};
+				Sint8 yvs[] = {-25, -25, -10, -10, -5, -5};
+				Sint8 ys[] = {0, 0, 0, 0, 0, 0, 0, 0};
+				for(int i = 0; i < 6; i++){
+					PlasmaProjectile * plasmaprojectile = (PlasmaProjectile *)world.CreateObject(ObjectTypes::PLASMAPROJECTILE);
+					if(plasmaprojectile){
+						plasmaprojectile->large = false;
+						plasmaprojectile->x = x;
+						plasmaprojectile->y = y - 1 + ys[i];
+						plasmaprojectile->ownerid = id;
+						plasmaprojectile->xv = xvs[i];
+						plasmaprojectile->yv = yvs[i];
+					}
+				}
 				state = DEAD;
 				state_i = -1;
 				break;
 			}
 			res_bank = 48;
-			res_index = state_i / 4;
+			res_index = state_i / 2;
+			if(res_index > 15){
+				res_index = 15;
+			}
 		}break;
 		case DEAD:{
 			/*collidable = false;
@@ -297,6 +341,10 @@ bool Robot::Look(World & world, Uint8 direction){
 	// 2: backward
 	std::vector<Uint8> types;
 	types.push_back(ObjectTypes::PLAYER);
+	types.push_back(ObjectTypes::FIXEDCANNON);
+	if(virusplanter){
+		types.push_back(ObjectTypes::GUARD);
+	}
 	int y1 = -60;
 	int y2 = y1;
 	int minx = 70;
@@ -333,16 +381,39 @@ bool Robot::Look(World & world, Uint8 direction){
 	}
 	std::vector<Object *> objects = world.TestAABB(x + minx, y + y1, x + maxx, y + y2, types);
 	for(std::vector<Object *>::iterator it = objects.begin(); it != objects.end(); it++){
-		Player * player = static_cast<Player *>(*it);
-		Team * team = player->GetTeam(world);
-		if(!player->IsDisguised() && !player->HasSecurityPass() && (team && team->id != virusplanter)){
+		bool target = false;
+		switch((*it)->type){
+			case ObjectTypes::PLAYER:{
+				Player * player = static_cast<Player *>(*it);
+				Team * team = player->GetTeam(world);
+				if(!player->IsDisguised() && !player->HasSecurityPass() && (team && team->id != virusplanter)){
+					target = true;
+				}
+			}break;
+			case ObjectTypes::GUARD:{
+				target = true;
+			}break;
+			case ObjectTypes::FIXEDCANNON:{
+				if(virusplanter){
+					FixedCannon * fixedcannon = static_cast<FixedCannon *>(*it);
+					if(fixedcannon->teamid == virusplanter){
+						target = false;
+					}else{
+						target = true;
+					}
+				}else{
+					target = true;
+				}
+			}
+		}
+		if(target){
 			int xv2 = maxx - minx;
 			int yv2 = y2 - y1;
 			Object * object = world.TestIncr(x + minx, y + y1 - 1, x + minx, y + y1, &xv2, &yv2, types);
 			if(object){
 				if(!world.map.TestIncr(x + minx, y + y1 - 1, x + minx, y + y1, &xv2, &yv2, Platform::STAIRSDOWN | Platform::STAIRSDOWN | Platform::RECTANGLE, 0, true)){
 					if(state == ASLEEP){
-						if(player->x < x){
+						if(object->x < x){
 							mirrored = true;
 						}else{
 							mirrored = false;

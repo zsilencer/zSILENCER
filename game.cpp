@@ -865,11 +865,11 @@ bool Game::Tick(void){
 										world.map.RandomPlayerStartLocation(world, player->x, player->y);
 										player->oldx = player->x;
 										player->oldy = player->y;
-										player->teamid = team->id;
 										Uint8 teamcolor = team->GetColor();
 										player->suitcolor = teamcolor;//(((teamcolor >> 4) - i) << 4) + (teamcolor & 0xF);
 										peer->controlledlist.clear();
 										peer->controlledlist.push_back(player->id);
+										GiveDefaultItems(*player);
 									}
 								}
 							}
@@ -889,13 +889,8 @@ bool Game::Tick(void){
 					Audio::GetInstance().PlayMusic(world.resources.gamemusic);
 				}
 				if(world.replay.IsPlaying()){
-					if(world.localinput.keymoveleft){
-						world.localpeerid--;
-					}
-					if(world.localinput.keymoveright){
-						world.localpeerid++;
-					}
-					if(!world.peerlist[world.localpeerid] || world.localpeerid == world.authoritypeer){
+					// replay controls
+					if(world.localpeerid == world.authoritypeer){
 						for(int i = 0; i < world.maxpeers; i++){
 							if(world.peerlist[i] && i != world.authoritypeer){
 								world.localpeerid = i;
@@ -903,6 +898,29 @@ bool Game::Tick(void){
 							}
 						}
 					}
+					if(world.localinput.keyprevcam && !world.localinputhistory[(world.tickcount - 1) % world.maxlocalinputhistory].keyprevcam){
+						for(int i = world.localpeerid - 1; i > 0; i--){
+							if(world.peerlist[i] && i != world.authoritypeer){
+								world.localpeerid = i;
+								break;
+							}
+						}
+					}
+					if(world.localinput.keynextcam && !world.localinputhistory[(world.tickcount - 1) % world.maxlocalinputhistory].keynextcam){
+						for(int i = world.localpeerid + 1; i < world.maxpeers; i++){
+							if(world.peerlist[i] && i != world.authoritypeer){
+								world.localpeerid = i;
+								break;
+							}
+						}
+
+					}
+					if(world.localinput.keyjump){
+						world.replay.showallnames = true;
+					}else{
+						world.replay.showallnames = false;
+					}
+					//
 					if(!world.replay.ReadToNextTick(world)){
 						world.replay.EndPlaying();
 						GoToState(MAINMENU);
@@ -1720,7 +1738,6 @@ bool Game::Tick(void){
 										world.map.RandomPlayerStartLocation(world, player->x, player->y);
 										player->oldx = player->x;
 										player->oldy = player->y;
-										player->teamid = team->id;
 										//player->AddInventoryItem(Player::INV_VIRUS);
 										//player->credits = 2000;
 										Uint8 teamcolor = team->GetColor();
@@ -1728,6 +1745,7 @@ bool Game::Tick(void){
 										//world.peerlist[team->peers[i]]->techchoices = 0xFFFFFFFF;
 										world.peerlist[team->peers[i]]->controlledlist.clear();
 										world.peerlist[team->peers[i]]->controlledlist.push_back(player->id);
+										GiveDefaultItems(*player);
 									}
 								}
 							}
@@ -1765,7 +1783,7 @@ bool Game::Tick(void){
 				world.GetAuthorityPeer()->techchoices = 0xffffffff;//World::BUY_LASER | World::BUY_ROCKET;
 				Team * team = (Team *)world.CreateObject(ObjectTypes::TEAM);
 				team->AddPeer(world.GetAuthorityPeer()->id);
-				team->agency = Team::NOXIS;
+				team->agency = Team::LAZARUS;
 				//team->color = ((8 << 4) + 13);
 				Player * player = (Player *)world.CreateObject(ObjectTypes::PLAYER);
 				player->suitcolor = team->GetColor();
@@ -1774,6 +1792,7 @@ bool Game::Tick(void){
 				player->oldx = player->x;
 				player->oldy = player->y;
 				world.GetAuthorityPeer()->controlledlist.push_back(player->id);
+				GiveDefaultItems(*player);
 				int botnum = 0;
 				for(int i = 0; i < 40; i++){
 					Uint8 agency;
@@ -1948,16 +1967,18 @@ void Game::UpdateInputState(Input & input){
 				break;
 			}
 		}
-		if(localplayer->chatinterfaceid){
-			Input zeroinput;
-			input = zeroinput;
-		}
-		if(localplayer->buyinterfaceid || localplayer->techinterfaceid){
-			Input zeroinput;
-			zeroinput.keyactivate = input.keyactivate;
-			zeroinput.keymoveleft = input.keymoveleft;
-			zeroinput.keymoveright = input.keymoveright;
-			input = zeroinput;
+		if(!world.replay.IsPlaying()){
+			if(localplayer->chatinterfaceid){
+				Input zeroinput;
+				input = zeroinput;
+			}
+			if(localplayer->buyinterfaceid || localplayer->techinterfaceid){
+				Input zeroinput;
+				zeroinput.keyactivate = input.keyactivate;
+				zeroinput.keymoveleft = input.keymoveleft;
+				zeroinput.keymoveright = input.keymoveright;
+				input = zeroinput;
+			}
 		}
 	}
 }
@@ -2143,6 +2164,53 @@ void Game::ProcessInGameInterfaces(void){
 void Game::ShowDeployMessage(void){
 	world.ShowMessage((char *)"STANDBY FOR TEAM DEPLOYMENT", 64, 1);
 	deploymessageshown = false;
+}
+
+void Game::GiveDefaultItems(Player & player){
+	Team * team = player.GetTeam(world);
+	if(team){
+		for(std::vector<BuyableItem *>::iterator it = world.buyableitems.begin(); it != world.buyableitems.end(); it++){
+			BuyableItem * buyableitem = *it;
+			switch(buyableitem->id){
+				case World::BUY_LASER:{
+					if(team->GetAvailableTech(world) & buyableitem->techchoice){
+						player.laserammo = 5;
+					}
+				}break;
+				case World::BUY_ROCKET:{
+					if(team->GetAvailableTech(world) & buyableitem->techchoice){
+						player.rocketammo = 3;
+					}
+				}break;
+				case World::BUY_FLAMER:{
+					if(team->GetAvailableTech(world) & buyableitem->techchoice){
+						player.flamerammo = 15;
+					}
+				}break;
+				case World::BUY_HEALTH:{
+					if(team->GetAvailableTech(world) & buyableitem->techchoice){
+						player.AddInventoryItem(Player::INV_HEALTHPACK);
+					}
+				}break;
+				case World::BUY_VIRUS:{
+					if(team->GetAvailableTech(world) & buyableitem->techchoice){
+						player.AddInventoryItem(Player::INV_VIRUS);
+					}
+				}break;
+				case World::BUY_POISON:{
+					if(team->GetAvailableTech(world) & buyableitem->techchoice){
+						player.AddInventoryItem(Player::INV_POISON);
+						player.AddInventoryItem(Player::INV_POISON);
+					}
+				}break;
+				case World::BUY_TRACT:{
+					if(team->GetAvailableTech(world) & buyableitem->techchoice){
+						player.AddInventoryItem(Player::INV_LAZARUSTRACT);
+					}
+				}break;
+			}
+		}
+	}
 }
 
 void Game::JoinGame(LobbyGame & lobbygame, char * password){
@@ -3380,7 +3448,7 @@ Interface * Game::CreateGameSummaryInterface(Stats & stats, Uint8 agency){
 	xptext->x = 467 - ((strlen(xptext->text) * xptext->textwidth) / 2);
 	xptext->y = 45;
 	
-	bool upgradeavailable = true;
+	//bool upgradeavailable = true;
 	
 	Overlay * line1text = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
 	line1text->text = new char[64];
@@ -3395,11 +3463,11 @@ Interface * Game::CreateGameSummaryInterface(Stats & stats, Uint8 agency){
 	line1text->y = 77;
 	line1text->draw = false;
 	iface->AddObject(line1text->id);
-	if(upgradeavailable){
+	/*if(upgradeavailable){
 		line1text->draw = true;
 	}else{
 		line1text->draw = false;
-	}
+	}*/
 	
 	for(int i = 0; i < 6; i++){
 		Overlay * text = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
@@ -4545,25 +4613,31 @@ void Game::UpdateGameSummaryInterface(void){
 			totalbonusupgrades += user->agency[user->statsagency].contacts;
 			if(user->agency[user->statsagency].endurance < user->maxendurance){
 				upgradesavailable[0] = true;
+				upgradeavailable = true;
 			}
 			if(user->agency[user->statsagency].shield < user->maxshield){
 				upgradesavailable[1] = true;
+				upgradeavailable = true;
 			}
 			if(user->agency[user->statsagency].jetpack < user->maxjetpack){
 				upgradesavailable[2] = true;
+				upgradeavailable = true;
 			}
 			if(user->agency[user->statsagency].techslots < user->maxtechslots){
 				upgradesavailable[3] = true;
+				upgradeavailable = true;
 			}
 			if(user->agency[user->statsagency].hacking < user->maxhacking){
 				upgradesavailable[4] = true;
+				upgradeavailable = true;
 			}
 			if(user->agency[user->statsagency].contacts < user->maxcontacts){
 				upgradesavailable[5] = true;
-			}
-			if(totalbonusupgrades - user->agency[user->statsagency].defaultbonuses < user->agency[user->statsagency].level){
 				upgradeavailable = true;
 			}
+			/*if(totalbonusupgrades - user->agency[user->statsagency].defaultbonuses < user->agency[user->statsagency].level){
+				upgradeavailable = true;
+			}*/
 		}
 		for(int i = 0; i < 6; i++){
 			if(upgradesavailable[i] && upgradeavailable){

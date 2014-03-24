@@ -15,6 +15,7 @@ public:
 	friend class Renderer;
 
 protected:
+	void WarpTick(void);
 	bool FollowGround(class Object & object, class World & world, Sint8 velocity);
 	bool FindCurrentPlatform(class Object & object, class World & world);
 	int DistanceToEnd(class Object & object, class World & world);

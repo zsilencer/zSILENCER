@@ -11,7 +11,7 @@ Civilian::Civilian() : Object(ObjectTypes::CIVILIAN){
 	speed = 4;
 	res_bank = 121;
 	res_index = 0;
-	suitcolor = (7 << 4) + 11;
+	suitcolor = defaultsuitcolor;
 	renderpass = 2;
 	ishittable = true;
 	isbipedal = true;
@@ -205,7 +205,7 @@ void Civilian::HandleHit(World & world, Uint8 x, Uint8 y, Object & projectile){
 	}else{
 		xv = speed * xpcnt;
 	}
-	if(projectile.type == ObjectTypes::ROCKETPROJECTILE){
+	if(projectile.type == ObjectTypes::ROCKETPROJECTILE || projectile.type == ObjectTypes::PLASMAPROJECTILE){
 		state = DYINGEXPLODE;
 		world.Explode(*this, suitcolor, xpcnt);
 	}
@@ -256,7 +256,8 @@ bool Civilian::CheckTractVictim(World & world){
 	std::vector<Object *> objects = world.TestAABB(x1, y1, x2, y2, types);
 	for(std::vector<Object *>::iterator it = objects.begin(); it != objects.end(); it++){
 		Player * player = static_cast<Player *>(*it);
-		if(player->teamid != tractteamid){
+		Team * team = player->GetTeam(world);
+		if(team && team->id != tractteamid){
 			world.Explode(*this, suitcolor, 1);
 			state = DYINGEXPLODE;
 			EmitSound(world, world.resources.soundbank["seekexp1.wav"], 128);

@@ -2,6 +2,7 @@
 #include "projectile.h"
 #include "bodypart.h"
 #include "player.h"
+#include "robot.h"
 #include "laserprojectile.h"
 #include "rocketprojectile.h"
 #include "pickup.h"
@@ -459,22 +460,25 @@ void Guard::Tick(World & world){
 		}break;
 	}
 	if(chasing){
-		Player * player = (Player *)world.GetObjectFromId(chasing);
-		if(player){
-			if(player->InBase(world)){
-				chasing = 0;
+		Object * object = world.GetObjectFromId(chasing);
+		if(object){
+			if(object->type == ObjectTypes::PLAYER){
+				Player * player = static_cast<Player *>(object);
+				if(player->InBase(world)){
+					chasing = 0;
+				}
 			}
 			if(state == STANDING || state == WALKING){
-				if(abs(player->x - x) <= 90 && abs(player->x - x) > 80){
-					if(player->x > x){
+				if(abs(object->x - x) <= 90 && abs(object->x - x) > 80){
+					if(object->x > x){
 						mirrored = false;
 					}else{
 						mirrored = true;
 					}
 				}else
-					if(abs(player->x - x) > 90){
+					if(abs(object->x - x) > 90){
 						state = WALKING;
-						if(player->x > x){
+						if(object->x > x){
 							mirrored = false;
 						}else{
 							mirrored = true;
@@ -486,13 +490,13 @@ void Guard::Tick(World & world){
 				if(ladder){
 					Uint32 center = ((ladder->x2 - ladder->x1) / 2) + ladder->x1;
 					if(abs(signed(center) - x) <= abs(ceil(float(xv)))){
-						if(ladder->y2 == player->y && y != player->y && ladder->y2 > y){
+						if(ladder->y2 == object->y && y != object->y && ladder->y2 > y){
 							x = center;
 							yv = 5;
 							state = LADDER;
 							state_i = 0;
 						}
-						if(ladder->y1 == player->y && y != player->y && ladder->y1 < y){
+						if(ladder->y1 == object->y && y != object->y && ladder->y1 < y){
 							x = center;
 							yv = -5;
 							state = LADDER;
@@ -547,7 +551,7 @@ void Guard::HandleHit(World & world, Uint8 x, Uint8 y, Object & projectile){
 	}else{
 		xv = -abs(speed) * (mirrored ? -1 : 1);
 	}*/
-	if(projectile.type == ObjectTypes::ROCKETPROJECTILE){
+	if(projectile.type == ObjectTypes::ROCKETPROJECTILE || projectile.type == ObjectTypes::PLASMAPROJECTILE){
 		if(health == 0 && state != DYINGEXPLODE){
 			state = DYINGEXPLODE;
 			world.Explode(*this, 8, xpcnt);
@@ -569,6 +573,8 @@ Object * Guard::Look(World & world, Uint8 direction){
 	// 10: standing and backward
 	std::vector<Uint8> types;
 	types.push_back(ObjectTypes::PLAYER);
+	types.push_back(ObjectTypes::ROBOT);
+	types.push_back(ObjectTypes::FIXEDCANNON);
 	Sint16 y1 = 0;
 	Sint16 y2 = 0;
 	Sint16 x1 = 0;
@@ -644,17 +650,21 @@ Object * Guard::Look(World & world, Uint8 direction){
 		y2 = -y;
 	}*/
 	if(y1 == y2 || x1 == x2){
+		bool target = false;
 		std::vector<Object *> objects = world.TestAABB(x + x1, y + y1, x + x2, y + y2, types);
 		for(std::vector<Object *>::iterator it = objects.begin(); it != objects.end(); it++){
-			Player * player = static_cast<Player *>(*it);
-			if((!chasing && !player->IsDisguised() && !player->HasSecurityPass()) || chasing){
-				int xv2 = x2 - x1;
-				int yv2 = y2 - y1;
-				Object * object = world.TestIncr(x + x1, y + y1 - 1, x + x1, y + y1, &xv2, &yv2, types);
-				if(object){
-					if(!world.map.TestIncr(x + x1, y + y1 - 1, x + x1, y + y1, &xv2, &yv2, Platform::STAIRSDOWN | Platform::STAIRSDOWN | Platform::RECTANGLE, 0, true)){
-						return object;
-					}
+			if(ShouldTarget(*(*it))){
+				target = true;
+				break;
+			}
+		}
+		if(target){
+			int xv2 = x2 - x1;
+			int yv2 = y2 - y1;
+			Object * object = world.TestIncr(x + x1, y + y1 - 1, x + x1, y + y1, &xv2, &yv2, types);
+			if(object){
+				if(!world.map.TestIncr(x + x1, y + y1 - 1, x + x1, y + y1, &xv2, &yv2, Platform::STAIRSDOWN | Platform::STAIRSDOWN | Platform::RECTANGLE, 0, true)){
+					return object;
 				}
 			}
 		}
@@ -662,12 +672,9 @@ Object * Guard::Look(World & world, Uint8 direction){
 		int xv2 = x2 - x1;
 		int yv2 = y2 - y1;
 		Object * object = world.TestIncr(x + x1, y + y1 - 1, x + x1, y + y1, &xv2, &yv2, types);
-		if(object){
-			Player * player = static_cast<Player *>(object);
-			if((!chasing && !player->IsDisguised() && !player->HasSecurityPass()) || chasing){
-				if(!world.map.TestIncr(x + x1, y + y1 - 1, x + x1, y + y1, &xv2, &yv2, Platform::STAIRSDOWN | Platform::STAIRSDOWN | Platform::RECTANGLE, 0, true)){
-					return object;
-				}
+		if(object && ShouldTarget(*object)){
+			if(!world.map.TestIncr(x + x1, y + y1 - 1, x + x1, y + y1, &xv2, &yv2, Platform::STAIRSDOWN | Platform::STAIRSDOWN | Platform::RECTANGLE, 0, true)){
+				return object;
 			}
 		}
 	}
@@ -748,6 +755,27 @@ bool Guard::CooledDown(World & world){
 	if(world.tickcount - lastshot >= cooldowntime){
 		lastshot = world.tickcount;
 		return true;
+	}
+	return false;
+}
+
+bool Guard::ShouldTarget(Object & object){
+	switch(object.type){
+		case ObjectTypes::PLAYER:{
+			Player * player = static_cast<Player *>(&object);
+			if((!chasing && !player->IsDisguised() && !player->HasSecurityPass()) || player->id == chasing){
+				return true;
+			}
+		}break;
+		case ObjectTypes::ROBOT:{
+			Robot * robot = static_cast<Robot *>(&object);
+			if(robot->virusplanter){
+				return true;
+			}
+		}break;
+		case ObjectTypes::FIXEDCANNON:{
+			return true;
+		}break;
 	}
 	return false;
 }

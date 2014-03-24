@@ -45,7 +45,7 @@ void Grenade::Tick(World & world){
 			if(state_i < 30){
 				res_index = state_i % 16;
 			}
-			Move(world);
+			Move(*this, world);
 		}
 		if(state_i >= 30 && (type == FLARE || type == POISONFLARE) && state_i % 3 == 0){
 			for(int i = 0; i < 3; i++){
@@ -211,7 +211,7 @@ void Grenade::Tick(World & world){
 				}
 			}
 		}else
-		if(state_i == 250){
+		if(state_i == 30 + 168){ // flares last 7 seconds
 			world.MarkDestroyObject(id);
 		}
 	}
@@ -309,41 +309,59 @@ void Grenade::SetType(Uint8 type){
 	}
 }
 
-void Grenade::Move(World & world){
-	int xv2 = xv;
-	int yv2 = yv;
-	Platform * platform = world.map.TestIncr(x - radius, y - radius, x + radius, y + radius, &xv2, &yv2, Platform::RECTANGLE | Platform::STAIRSUP | Platform::STAIRSDOWN);
+void Grenade::Move(Object & object, World & world, int v){
+	int xv2 = object.xv;
+	int yv2 = object.yv;
+	Platform * platform = world.map.TestIncr(object.x - object.radius, object.y - object.radius, object.x + object.radius, object.y + object.radius, &xv2, &yv2, Platform::RECTANGLE | Platform::STAIRSUP | Platform::STAIRSDOWN);
 	if(platform){
-		Uint32 yt = platform->XtoY(x);
-		if(platform->y2 - platform->y1 <= 1 && y >= yt){
-			xv2 = xv;
-			yv2 = yv;
-			platform = world.map.TestIncr(x - radius, y - radius, x + radius, y + radius, &xv2, &yv2, Platform::RECTANGLE | Platform::STAIRSUP | Platform::STAIRSDOWN, platform);
+		Uint32 yt = platform->XtoY(object.x);
+		if(platform->y2 - platform->y1 <= 1 && object.y >= yt){
+			xv2 = object.xv;
+			yv2 = object.yv;
+			platform = world.map.TestIncr(object.x - object.radius, object.y - object.radius, object.x + object.radius, object.y + object.radius, &xv2, &yv2, Platform::RECTANGLE | Platform::STAIRSUP | Platform::STAIRSDOWN, platform);
 		}
 	}
-	int morex = abs(xv - xv2);
-	int morey = abs(yv - yv2);
+	int morex = abs(object.xv - xv2);
+	int morey = abs(object.yv - yv2);
+	int movedx = abs(object.xv) - morex;
+	int movedy = abs(object.yv) - morey;
+	int volume = 0;
 	if(platform){
+		if(!v){
+			volume = (object.xv + object.yv) * 10;
+			if(volume > 128){
+				volume = 128;
+			}
+		}
 		float xn, yn;
-		platform->GetNormal(x, y, &xn, &yn);
+		platform->GetNormal(object.x, object.y, &xn, &yn);
 		if(xn){
-			xv = (xn * abs(xv)) * 0.5;
+			object.xv = (xn * abs(object.xv)) * 0.5;
 		}else{
-			xv *= 0.8;
+			object.xv *= 0.8;
 		}
 		if(yn){
-			yv = (yn * abs(yv)) * 0.4;
+			object.yv = (yn * abs(object.yv)) * 0.4;
 		}else{
-			yv *= 0.8;
+			object.yv *= 0.8;
 		}
 	}
-	x += xv2;
-	y += yv2;
+	object.x += xv2;
+	object.y += yv2;
 	if(morex || morey){
-		Move(world);
+		if(!v){
+			v = object.yv;
+			if(!v){
+				v = 1;
+			}
+		}
+		Move(object, world, v);
 	}
-	yv += world.gravity;
-	/*if(world.map.TestAABB(x - 5, y - 5, x + 5, y + 5, Platform::RECTANGLE | Platform::STAIRSUP | Platform::STAIRSDOWN)){
-		int b = 0;
-	}*/
+	if(movedx == 0 && v && abs(movedy - v) <= 2){
+		object.xv = 0;
+		object.yv = 0;
+	}else{
+		object.EmitSound(world, world.resources.soundbank["land1.wav"], volume);
+		object.yv += world.gravity;
+	}
 }

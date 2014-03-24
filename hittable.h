@@ -15,7 +15,7 @@ public:
 	friend class Renderer;
 	
 protected:
-	Uint8 health;
+	Uint16 health;
 	Uint16 shield;
 	Uint8 state_hit;
 	Uint8 hitx;

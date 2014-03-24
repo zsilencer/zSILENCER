@@ -12,6 +12,7 @@ public:
 	void GetAABB(Resources & resources, int * x1, int * y1, int * x2, int * y2);
 	Sint16 x, y;
 	Sint16 oldx, oldy;
+	int nudgex, nudgey; // lerp nudges for smooth rendering
 	Uint8 res_bank;
 	Uint8 res_index;
 	bool drawcheckered;

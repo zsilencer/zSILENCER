@@ -138,21 +138,6 @@ void Team::Tick(World & world){
 		secretdelivered = 0;
 	}
 	if(secretprogress >= 180 && oldsecretprogress > 0){
-		char teamtext[256];
-		char enemytext[256];
-		sprintf(teamtext, "TOP SECRET LOCATION DETERMINED\n\nApproximate time : 60 seconds");
-		sprintf(enemytext, "ENEMY BEAMING DETECTED\n\nTracking location on radar");
-		for(int i = 0; i < world.maxpeers; i++){
-			Peer * peer = world.peerlist[i];
-			if(peer){
-				if(world.GetPeerTeam(peer->id) == this){
-					world.ShowMessage(teamtext, 128, 0, true, peer);
-				}else{
-					world.ShowMessage(enemytext, 128, 0, true, peer);
-				}
-			}
-		}
-		world.SendSound("typerev6.wav");
 		secretprogress = 0;
 		oldsecretprogress = 0;
 		if(world.IsAuthority()){
@@ -171,7 +156,22 @@ void Team::Tick(World & world){
 				terminal->state = Terminal::SECRETBEAMING;
 				terminal->state_i = 0;
 				beamingterminalid = terminal->id;
-				terminal->beamingtime = 60;
+				terminal->beamingtime = 65;
+				char teamtext[256];
+				char enemytext[256];
+				sprintf(teamtext, "TOP SECRET LOCATION DETERMINED\n\nApproximate time : %d seconds", terminal->beamingtime);
+				sprintf(enemytext, "ENEMY BEAMING DETECTED\n\nTracking location on radar");
+				for(int i = 0; i < world.maxpeers; i++){
+					Peer * peer = world.peerlist[i];
+					if(peer){
+						if(world.GetPeerTeam(peer->id) == this){
+							world.ShowMessage(teamtext, 128, 0, true, peer);
+						}else{
+							world.ShowMessage(enemytext, 128, 0, true, peer);
+						}
+					}
+				}
+				world.SendSound("typerev6.wav");
 			}
 		}
 	}

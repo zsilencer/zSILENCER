@@ -15,9 +15,10 @@ FlamerProjectile::FlamerProjectile() : Object(ObjectTypes::FLAMERPROJECTILE){
 		plumeids[i] = 0;
 	}
 	emitoffset = -7;
-	moveamount = 1;
+	moveamount = 6;
 	soundplaying = 0;
 	renderpass = 2;
+	radius = 10;
 	stopatobjectcollision = false;
 	isprojectile = true;
 	isphysical = true;
@@ -36,12 +37,12 @@ void FlamerProjectile::Tick(World & world){
 			Plume * plume = (Plume *)world.CreateObject(ObjectTypes::PLUME);
 			if(plume){
 				plume->type = 4;
-				plume->xv = (rand() % 17) - 8 + (xv * 8);
-				plume->yv = (rand() % 17) - 8 + (yv * 8);
-				plume->SetPosition(x + (xv * (i * 1)), y + (yv * (i * 1)));
+				plume->xv = (rand() % 17) - 8 + (xv * 12);
+				plume->yv = (rand() % 17) - 8 + (yv * 12);
+				plume->SetPosition(x - (xv * ((i + 1) * 1)), y - (yv * ((i + 1) * 1)));
 				plumeids[i] = plume->id;
-				plume->state_i = i;
-				
+				//plume->state_i = i;
+				break;
 			}
 		}
 	}
@@ -51,6 +52,8 @@ void FlamerProjectile::Tick(World & world){
 		float xn = 0, yn = 0;
 		if(platform){
 			platform->GetNormal(x, y, &xn, &yn);
+			xv /= 3;
+			yv /= 3;
 			for(int i = 0; i < plumecount; i++){
 				Plume * plume = (Plume *)world.GetObjectFromId(plumeids[i]);
 				if(plume){

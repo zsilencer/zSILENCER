@@ -1,6 +1,7 @@
 #include "fixedcannon.h"
 #include "laserprojectile.h"
 #include "player.h"
+#include "robot.h"
 #include "team.h"
 #include "plume.h"
 
@@ -30,12 +31,15 @@ void FixedCannon::Serialize(bool write, Serializer & data, Serializer * old){
 	data.Serialize(write, ownerid, old);
 	data.Serialize(write, teamid, old);
 	data.Serialize(write, suitcolor, old);
+	data.Serialize(write, state_warp, old);
 }
 
 void FixedCannon::Tick(World & world){
 	Hittable::Tick(*this, world);
+	WarpTick();
 	switch(state){
 		case NEW:{
+			state_warp = 12;
 			EmitSound(world, world.resources.soundbank["shield2.wav"], 96);
 			state = UP;
 		}break;
@@ -47,7 +51,27 @@ void FixedCannon::Tick(World & world){
 				state_i = -1;
 				break;
 			}
+			if(Look(world, true, true)){
+				if(mirrored){
+					mirrored = false;
+				}else{
+					mirrored = true;
+				}
+				state = SHOOTING_UP;
+				state_i = -1;
+				break;
+			}
 			if(Look(world, false)){
+				state = MOVING_DOWN;
+				state_i = -1;
+				break;
+			}
+			if(Look(world, false, true)){
+				if(mirrored){
+					mirrored = false;
+				}else{
+					mirrored = true;
+				}
 				state = MOVING_DOWN;
 				state_i = -1;
 				break;
@@ -61,7 +85,27 @@ void FixedCannon::Tick(World & world){
 				state_i = -1;
 				break;
 			}
+			if(Look(world, false, true)){
+				if(mirrored){
+					mirrored = false;
+				}else{
+					mirrored = true;
+				}
+				state = SHOOTING_DOWN;
+				state_i = -1;
+				break;
+			}
 			if(Look(world, true)){
+				state = MOVING_UP;
+				state_i = -1;
+				break;
+			}
+			if(Look(world, true, true)){
+				if(mirrored){
+					mirrored = false;
+				}else{
+					mirrored = true;
+				}
 				state = MOVING_UP;
 				state_i = -1;
 				break;
@@ -191,20 +235,43 @@ bool FixedCannon::ImplantVirus(World & world, Uint16 playerid){
 	return false;
 }
 
-bool FixedCannon::Look(World & world, bool up){
+bool FixedCannon::Look(World & world, bool up, bool behind){
 	std::vector<Uint8> types;
 	types.push_back(ObjectTypes::PLAYER);
+	types.push_back(ObjectTypes::GUARD);
+	types.push_back(ObjectTypes::ROBOT);
 	Sint8 y2 = up ? -47 : -28;
-	std::vector<Object *> objects = world.TestAABB(x + (mirrored ? -70 : 70), y + y2, x + (mirrored ? -300 : 300), y + y2, types);
-	for(std::vector<Object *>::iterator it = objects.begin(); it != objects.end(); it++){
-		Player * player = static_cast<Player *>(*it);
-		Player * owner = (Player *)world.GetObjectFromId(ownerid);
-		Team * team = 0;
-		if(owner){
-			team = owner->GetTeam(world);
+	bool direction = mirrored;
+	if(behind){
+		if(direction){
+			direction = false;
+		}else{
+			direction = true;
 		}
-		if(team && player->teamid != team->id && !player->IsDisguised()){
-			return true;
+	}
+	std::vector<Object *> objects = world.TestAABB(x + (direction ? -70 : 70), y + y2, x + (direction ? -300 : 300), y + y2, types);
+	for(std::vector<Object *>::iterator it = objects.begin(); it != objects.end(); it++){
+		switch((*it)->type){
+			case ObjectTypes::PLAYER:{
+				Player * player = static_cast<Player *>(*it);
+				Player * owner = (Player *)world.GetObjectFromId(ownerid);
+				Team * team = 0;
+				if(owner){
+					team = owner->GetTeam(world);
+				}
+				if(team && player->GetTeam(world) != team && !player->IsDisguised()){
+					return true;
+				}
+			}break;
+			case ObjectTypes::GUARD:{
+				return true;
+			}break;
+			case ObjectTypes::ROBOT:{
+				Robot * robot = static_cast<Robot *>(*it);
+				if(robot->virusplanter != teamid){
+					return true;
+				}
+			}break;
 		}
 	}
 	return false;

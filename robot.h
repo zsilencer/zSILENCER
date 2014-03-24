@@ -24,9 +24,10 @@ private:
 	enum {NEW, SLEEPING, ASLEEP, AWAKENING, WALKING, SHOOTING, DYING, DEAD};
 	Uint8 state;
 	Uint8 state_i;
-	Uint8 maxhealth;
-	Uint8 maxshield;
+	Uint16 maxhealth;
+	Uint16 maxshield;
 	Uint8 respawnseconds;
+	Uint8 shootcooldown;
 	int soundchannel;
 };
 

@@ -14,7 +14,7 @@ public:
 	void Detonate(void);
 	bool HasDetonated(void);
 	Uint16 ownerid;
-	Uint16 originaly;
+	Sint16 lowestypos;
 	bool iscamera;
 	
 private:

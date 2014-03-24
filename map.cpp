@@ -1008,6 +1008,14 @@ void Map::CalculateNodes(void){
 	}
 }
 
+int Map::TeamNumberFromY(Sint16 y){
+	if(y < (height + 10) * 64){
+		return -1; // in main map
+	}
+	// returns the team number of the base at the y position
+	return (y - ((height + 10) * 64)) / (26 * 64);
+}
+
 int Map::AdjacentPlatformsLength(Platform & platform){
 	Platform * leftmost = &GetLeftmostPlatform(platform);
 	int length = 0;

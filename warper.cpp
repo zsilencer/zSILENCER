@@ -22,7 +22,7 @@ void Warper::Tick(World & world){
 	if(state_i / 24 >= 6){
 		state_i = 0;
 	}
-	if(GetCountdown() == 0){
+	if(GetCountdown() == 0 && state_i % 24 == 0){
 		std::vector<Uint8> types;
 		types.push_back(ObjectTypes::PLAYER);
 		Uint16 x1 = x - world.resources.spriteoffsetx[res_bank][res_index];
@@ -35,9 +35,11 @@ void Warper::Tick(World & world){
 			switch(object->type){
 				case ObjectTypes::PLAYER:{
 					Player * player = static_cast<Player *>(object);
-					Warper * warpermatch = (Warper *)world.GetObjectFromId(match);
-					if(warpermatch){
-						player->Warp(world, warpermatch->x, warpermatch->y);
+					if(player->x >= x1 && player->x <= x2){
+						Warper * warpermatch = (Warper *)world.GetObjectFromId(match);
+						if(warpermatch){
+							player->Warp(world, warpermatch->x, warpermatch->y);
+						}
 					}
 				}break;
 			}
