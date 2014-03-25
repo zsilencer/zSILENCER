@@ -385,11 +385,11 @@ void Interface::DestroyInterface(World & world, Interface * parentinterface){
 	world.MarkDestroyObject(id);
 }
 
-char * Interface::WordWrap(const char * text, unsigned int maxlength){
+char * Interface::WordWrap(const char * text, unsigned int maxlength, const char * breakchar){
 	// This function was taken from php
-	const char * breakchar = "\n";
+	//const char * breakchar = "\n";
 	char * newtext = 0;
-	int textlen = strlen(text), breakcharlen = 1, newtextlen, chk;
+	int textlen = strlen(text), breakcharlen = strlen(breakchar), newtextlen, chk;
 	size_t alloced;
 	long current = 0, laststart = 0, lastspace = 0;
 	long linelength = maxlength;

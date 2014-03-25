@@ -146,9 +146,9 @@ void Robot::Tick(World & world){
 				for(std::vector<Object *>::iterator it = players.begin(); it != players.end(); it++){
 					Player * player = static_cast<Player *>(*it);
 					Team * team = player->GetTeam(world);
-					if(!player->IsDisguised() && (team && team->id != virusplanter) && !player->HasSecurityPass()){
+					if(!player->IsDisguised() && !player->IsInvisible(world) && (team && team->id != virusplanter) && !player->HasSecurityPass()){
 						damaging = 1;
-						Object damageprojectile(ObjectTypes::FLAMERPROJECTILE);
+						Object damageprojectile(ObjectTypes::FLAREPROJECTILE);
 						damageprojectile.healthdamage = 60;
 						damageprojectile.shielddamage = 60;
 						damageprojectile.ownerid = id;
@@ -328,7 +328,7 @@ void Robot::HandleHit(World & world, Uint8 x, Uint8 y, Object & projectile){
 }
 
 bool Robot::ImplantVirus(Uint16 teamid){
-	if(!virusplanter){
+	if(!virusplanter || virusplanter != teamid){
 		virusplanter = teamid;
 		return true;
 	}
@@ -386,7 +386,7 @@ bool Robot::Look(World & world, Uint8 direction){
 			case ObjectTypes::PLAYER:{
 				Player * player = static_cast<Player *>(*it);
 				Team * team = player->GetTeam(world);
-				if(!player->IsDisguised() && !player->HasSecurityPass() && (team && team->id != virusplanter)){
+				if(!player->IsDisguised() && !player->IsInvisible(world) && !player->HasSecurityPass() && (team && team->id != virusplanter)){
 					target = true;
 				}
 			}break;

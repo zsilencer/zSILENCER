@@ -11,7 +11,7 @@ public:
 	LagSimulator(SOCKET * sockethandle);
 	void Process(class World & world);
 	bool Active(void);
-	void Activate(Uint32 minlatecy, Uint32 maxlatecy);
+	void Activate(Uint32 minlatecy, Uint32 maxlatecy, float packetloss);
 	void QueuePacket(Peer * peer, char * data, unsigned int size);
 	
 private:
@@ -19,6 +19,7 @@ private:
 	bool active;
 	Uint32 minlatecy;
 	Uint32 maxlatecy;
+	int packetloss;
 	std::vector<char *> packetbuffer;
 	std::vector<int> packetbuffersize;
 	std::vector<int> packetbuffertime;

@@ -139,6 +139,7 @@ private:
 	bool deploymessageshown;
 	Uint32 optionscontrolstick;
 	int quitscancode;
+	bool interfaceenterfix;
 };
 
 #endif

@@ -170,7 +170,7 @@ bool Game::Load(char * cmdline){
 	if(!Audio::GetInstance().Init()){
 		printf("Could not initialize audio\n");
 	}
-	Audio::GetInstance().SetMusicVolume(64);
+	Audio::GetInstance().SetMusicVolume(Config::GetInstance().musicvolume);
 	printf("Loading palette...\n");
 	if(!renderer.palette.SetPalette(0)){
 		return false;
@@ -662,6 +662,7 @@ bool Game::Tick(void){
 		}break;
 		case LOBBY:{
 			if(stateisnew){
+				world.lobby.ForgetAllUserInfo();
 				world.gameplaystate = World::INLOBBY;
 				agencychanged = true;
 				UnloadGame();
@@ -924,6 +925,12 @@ bool Game::Tick(void){
 					if(!world.replay.ReadToNextTick(world)){
 						world.replay.EndPlaying();
 						GoToState(MAINMENU);
+					}
+				}
+				Peer * localpeer = world.peerlist[world.localpeerid];
+				if(localpeer && world.localpeerid != world.authoritypeer){
+					if(localpeer->controlledlist.size() == 0){
+						world.RequestPeerList();
 					}
 				}
 				if(!deploymessageshown && world.messagetype == 1 && world.message_i == 63){
@@ -1739,10 +1746,12 @@ bool Game::Tick(void){
 										player->oldx = player->x;
 										player->oldy = player->y;
 										//player->AddInventoryItem(Player::INV_VIRUS);
-										//player->credits = 2000;
+										player->credits = 50000;
 										Uint8 teamcolor = team->GetColor();
 										player->suitcolor = (((teamcolor >> 4) - i) << 4) + (teamcolor & 0xF);
-										//world.peerlist[team->peers[i]]->techchoices = 0xFFFFFFFF;
+										for(int j = 0; j < 5; j++){
+											world.peerlist[team->peers[i]]->techchoices |= 1 << (rand() % 10);
+										}
 										world.peerlist[team->peers[i]]->controlledlist.clear();
 										world.peerlist[team->peers[i]]->controlledlist.push_back(player->id);
 										GiveDefaultItems(*player);
@@ -1968,16 +1977,21 @@ void Game::UpdateInputState(Input & input){
 			}
 		}
 		if(!world.replay.IsPlaying()){
-			if(localplayer->chatinterfaceid){
+			if(interfaceenterfix && !keystate[SDL_SCANCODE_RETURN]){
+				interfaceenterfix = false;
+			}
+			if(localplayer->chatinterfaceid || interfaceenterfix){
 				Input zeroinput;
 				input = zeroinput;
+				interfaceenterfix = true;
 			}
-			if(localplayer->buyinterfaceid || localplayer->techinterfaceid){
+			if(localplayer->buyinterfaceid || localplayer->techinterfaceid || interfaceenterfix){
 				Input zeroinput;
 				zeroinput.keyactivate = input.keyactivate;
 				zeroinput.keymoveleft = input.keymoveleft;
 				zeroinput.keymoveright = input.keymoveright;
 				input = zeroinput;
+				interfaceenterfix = true;
 			}
 		}
 	}
@@ -4065,7 +4079,7 @@ bool Game::ProcessLobbyInterface(Interface * iface){
 							char * message = world.lobby.chatmessages.front();
 							Uint8 color = message[strlen(message) + 1];
 							Uint8 brightness = message[strlen(message) + 2];
-							textbox->AddText(message, color, brightness);
+							textbox->AddText(message, color, brightness, 2);
 							delete[] message;
 							world.lobby.chatmessages.pop_front();
 							if(scrollbar){
@@ -4305,11 +4319,17 @@ bool Game::ProcessLobbyInterface(Interface * iface){
 											TextInput * textinput = static_cast<TextInput *>(tobject);
 											maxplayers = atoi(textinput->text);
 										}
+										if(maxplayers <= 0){
+											maxplayers = 1;
+										}
 										Uint8 maxteams = 0;
 										tobject = gamecreateiface->GetObjectWithUid(world, 44);
 										if(tobject){
 											TextInput * textinput = static_cast<TextInput *>(tobject);
 											maxteams = atoi(textinput->text);
+										}
+										if(maxteams <= 0){
+											maxteams = 1;
 										}
 										if(strlen(gamename) == 0){
 											CreateModalDialog("No game name");
@@ -4977,7 +4997,7 @@ const char * Game::GetKeyName(SDL_Scancode sym){
 }
 
 void Game::GetGameChannelName(LobbyGame & lobbygame, char * name){
-	sprintf(name, "#%s-%d", lobbygame.name, lobbygame.accountid);
+	sprintf(name, "#%s-%d", lobbygame.name, lobbygame.id);
 }
 
 void Game::CreateAmbienceChannels(void){
@@ -5161,6 +5181,19 @@ bool Game::HandleSDLEvents(void){
 						if(world.quitstate == 2){
 							world.quitstate = 3;
 						}
+					}
+				}
+				if(event.key.keysym.scancode == SDL_SCANCODE_F4){
+					// play new music track
+					LoadRandomGameMusic();
+					Audio::GetInstance().PlayMusic(world.resources.gamemusic);
+				}
+				if(event.key.keysym.scancode == SDL_SCANCODE_F5){
+					// toggle music playing
+					if(Audio::GetInstance().MusicPaused()){
+						Audio::GetInstance().ResumeMusic();
+					}else{
+						Audio::GetInstance().PauseMusic();
 					}
 				}
 				keystate[event.key.keysym.scancode] = true;

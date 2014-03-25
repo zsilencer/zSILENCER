@@ -20,7 +20,7 @@ public:
 	void ActiveChanged(World & world, Interface * callinginterface, bool mouse);
 	Object * GetObjectWithUid(World & world, Uint8 uid);
 	void DestroyInterface(World & world, Interface * parentinterface);
-	static char * WordWrap(const char * string, unsigned int maxlength);
+	static char * WordWrap(const char * string, unsigned int maxlength, const char * breakchar = "\n");
 	std::vector<Uint16> objects;
 	std::vector<Uint16> tabobjects;
 	Uint16 activeobject;

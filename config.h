@@ -17,6 +17,7 @@ public:
 	bool scalefilter;
 	bool teamcolors;
 	bool music;
+	Uint8 musicvolume;
 	Uint8 defaultagency;
 	char defaultgamename[64];
 	Uint32 defaulttechchoices[5];
@@ -50,7 +51,7 @@ private:
 	void WriteKey(SDL_RWops * file, const char * variable, SDL_Scancode keybindings[2], bool keyoperator);
 	void ReadKey(char * data, SDL_Scancode (*keybindings)[2], bool * keyoperator);
 	void WriteString(SDL_RWops * file, const char * variable, const char * string);
-	void ReadString(const char * data, char * variable);
+	void ReadString(const char * data, char * variable, int length);
 	char * RWgets(SDL_RWops * file, char * buffer, int count);
 };
 

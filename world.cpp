@@ -52,7 +52,7 @@ World::World(bool mode) : lobby(this), lagsimulator(&sockethandle), audio(Audio:
 	intutorialmode = false;
 	choosingtech = false;
 	boundport = 0;
-	//lagsimulator.Activate(80, 120);
+	//lagsimulator.Activate(40, 70, 5.0f);
 }
 
 World::~World(){
@@ -89,7 +89,13 @@ void World::Tick(void){
 		SendSnapshots();
 	}
 	if(mode == REPLICA){
-		ProcessSnapshotQueue();
+		if(!ProcessSnapshotQueue()){
+			replaying = true;
+			audio.enabled = false;
+			TickObjects();
+			audio.enabled = true;
+			replaying = false;
+		}
 	}
 	if(dedicatedserver.active){
 		dedicatedserver.Tick(*this);
@@ -103,14 +109,14 @@ void World::Tick(void){
 			if(peer){
 				Player * player = GetPeerPlayer(peer->id);
 				bool processed = false;
-				while(player && player->CanExhaustInputQueue(*this) && ProcessInputQueue(*peer)){ processed = true; };
+				while(player && player->CanExhaustInputQueue(*this, inputqueue[peer->id].size()) && ProcessInputQueue(*peer)){ processed = true; };
 				if(!processed){
 					ProcessInputQueue(*peer);
 				}
 			}
 		}
 	}
-	if(tickcount % 25 == 0 && IsAuthority()){
+	if(tickcount % 24 == 0 && IsAuthority()){
 		ActivateTerminals();
 	}
 	tickcount++;
@@ -160,8 +166,10 @@ void World::TickObjects(void){
 		}
 		if(!(object->requiresmaptobeloaded && !map.loaded) && !object->wasdestroyed){
 			if(!peercontrolled){
-				object->oldx = object->x;
-				object->oldy = object->y;
+				if(!replaying){
+					object->oldx = object->x;
+					object->oldy = object->y;
+				}
 				object->Tick(*this);
 				object->lasttick = tickcount;
 			}else
@@ -193,7 +201,7 @@ void World::SetVersion(const char * version){
 }
 
 void World::DoNetwork_Authority(void){
-	Serializer data(1400);
+	Serializer data(10000);
 	sockaddr_in senderaddr;
 	socklen_t senderaddrsize = sizeof(senderaddr);
 	int received;
@@ -282,9 +290,13 @@ void World::DoNetwork_Authority(void){
 			case MSG_INPUT:{ // client sending input
 				if(peer && gameplaystate == INGAME){
 					totalinputpackets++;
+					peer->totalinputs++;
 					Serializer * inputcopy = new Serializer;
 					inputcopy->Copy(data);
 					inputqueue[peer->id].push_back(inputcopy);
+					if(!peer->firstinputtime){
+						peer->firstinputtime = tickcount;
+					}
 					if(replay.IsRecording()){
 						replay.WriteInputCommand(*this, peer->id, data);
 					}
@@ -471,7 +483,7 @@ void World::DoNetwork_Replica(void){
 	if(SDL_GetTicks() - lastpingsent >= 1000){
 		SendPing();
 	}
-	Serializer data(5000);
+	Serializer data(10000); // hopefully snapshots dont get larger than this
 	sockaddr_in senderaddr;
 	socklen_t senderaddrsize = sizeof(senderaddr);
 	Peer * peer = 0;
@@ -619,7 +631,10 @@ void World::DoNetwork_Replica(void){
 			}break;
 			case MSG_SOUND:{
 				if(peer){
-					Audio::GetInstance().Play(resources.soundbank[&data.data[data.BitsToBytes(data.readoffset)]]);
+					Uint8 volume = data.data[data.BitsToBytes(data.readoffset)];
+					char * name = &data.data[data.BitsToBytes(data.readoffset) + 1];
+					Audio::GetInstance().Play(resources.soundbank[name], volume);
+					//printf("MSG_SOUND %d %s\n", volume, name);
 				}
 			}break;
 		}
@@ -733,8 +748,10 @@ bool World::ProcessInputQueue(Peer & peer){
 			for(std::list<Uint16>::iterator i = peer.controlledlist.begin(); i != peer.controlledlist.end(); i++){
 				Object * object = GetObjectFromId((*i));
 				if(object){
-					object->oldx = object->x;
-					object->oldy = object->y;
+					if(!replaying){
+						object->oldx = object->x;
+						object->oldy = object->y;
+					}
 					object->HandleInput(peer.input);
 					object->Tick(*this);
 					object->lasttick = tickcount;
@@ -749,12 +766,14 @@ bool World::ProcessInputQueue(Peer & peer){
 	return false;
 }
 
-void World::ProcessSnapshotQueue(void){
+bool World::ProcessSnapshotQueue(void){
+	bool ran = false;
 	bool shortenqueue = false;
 	if(snapshotqueue.size() >= snapshotqueuemaxsize){
 		shortenqueue = true;
 	}
 	if(snapshotqueue.size() >= snapshotqueueminsize){
+		ran = true;
 		do{
 			Serializer * data = snapshotqueue.front();
 			Uint32 tick;
@@ -823,13 +842,13 @@ void World::ProcessSnapshotQueue(void){
 				}else
 				if(tick < peerlist[localpeerid]->lasttick){
 					/*Serializer olddata;
-					 SaveSnapshot(olddata, localpeerid);
-					 LoadSnapshot(*data, false);
-					 replaying = true;
-					 TickObjects();
-					 replaying = false;
-					 LoadSnapshot(olddata, false);
-					 printf("old snapshot replayed %d\n", tick);*/
+					SaveSnapshot(olddata, localpeerid);
+					LoadSnapshot(*data, false);
+					replaying = true;
+					TickObjects();
+					replaying = false;
+					LoadSnapshot(olddata, false);*/
+					printf("old snapshot %d\n", tick);
 				}else
 				if(tick == peerlist[localpeerid]->lasttick){
 					// this shouldnt happen
@@ -839,6 +858,7 @@ void World::ProcessSnapshotQueue(void){
 			snapshotqueue.pop_front();
 		}while(shortenqueue && snapshotqueue.size() > snapshotqueueminsize);
 	}
+	return ran;
 }
 
 void World::ClearSnapshotQueue(void){
@@ -1216,7 +1236,7 @@ void World::DisplayChatMessage(Uint32 accountid, const char * msg){
 	chatmsg.append(":\xA0");
 	chatmsg.append(msg);
 	
-	char * wrapped = Interface::WordWrap(chatmsg.c_str(), 36);
+	char * wrapped = Interface::WordWrap(chatmsg.c_str(), 36, "\n ");
 	char * line = strtok(wrapped, "\n");
 	while(line){
 		chatlines.push_back(line);
@@ -1380,8 +1400,10 @@ void World::SendInput(void){
 		for(std::list<Uint16>::iterator i = peer->controlledlist.begin(); i != peer->controlledlist.end(); i++){
 			Object * object = GetObjectFromId((*i));
 			if(object){
-				object->oldx = object->x;
-				object->oldy = object->y;
+				if(!replaying){
+					object->oldx = object->x;
+					object->oldy = object->y;
+				}
 				object->HandleInput(peer->input);
 				object->Tick(*this);
 				object->lasttick = tickcount;
@@ -1670,25 +1692,26 @@ void World::SendChat(bool toteam, char * message){
 	SendPacket(GetAuthorityPeer(), msg, sizeof(msg));
 }
 
-void World::SendSound(const char * name, Peer * peer){
+void World::SendSound(const char * name, Peer * peer, Uint8 volume){
 	if(IsAuthority()){
 		if(!peer || (peer && peer->id == localpeerid)){
-			Audio::GetInstance().Play(resources.soundbank[name]);
+			Audio::GetInstance().Play(resources.soundbank[name], volume);
 		}
-		char msg[1 + 255];
+		char msg[2 + 255];
 		msg[0] = MSG_SOUND;
-		strcpy(&msg[1], name);
-		msg[1 + strlen(name)] = 0;
+		msg[1] = volume;
+		strcpy(&msg[2], name);
+		msg[2 + strlen(name)] = 0;
 		if(!peer){
 			for(unsigned int i = 0; i < maxpeers; i++){
 				Peer * peer = peerlist[i];
 				if(peer && i != localpeerid){
-					SendPacket(peer, msg, 1 + strlen(name) + 1);
+					SendPacket(peer, msg, 2 + strlen(name) + 1);
 				}
 			}
 		}else{
 			if(peer->id != localpeerid){
-				SendPacket(peer, msg, 1 + strlen(name) + 1);
+				SendPacket(peer, msg, 2 + strlen(name) + 1);
 			}
 		}
 	}
@@ -2003,18 +2026,26 @@ void World::LoadSnapshot(Serializer & data, bool create, Serializer * delta, Uin
 			object = CreateObject(type, id);
 		}
 		if(object){
-			if(object->iscontrollable){
-				object->oldx = object->x;
-				object->oldy = object->y;
-			}
-			if(delta){
-				delta->readoffset = 0;
-				LoadSnapshot(*delta, false, 0, id);
-			}
-			if(isdeltacompressed){
-				object->Serialize(Serializer::READ, data, (Serializer *)true);
+			if(object->type != type){
+				printf("OBJECT TYPE DOES NOT MATCH IN SNAPSHOT\n");
+				MarkDestroyObject(object->id);
+				data.readoffset += objecttypes.SerializedSize(type);
 			}else{
-				object->Serialize(Serializer::READ, data);
+				if(object->iscontrollable){
+					if(!replaying){
+						object->oldx = object->x;
+						object->oldy = object->y;
+					}
+				}
+				if(delta){
+					delta->readoffset = 0;
+					LoadSnapshot(*delta, false, 0, id);
+				}
+				if(isdeltacompressed){
+					object->Serialize(Serializer::READ, data, (Serializer *)true);
+				}else{
+					object->Serialize(Serializer::READ, data);
+				}
 			}
 		}else{
 			data.readoffset += objecttypes.SerializedSize(type);

@@ -524,6 +524,13 @@ void Lobby::ForgetUserInfo(Uint32 accountid){
 	}
 }
 
+void Lobby::ForgetAllUserInfo(void){
+	for(std::map<Uint32, User *>::iterator it = userinfos.begin(); it != userinfos.end(); it++){
+		delete (*it).second;
+	}
+	userinfos.clear();
+}
+
 void Lobby::UpgradeStat(Uint8 agency, Uint8 stat){
 	char msg[3];
 	msg[0] = MSG_UPGRADESTAT;

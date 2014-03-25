@@ -54,9 +54,15 @@ void Team::Tick(World & world){
 		}
 	}
 	if(secretprogress - oldsecretprogress >= 20){
-		Player * localplayer = world.GetPeerPlayer(world.localpeerid);
+		/*Player * localplayer = world.GetPeerPlayer(world.localpeerid);
 		if(localplayer && this == localplayer->GetTeam(world)){
 			Audio::GetInstance().Play(world.resources.soundbank["select2.wav"], 32);
+		}*/
+		for(int i = 0; i < numpeers; i++){
+			Peer * peer = world.peerlist[peers[i]];
+			if(peer){
+				world.SendSound("select2.wav", peer, 32);
+			}
 		}
 		oldsecretprogress = secretprogress;
 	}
@@ -65,6 +71,7 @@ void Team::Tick(World & world){
 		world.SendSound("cathdoor.wav");
 		Player * player = static_cast<Player *>(world.GetObjectFromId(secretdelivered));
 		if(player){
+			player->EmitSound(world, world.resources.soundbank["if15.wav"], 48);
 			Peer * peer = player->GetPeer(world);
 			if(peer){
 				User * user = world.lobby.GetUserInfo(peer->accountid);
@@ -379,7 +386,7 @@ const char * Team::GetAgencyName(void){
 
 Uint32 Team::GetAvailableTech(World & world){
 	Uint32 tech = 0;
-	for(int i = 0; i < 4; i++){
+	for(int i = 0; i < numpeers; i++){
 		Peer * peer = world.peerlist[peers[i]];
 		if(peer){
 			tech |= peer->techchoices;

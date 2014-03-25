@@ -53,7 +53,7 @@ void Grenade::Tick(World & world){
 				if(flareprojectile){
 					flareprojectile->ownerid = ownerid;
 					flareprojectile->x = x;
-					flareprojectile->y = y;
+					flareprojectile->y = y - 1;
 					if(type == POISONFLARE){
 						flareprojectile->poisonous = true;
 					}
@@ -92,10 +92,10 @@ void Grenade::Tick(World & world){
 					for(std::list<Object *>::iterator it = world.objectlist.begin(); it != world.objectlist.end(); it++){
 						Object * object = *it;
 						//int radius = 500;
-						if(object && object->ishittable && object->id != ownerid){
+						if(object && object->ishittable && object->id != ownerid && world.map.TeamNumberFromY(y) == world.map.TeamNumberFromY(object->y)){
 							//int distance = sqrt((float)((x - object->x) * (x - object->x)) + ((y - object->y) * (y - object->y)));
 							//if(distance < radius){
-								Object empprojectile(ObjectTypes::PLASMAPROJECTILE);
+								Object empprojectile(ObjectTypes::FLAREPROJECTILE);
 								empprojectile.healthdamage = 0;
 								empprojectile.shielddamage = 0xFFFF;
 								empprojectile.ownerid = ownerid;
@@ -114,7 +114,7 @@ void Grenade::Tick(World & world){
 						if(plasmaprojectile){
 							plasmaprojectile->large = false;
 							plasmaprojectile->x = x;
-							plasmaprojectile->y = y + ys[i];
+							plasmaprojectile->y = y + ys[i] - 1;
 							plasmaprojectile->ownerid = ownerid;
 							plasmaprojectile->xv = xvs[i];
 							plasmaprojectile->yv = yvs[i];
@@ -131,7 +131,7 @@ void Grenade::Tick(World & world){
 						if(plasmaprojectile){
 							plasmaprojectile->large = false;
 							plasmaprojectile->x = x;
-							plasmaprojectile->y = y + ys[i];
+							plasmaprojectile->y = y + ys[i] - 1;
 							plasmaprojectile->ownerid = ownerid;
 							plasmaprojectile->xv = xvs[i];
 							plasmaprojectile->yv = yvs[i];
@@ -168,7 +168,7 @@ void Grenade::Tick(World & world){
 						if(plasmaprojectile){
 							plasmaprojectile->large = true;
 							plasmaprojectile->x = x;
-							plasmaprojectile->y = y + ys[i];
+							plasmaprojectile->y = y + ys[i] - 1;
 							plasmaprojectile->oldx = plasmaprojectile->x;
 							plasmaprojectile->oldy = plasmaprojectile->y;
 							plasmaprojectile->ownerid = ownerid;
@@ -186,7 +186,7 @@ void Grenade::Tick(World & world){
 						if(plasmaprojectile){
 							plasmaprojectile->large = true;
 							plasmaprojectile->x = x;
-							plasmaprojectile->y = y + ys[i];
+							plasmaprojectile->y = y + ys[i] - 1;
 							plasmaprojectile->ownerid = ownerid;
 							plasmaprojectile->xv = xvs[i];
 							plasmaprojectile->yv = yvs[i];
@@ -200,16 +200,7 @@ void Grenade::Tick(World & world){
 		}else
 		if(state_i == 120 && type == NEUTRON){
 			world.MarkDestroyObject(id);
-			for(std::list<Object *>::iterator it = world.objectlist.begin(); it != world.objectlist.end(); it++){
-				Object * object = *it;
-				if(object && object->ishittable && object->y <= world.map.height * 64){
-					Object neutronprojectile(ObjectTypes::PLASMAPROJECTILE);
-					neutronprojectile.healthdamage = 0xFFFF;
-					neutronprojectile.shielddamage = 0xFFFF;
-					neutronprojectile.ownerid = ownerid;
-					object->HandleHit(world, 50, 50, neutronprojectile);
-				}
-			}
+			NeutronBlast(world, y, ownerid);
 		}else
 		if(state_i == 30 + 168){ // flares last 7 seconds
 			world.MarkDestroyObject(id);
@@ -240,6 +231,9 @@ bool Grenade::UpdatePosition(World & world, Player & player){
 			y = player.y - 70;
 			if(player.input.keymoveleft || player.input.keymoveright){
 				xv = 30;
+				if(player.state == Player::RUNNING){
+					xv = 26 + abs(player.xv);
+				}
 			}
 			if(player.input.keymovedown){
 				y = player.y - 30;
@@ -363,5 +357,28 @@ void Grenade::Move(Object & object, World & world, int v){
 	}else{
 		object.EmitSound(world, world.resources.soundbank["land1.wav"], volume);
 		object.yv += world.gravity;
+	}
+}
+
+void Grenade::NeutronBlast(World & world, Sint16 y, Uint16 ownerid){
+	for(std::list<Object *>::iterator it = world.objectlist.begin(); it != world.objectlist.end(); it++){
+		Object * object = *it;
+		if(object && object->ishittable && world.map.TeamNumberFromY(y) == world.map.TeamNumberFromY(object->y)){
+			bool invulnerable = false;
+			if(object->type == ObjectTypes::PLAYER){
+				Player * player = static_cast<Player *>(object);
+				if(player->hasdepositor){
+					invulnerable = true;
+					player->hasdepositor = false;
+				}
+			}
+			if(!invulnerable){
+				Object neutronprojectile(ObjectTypes::FLAREPROJECTILE);
+				neutronprojectile.healthdamage = 0xFFFF;
+				neutronprojectile.shielddamage = 0xFFFF;
+				neutronprojectile.ownerid = ownerid;
+				object->HandleHit(world, 50, 50, neutronprojectile);
+			}
+		}
 	}
 }

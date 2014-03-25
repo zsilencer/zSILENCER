@@ -25,6 +25,7 @@ public:
 	Team * TeamOfCurrentBase(World & world);
 	bool IsDisguised(void);
 	void UnDisguise(World & world);
+	bool IsInvisible(World & world);
 	bool Poison(World & world, Uint16 playerid, Uint8 amount);
 	void UnPoison(void);
 	bool HasSecurityPass(void);
@@ -39,7 +40,7 @@ public:
 	void KillByGovt(World & world);
 	void AddCredits(int amount);
 	void UnDeploy(void);
-	bool CanExhaustInputQueue(World & world);
+	bool CanExhaustInputQueue(World & world, int queuesize);
 	Peer * GetPeer(World & world);
 	enum {INV_NONE, INV_HEALTHPACK, INV_LAZARUSTRACT, INV_SECURITYPASS, INV_VIRUS,
 		INV_POISON, INV_NEUTRONBOMB, INV_EMPBOMB, INV_SHAPEDBOMB, INV_PLASMABOMB, INV_PLASMADET,
@@ -77,6 +78,7 @@ public:
 	int buyifacelastitem;
 	int buyifacelastscrolled;
 	Uint8 disguised;
+	bool hasdepositor;
 	class PlayerAI * ai;
 
 	friend class Renderer;
@@ -117,7 +119,7 @@ private:
 	Input input;
 	Input oldinput;
 	Uint8 weaponfiredelay[4];
-	Uint32 lastfire;
+	Uint8 weaponfirecool;
 	int hacksoundchannel;
 	int jetpacksoundchannel;
 	int flamersoundchannel;
@@ -140,10 +142,12 @@ private:
 	Uint32 jetpackbonustime;
 	Uint32 hackingbonustime;
 	Uint32 radarbonustime;
+	Uint32 invisiblebonustime;
 	Uint8 tracetime;
 	int secondcounter;
 	Uint16 poisonedby;
 	Uint8 poisonedamount;
+	static const Uint8 maxpoisoned = 9;
 	Uint32 lastweaponchangesound;
 	Uint16 teamid;
 };

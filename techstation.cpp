@@ -44,27 +44,32 @@ void TechStation::Tick(World & world){
 }
 
 void TechStation::HandleHit(World & world, Uint8 x, Uint8 y, Object & projectile){
+	Uint16 oldhealth = health;
 	Hittable::HandleHit(*this, world, x, y, projectile);
-	if(health == 0 && projectile.healthdamage > 0){
+	if(oldhealth != health && health == 0 && projectile.healthdamage > 0){
 		collidable = false;
 		EmitSound(world, world.resources.soundbank["q_expl02.wav"], 96);
 		Team * team = static_cast<Team *>(world.GetObjectFromId(teamid));
 		if(team){
 			Uint32 tech = team->GetAvailableTech(world);
-			std::vector<BuyableItem *> buyablecopy = world.buyableitems;
-			//std::random_shuffle(buyablecopy.begin(), buyablecopy.end());
-			for(int i = 0; i < buyablecopy.size(); i++){
-				int r = world.Random() % buyablecopy.size();
-				BuyableItem * temp = buyablecopy[i];
-				buyablecopy[i] = buyablecopy[r];
-				buyablecopy[r] = temp;
+			std::vector<BuyableItem *> buyableitems;
+			for(int i = 0; i < world.buyableitems.size(); i++){
+				if(world.buyableitems[i]->techchoice & tech){
+					buyableitems.push_back(world.buyableitems[i]);
+				}
 			}
-			for(std::vector<BuyableItem *>::iterator it = buyablecopy.begin(); it != buyablecopy.end(); it++){
+			for(int i = 0; i < buyableitems.size(); i++){
+				int r = world.Random() % buyableitems.size();
+				BuyableItem * temp = buyableitems[i];
+				buyableitems[i] = buyableitems[r];
+				buyableitems[r] = temp;
+			}
+			for(std::vector<BuyableItem *>::iterator it = buyableitems.begin(); it != buyableitems.end(); it++){
 				BuyableItem * buyableitem = *it;
 				if((buyableitem->techchoice & tech) && !(buyableitem->techchoice & team->disabledtech)){
 					team->disabledtech |= buyableitem->techchoice;
 					techdisabled = buyableitem->techchoice;
-					printf("Disabled the %s tech\n", buyableitem->name);
+					//printf("Disabled the %s tech\n", buyableitem->name);
 					break;
 				}
 			}

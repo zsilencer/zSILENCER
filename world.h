@@ -50,7 +50,7 @@ public:
 	void ShowMessage(const char * message, Uint8 time = 255, Uint8 type = 0, bool networked = false, Peer * peer = 0);
 	void ShowStatus(const char * status, Uint8 color = 0, bool networked = false, Peer * peer = 0);
 	void SendChat(bool toteam, char * message);
-	void SendSound(const char * name, Peer * peer = 0);
+	void SendSound(const char * name, Peer * peer = 0, Uint8 volume = 128);
 	void ChangeTeam(void);
 	void KillByGovt(Peer & peer);
 	void Explode(Object & object, Uint8 suitcolor, float hitx);
@@ -123,7 +123,7 @@ private:
 	void DoNetwork_Replica(void);
 	Peer * FindPeer(sockaddr_in & sockaddr);
 	bool ProcessInputQueue(Peer & peer);
-	void ProcessSnapshotQueue(void);
+	bool ProcessSnapshotQueue(void);
 	void ClearSnapshotQueue(void);
 	void SendGameInfo(Uint8 peerid);
 	void SendReady(void);
@@ -184,7 +184,7 @@ private:
 	LagSimulator lagsimulator;
 	std::list<Serializer *> snapshotqueue;
 	static const int snapshotqueueminsize = 1;
-	static const int snapshotqueuemaxsize = 4;
+	static const int snapshotqueuemaxsize = 1;
 	std::list<Serializer *> inputqueue[maxpeers];
 	Uint8 illuminate;
 	bool systemcameraactive[2];

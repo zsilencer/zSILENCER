@@ -48,6 +48,7 @@ int Audio::Play(Mix_Chunk * chunk, int volume, bool loop){
 		int channel = Mix_PlayChannel(-1, chunk, loops);
 		if(channel >= 0){
 			Mix_Volume(channel, volume * effectvolume);
+			channelobject[channel] = 0;
 			channelvolume[channel] = volume;
 		}
 		return channel;
@@ -149,8 +150,10 @@ void Audio::PlayMusic(Mix_Music * music){
 		return;
 	}
 	if(!Mix_PlayingMusic() || Mix_FadingMusic() == MIX_FADING_OUT){
-		Mix_PlayMusic(music, -1);
-		SetMusicVolume(musicvolume);
+		if(!MusicPaused()){
+			Mix_PlayMusic(music, -1);
+			SetMusicVolume(musicvolume);
+		}
 	}
 }
 
@@ -164,6 +167,10 @@ void Audio::PauseMusic(void){
 
 void Audio::ResumeMusic(void){
 	Mix_ResumeMusic();
+}
+
+bool Audio::MusicPaused(void){
+	return Mix_PausedMusic();
 }
 
 void Audio::SetMusicVolume(int volume){

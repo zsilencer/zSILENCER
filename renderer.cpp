@@ -236,6 +236,7 @@ void Renderer::DrawWorld(Surface * surface, Camera & camera, bool drawminimap, b
 				if(object->renderpass == renderpass){
 					object->x += object->nudgex;
 					object->y += object->nudgey;
+					bool skipdrawing = false; // this is only used for player invisibility
 					Surface * src = world.resources.spritebank[object->res_bank][object->res_index];
 					Rect dstrect;
 					if(src){
@@ -247,10 +248,21 @@ void Renderer::DrawWorld(Surface * surface, Camera & camera, bool drawminimap, b
 								Player * player = static_cast<Player *>(object);
 								effectsurface = CreateSurfaceCopy(src);
 								Uint8 suitcolor = Civilian::defaultsuitcolor;
-								if(!player->IsDisguised() || (localplayer && player->GetTeam(world) == localplayer->GetTeam(world) && localplayer->id != player->id)){
+								if(!player->IsDisguised() || (player->IsDisguised() && (player->state == Player::WALKIN || player->state == Player::WALKOUT)) || (localplayer && player->GetTeam(world) == localplayer->GetTeam(world) && localplayer->id != player->id)){
 									suitcolor = player->suitcolor;
 								}
 								EffectTeamColor(effectsurface, 0, suitcolor);
+								if(player->IsInvisible(world)){
+									Team * localteam = 0;
+									if(localplayer){
+										localteam = localplayer->GetTeam(world);
+									}
+									if(localteam && world.BelongsToTeam(*player, localteam->id)){
+										EffectRampColor(effectsurface, 0, 208);
+									}else{
+										skipdrawing = true;
+									}
+								}
 								if(player->state_hit){
 									EffectHit(effectsurface, 0, player->hitx, player->hity, player->state_hit);
 								}
@@ -266,9 +278,11 @@ void Renderer::DrawWorld(Surface * surface, Camera & camera, bool drawminimap, b
 								if(player->state_warp){
 									EffectWarp(effectsurface, 0, player->state_warp);
 								}else{
-									DrawShadow(surface, object);
+									if(!skipdrawing){
+										DrawShadow(surface, object);
+									}
 								}
-								if(player->res_index == 5 || (player->currentweapon == 3 && player->res_index == 4 && player->flamersoundchannel != -1)){
+								if(player->res_index == 5 || (player->currentweapon == 3 && player->res_index == 5 && player->flamersoundchannel != -1)){
 									switch(player->res_bank){
 										case 21:
 											lightingsurfacebank = 223;
@@ -362,18 +376,22 @@ void Renderer::DrawWorld(Surface * surface, Camera & camera, bool drawminimap, b
 								}else{
 									DrawShadow(surface, object);
 								}
+								if(guard->res_bank == 61 && guard->res_index == 7){
+									lightingsurfacebank = 220;
+									lightingsurfaceindex = 0;
+								}
 							}break;
 							case ObjectTypes::ROBOT:{
 								Robot * robot = static_cast<Robot *>(object);
 								effectsurface = CreateSurfaceCopy(src);
-								if(robot->state_hit){
-									EffectHit(effectsurface, 0, robot->hitx, robot->hity, robot->state_hit);
-								}
 								if(robot->virusplanter){
 									Team * team = static_cast<Team *>(world.GetObjectFromId(robot->virusplanter));
 									if(team){
 										EffectTeamColor(effectsurface, 0, team->GetColor(), true);
 									}
+								}
+								if(robot->state_hit){
+									EffectHit(effectsurface, 0, robot->hitx, robot->hity, robot->state_hit);
 								}
 								if(robot->damaging){
 									EffectShieldDamage(effectsurface, 0, 120);
@@ -503,6 +521,18 @@ void Renderer::DrawWorld(Surface * surface, Camera & camera, bool drawminimap, b
 									srcrect.y = 0;
 									BlitSurface(world.resources.spritebank[180][0], &srcrect, surface, &dstrect);
 								}
+								if(terminal->isbig && terminal->state == Terminal::BEAMING && localplayer){
+									Peer * peer = localplayer->GetPeer(world);
+									if(peer){
+										Team * team = localplayer->GetTeam(world);
+										User * user = world.lobby.GetUserInfo(peer->accountid);
+										if(team && user && user->agency[team->agency].contacts > 0){
+											char text[16];
+											sprintf(text, "%d", terminal->beamingseconds - terminal->beamingcount);
+											DrawText(surface, object->x + camera.GetXOffset() - 3, object->y + camera.GetYOffset(), text, 133, 6, false, 126, 128, true);
+										}
+									}
+								}
 							}break;
 							case ObjectTypes::SURVEILLANCEMONITOR:{
 								SurveillanceMonitor * surveillancemonitor = static_cast<SurveillanceMonitor *>(object);
@@ -573,7 +603,7 @@ void Renderer::DrawWorld(Surface * surface, Camera & camera, bool drawminimap, b
 						if(effectsurface){
 							src = effectsurface;
 						}
-						if(src){
+						if(src && !skipdrawing){
 							BlitSprite(object, camera, surface, &dstrect, src, 0);
 						}
 						if(effectsurface){
@@ -583,15 +613,17 @@ void Renderer::DrawWorld(Surface * surface, Camera & camera, bool drawminimap, b
 					switch(object->type){
 						case ObjectTypes::PLAYER:{
 							Player * player = static_cast<Player *>(object);
-							if(player->state == Player::JETPACK || player->state == Player::JETPACKSHOOT){
-								Rect dstrect;
-								dstrect.x = -world.resources.spriteoffsetx[218][0] + camera.GetXOffset() + object->x;
-								dstrect.y = -world.resources.spriteoffsety[218][0] + camera.GetYOffset() + object->y;
-								if(object->mirrored){
-									dstrect.x = object->x - (world.resources.spritewidth[218][0] - world.resources.spriteoffsetx[218][0]) + camera.GetXOffset();
-									DrawMirrored(world.resources.spritebank[218][0], 0, surface, &dstrect);
-								}else{
-									BlitSurface(world.resources.spritebank[218][0], 0, surface, &dstrect);
+							if(!skipdrawing){
+								if(player->state == Player::JETPACK || player->state == Player::JETPACKSHOOT){
+									Rect dstrect;
+									dstrect.x = -world.resources.spriteoffsetx[218][0] + camera.GetXOffset() + object->x;
+									dstrect.y = -world.resources.spriteoffsety[218][0] + camera.GetYOffset() + object->y;
+									if(object->mirrored){
+										dstrect.x = object->x - (world.resources.spritewidth[218][0] - world.resources.spriteoffsetx[218][0]) + camera.GetXOffset();
+										DrawMirrored(world.resources.spritebank[218][0], 0, surface, &dstrect);
+									}else{
+										BlitSurface(world.resources.spritebank[218][0], 0, surface, &dstrect);
+									}
 								}
 							}
 							////// 210:0-14 decal running
@@ -638,15 +670,17 @@ void Renderer::DrawWorld(Surface * surface, Camera & camera, bool drawminimap, b
 									decalres_index = object->res_index;
 								break;
 							}
-							if(decalres_bank && world.resources.spritebank[decalres_bank][decalres_index]){
-								Rect dstrect;
-								dstrect.x = -world.resources.spriteoffsetx[decalres_bank][decalres_index] + camera.GetXOffset() + object->x;
-								dstrect.y = -world.resources.spriteoffsety[decalres_bank][decalres_index] + camera.GetYOffset() + object->y;
-								if(object->mirrored){
-									dstrect.x = object->x - (world.resources.spritewidth[decalres_bank][decalres_index] - world.resources.spriteoffsetx[decalres_bank][decalres_index]) + camera.GetXOffset();
-									DrawMirrored(world.resources.spritebank[decalres_bank][decalres_index], 0, surface, &dstrect);
-								}else{
-									BlitSurface(world.resources.spritebank[decalres_bank][decalres_index], 0, surface, &dstrect);
+							if(!skipdrawing){
+								if(decalres_bank && world.resources.spritebank[decalres_bank][decalres_index]){
+									Rect dstrect;
+									dstrect.x = -world.resources.spriteoffsetx[decalres_bank][decalres_index] + camera.GetXOffset() + object->x;
+									dstrect.y = -world.resources.spriteoffsety[decalres_bank][decalres_index] + camera.GetYOffset() + object->y;
+									if(object->mirrored){
+										dstrect.x = object->x - (world.resources.spritewidth[decalres_bank][decalres_index] - world.resources.spriteoffsetx[decalres_bank][decalres_index]) + camera.GetXOffset();
+										DrawMirrored(world.resources.spritebank[decalres_bank][decalres_index], 0, surface, &dstrect);
+									}else{
+										BlitSurface(world.resources.spritebank[decalres_bank][decalres_index], 0, surface, &dstrect);
+									}
 								}
 							}
 							if((localplayer && player->GetTeam(world) == localplayer->GetTeam(world) && player != localplayer) || (world.replay.IsPlaying() && world.replay.ShowAllNames())){
@@ -1580,6 +1614,9 @@ void Renderer::DrawMessage(Surface * surface){
 		case 3: // secret dropped
 			color = 192;
 		break;
+		case 4: // neutron activated (red)
+			color = 153;
+		break;
 		case 10: // won
 			color = 224;
 		break;
@@ -2360,6 +2397,11 @@ void Renderer::DrawHUD(Surface * surface, float frametime){
 				delete effectsurface;
 			}else{
 				BlitSurface(world.resources.spritebank[95][1], &srcrect, surface, &dstrect);
+			}
+			if(player->poisonedby){
+				dstrect.x = 183;
+				dstrect.y = 453;
+				BlitSurface(world.resources.spritebank[97][5], 0, surface, &dstrect);
 			}
 			srcrect.y = 0;
 			srcrect.w = (((float)player->files/player->maxfiles) * world.resources.spritebank[95][7]->w);

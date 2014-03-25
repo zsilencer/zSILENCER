@@ -21,6 +21,7 @@ public:
 	Uint16 files;
 	Uint8 secretinfo;
 	Uint8 beamingseconds;
+	Uint8 beamingcount;
 	bool isbig;
 	Uint8 beamingtime;
 	Uint8 tracetime;
@@ -30,7 +31,6 @@ protected:
 	Uint8 inactiveframes;
 	Uint8 beamingframes;
 	Uint8 readyframes;
-	Uint8 beamingcount;
 	bool secretreadynotified;
 	bool sizeset;
 	int soundchannel;

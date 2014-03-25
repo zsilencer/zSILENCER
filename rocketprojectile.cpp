@@ -1,6 +1,8 @@
 #include "rocketprojectile.h"
 #include "plume.h"
 #include "player.h"
+#include "robot.h"
+#include "guard.h"
 #include <math.h>
 
 RocketProjectile::RocketProjectile() : Object(ObjectTypes::ROCKETPROJECTILE){
@@ -129,6 +131,39 @@ void RocketProjectile::Tick(World & world){
 						plume2->yv = plume->yv + (rand() % 7) - 3;
 						plume2->SetPosition(x, y);
 					}
+				}
+			}
+			std::vector<Uint8> types;
+			types.push_back(ObjectTypes::PLAYER);
+			types.push_back(ObjectTypes::GUARD);
+			types.push_back(ObjectTypes::ROBOT);
+			types.push_back(ObjectTypes::CIVILIAN);
+			types.push_back(ObjectTypes::FIXEDCANNON);
+			types.push_back(ObjectTypes::WALLDEFENSE);
+			types.push_back(ObjectTypes::TECHSTATION);
+			Object * owner = world.GetObjectFromId(ownerid);
+			Uint16 teamid = 0;
+			switch(owner->type){
+				case ObjectTypes::PLAYER:{
+					Player * player = static_cast<Player *>(owner);
+					Team * team = player->GetTeam(world);
+					if(team){
+						teamid = team->id;
+					}
+				}break;
+				case ObjectTypes::ROBOT:{
+					Robot * robot = static_cast<Robot *>(owner);
+					teamid = robot->virusplanter;
+				}break;
+			}
+			std::vector<Object *> objects = world.TestAABB(x - 30, y - 30, x + 30, y + 30, types, ownerid, teamid);
+			for(std::vector<Object *>::iterator it = objects.begin(); it != objects.end(); it++){
+				if(!object || (object && (*it)->id != object->id)){
+					Object damageprojectile(ObjectTypes::ROCKETPROJECTILE);
+					damageprojectile.healthdamage = healthdamage;
+					damageprojectile.shielddamage = shielddamage;
+					damageprojectile.ownerid = ownerid;
+					(*it)->HandleHit(world, 50, 50, damageprojectile);
 				}
 			}
 			xv = 0;

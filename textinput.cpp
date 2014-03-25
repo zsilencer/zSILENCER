@@ -32,6 +32,9 @@ void TextInput::ProcessKeyPress(char ascii){
 			caret--;
 			text[caret] = 0;
 			offset--;
+			if(scrolled > 0){
+				scrolled--;
+			}
 		}
 	}else
 	if(key == '\n'){

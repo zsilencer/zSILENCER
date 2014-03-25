@@ -30,6 +30,7 @@ public:
 	LobbyGame * GetGameById(Uint32 id);
 	User * GetUserInfo(Uint32 accountid);
 	void ForgetUserInfo(Uint32 accountid);
+	void ForgetAllUserInfo(void);
 	void UpgradeStat(Uint8 agency, Uint8 stat);
 	void RegisterStats(User & user, Uint8 won, Uint32 gameid);
 	char failmessage[256];

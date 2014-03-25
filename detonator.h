@@ -12,7 +12,7 @@ public:
 	void Serialize(bool write, Serializer & data, Serializer * old = 0);
 	void Tick(World & world);
 	void Detonate(void);
-	bool HasDetonated(void);
+	Uint8 HasDetonated(void);
 	Uint16 ownerid;
 	Sint16 lowestypos;
 	bool iscamera;

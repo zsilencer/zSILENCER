@@ -131,7 +131,7 @@ bool Projectile::TestCollision(Object & object, World & world, Platform ** colli
 				Peer * peer = player->GetPeer(world);
 				if(thecollidedobject->type == ObjectTypes::PLAYER){
 					Player * collidedplayer = static_cast<Player *>(thecollidedobject);
-					if(poisonous && collidedplayer->id != ownerid){
+					if(poisonous /*&& collidedplayer->id != ownerid*/){
 						// poison a little bit 4 times per second
 						if(world.tickcount % 6 == 0 && collidedplayer->Poison(world, ownerid, 1)){
 							/*if(peer){

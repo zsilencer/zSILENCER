@@ -142,7 +142,7 @@ Object * WallDefense::Look(World & world){
 	for(std::vector<Object *>::iterator it = objects.begin(); it != objects.end(); it++){
 		Object * object = *it;
 		Player * player = static_cast<Player *>(object);
-		if(player->IsDisguised() || player->HasSecurityPass()){
+		if(player->IsDisguised() || player->IsInvisible(world) || player->HasSecurityPass()){
 			continue;
 		}
 		Team * team = player->GetTeam(world);

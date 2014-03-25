@@ -114,9 +114,9 @@ void Detonator::Detonate(void){
 	}
 }
 
-bool Detonator::HasDetonated(void){
-	if(state_i >= (4 * 4) + 1){
-		return true;
+Uint8 Detonator::HasDetonated(void){
+	if(state_i > (4 * 4) + 1){
+		return state_i - ((4 * 4) + 1);
 	}
 	return false;
 }

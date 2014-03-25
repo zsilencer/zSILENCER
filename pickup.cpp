@@ -1,5 +1,6 @@
 #include "pickup.h"
 #include "player.h"
+#include "grenade.h"
 
 PickUp::PickUp() : Object(ObjectTypes::PICKUP){
 	requiresauthority = true;
@@ -13,6 +14,7 @@ PickUp::PickUp() : Object(ObjectTypes::PICKUP){
 	powerup = false;
 	poweruprespawntime = 0;
 	tracetime = 0;
+	neutronactivator = 0;
 }
 
 void PickUp::Serialize(bool write, Serializer & data, Serializer * old){
@@ -110,9 +112,20 @@ void PickUp::Tick(World & world){
 			}
 		}else{
 			if(state_i % 24 == 0){
-				quantity--;
+				state_i = 0;
+				if(quantity){
+					quantity--;
+				}
 				if(quantity == 0){
 					state_i = -1;
+				}
+				if(tracetime){
+					tracetime--;
+					if(tracetime == 0){
+						// neutron bomb activation complete
+						// this doesnt go off unless poweruprespawntime > 15
+						Grenade::NeutronBlast(world, y, neutronactivator);
+					}
 				}
 			}
 		}
@@ -120,30 +133,39 @@ void PickUp::Tick(World & world){
 	state_i++;
 }
 
+void PickUp::ArmNeutron(Uint16 activator){
+	if(type == NEUTRONBOMB){
+		neutronactivator = activator;
+		tracetime = 15;
+	}
+}
+
 void PickUp::CheckForPickedUp(World & world){
-	std::vector<Uint8> types;
-	types.push_back(ObjectTypes::PLAYER);
-	Sint16 x1 = x - world.resources.spriteoffsetx[res_bank][res_index];
-	Sint16 x2 = x - world.resources.spriteoffsetx[res_bank][res_index] + world.resources.spritewidth[res_bank][res_index];
-	Sint16 y1 = y - world.resources.spriteoffsety[res_bank][res_index];
-	Sint16 y2 = y - world.resources.spriteoffsety[res_bank][res_index] + world.resources.spriteheight[res_bank][res_index];
-	std::vector<Object *> objects = world.TestAABB(x1, y1, x2, y2, types);
-	for(std::vector<Object *>::iterator it = objects.begin(); it != objects.end(); it++){
-		Object * object = *it;
-		switch(object->type){
-			case ObjectTypes::PLAYER:{
-				Player * player = static_cast<Player *>(object);
-				if(player->PickUpItem(world, *this)){
-					draw = false;
-					collidable = false;
-					if(powerup){
-						quantity = poweruprespawntime;
-					}else{
-						world.MarkDestroyObject(id);
+	if(!world.replaying){
+		std::vector<Uint8> types;
+		types.push_back(ObjectTypes::PLAYER);
+		Sint16 x1 = x - world.resources.spriteoffsetx[res_bank][res_index];
+		Sint16 x2 = x - world.resources.spriteoffsetx[res_bank][res_index] + world.resources.spritewidth[res_bank][res_index];
+		Sint16 y1 = y - world.resources.spriteoffsety[res_bank][res_index];
+		Sint16 y2 = y - world.resources.spriteoffsety[res_bank][res_index] + world.resources.spriteheight[res_bank][res_index];
+		std::vector<Object *> objects = world.TestAABB(x1, y1, x2, y2, types);
+		for(std::vector<Object *>::iterator it = objects.begin(); it != objects.end(); it++){
+			Object * object = *it;
+			switch(object->type){
+				case ObjectTypes::PLAYER:{
+					Player * player = static_cast<Player *>(object);
+					if(player->PickUpItem(world, *this)){
+						draw = false;
+						collidable = false;
+						if(powerup){
+							quantity = poweruprespawntime;
+						}else{
+							world.MarkDestroyObject(id);
+						}
+						return;
 					}
-					return;
-				}
-			}break;
+				}break;
+			}
 		}
 	}
 }

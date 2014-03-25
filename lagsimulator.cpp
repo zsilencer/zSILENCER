@@ -10,10 +10,11 @@ bool LagSimulator::Active(void){
 	return active;
 }
 
-void LagSimulator::Activate(Uint32 minlatecy, Uint32 maxlatecy){
+void LagSimulator::Activate(Uint32 minlatecy, Uint32 maxlatecy, float packetloss){
 	active = true;
 	LagSimulator::minlatecy = minlatecy;
 	LagSimulator::maxlatecy = maxlatecy;
+	LagSimulator::packetloss = packetloss;
 }
 
 void LagSimulator::QueuePacket(Peer * peer, char * data, unsigned int size){
@@ -50,9 +51,11 @@ void LagSimulator::Process(World & world){
 				recvaddr.sin_family = AF_INET;
 				recvaddr.sin_port = htons((*i5));
 				recvaddr.sin_addr.s_addr = htonl((*i));
-				int ret = sendto(*sockethandle, (*i2), (*i3), 0, (sockaddr *)&recvaddr, sizeof(recvaddr));
-				if(ret > 0){
-					world.totalbytessent += ret;
+				if((float(rand()) / RAND_MAX) * 100 > packetloss){
+					int ret = sendto(*sockethandle, (*i2), (*i3), 0, (sockaddr *)&recvaddr, sizeof(recvaddr));
+					if(ret > 0){
+						world.totalbytessent += ret;
+					}
 				}
 				delete[] (*i2);
 				packetbufferip.erase(i);

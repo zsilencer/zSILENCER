@@ -33,6 +33,8 @@ public:
 	Stats stats;
 	Uint32 wantedtechchoices;
 	bool isbot;
+	Uint32 firstinputtime;
+	int totalinputs;
 };
 
 #endif

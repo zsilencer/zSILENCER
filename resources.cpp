@@ -372,6 +372,8 @@ void Resources::UnloadSounds(void){
 		Mix_FreeChunk((*it).second);
 	}
 	soundbank.clear();
+	Mix_FadeOutMusic(0);
+	Mix_ResumeMusic();
 	if(menumusic){
 		Mix_FreeMusic(menumusic);
 		menumusic = 0;

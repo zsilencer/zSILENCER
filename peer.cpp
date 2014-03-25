@@ -14,6 +14,8 @@ Peer::Peer(){
 	techchoices = 0;
 	wantedtechchoices = 0;
 	isbot = false;
+	firstinputtime = 0;
+	totalinputs = 0;
 }
 
 void Peer::Serialize(bool write, Serializer & data){

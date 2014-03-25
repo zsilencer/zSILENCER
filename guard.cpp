@@ -14,7 +14,7 @@ Guard::Guard() : Object(ObjectTypes::GUARD){
 	state_i = 0;
 	res_bank = 59;
 	res_index = 0;
-	speed = 3;
+	speed = 5;
 	maxhealth = 25;
 	health = maxhealth;
 	maxshield = 15;
@@ -73,7 +73,7 @@ void Guard::Tick(World & world){
 			}
 			if((found = Look(world, 1))){
 				if(state == CROUCHED){
-					if(CooledDown(world)){
+					if(CooledDown(world) && (state_hit == 0 || state_hit % 32 >= 3)){
 						state = SHOOTCROUCHED;
 						state_i = 0;
 					}
@@ -348,15 +348,17 @@ void Guard::Tick(World & world){
 					yv = -yv;
 				}
 			}
-			if(Look(world, 6) && CooledDown(world)){
-				state = SHOOTLADDERUP;
-				state_i = -1;
-				break;
-			}
-			if(Look(world, 7) && CooledDown(world)){
-				state = SHOOTLADDERDOWN;
-				state_i = -1;
-				break;
+			if(state_hit == 0 || state_hit % 32 >= 3){
+				if(Look(world, 6) && CooledDown(world)){
+					state = SHOOTLADDERUP;
+					state_i = -1;
+					break;
+				}
+				if(Look(world, 7) && CooledDown(world)){
+					state = SHOOTLADDERDOWN;
+					state_i = -1;
+					break;
+				}
 			}
 			if(state_i >= 20){
 				state_i = 0;
@@ -429,6 +431,15 @@ void Guard::Tick(World & world){
 			}
 			res_bank = 64;
 			res_index = state_i;
+		}break;
+		case HIT:{
+			res_bank = 63;
+			res_index = state_i;
+			if(state_i >= 3){
+				state = STANDING;
+				state_i = -1;
+				break;
+			}
 		}break;
 		case DYINGEXPLODE:{
 			draw = false;
@@ -513,6 +524,10 @@ void Guard::Tick(World & world){
 void Guard::HandleHit(World & world, Uint8 x, Uint8 y, Object & projectile){
 	Hittable::HandleHit(*this, world, x, y, projectile);
 	float xpcnt = -((x - 50) / 50.0) * (mirrored ? -1 : 1);
+	if(state == WALKING || state == STANDING || state == SHOOTSTANDING || state == SHOOTUP || state == SHOOTUPANGLE || state == SHOOTDOWN || state == SHOOTDOWNANGLE){
+		state = HIT;
+		state_i = 0;
+	}
 	if(health == 0 && state != DYING && state != DYINGEXPLODE){
 		state = DYING;
 		state_i = 0;
@@ -542,7 +557,7 @@ void Guard::HandleHit(World & world, Uint8 x, Uint8 y, Object & projectile){
 			}
 		}
 	}
-	xv = speed * xpcnt;
+	xv = projectile.moveamount * xpcnt;
 	if(state != LADDER && state != SHOOTLADDERUP && state != SHOOTLADDERDOWN){
 		FollowGround(*this, world, xv);
 	}
@@ -653,7 +668,7 @@ Object * Guard::Look(World & world, Uint8 direction){
 		bool target = false;
 		std::vector<Object *> objects = world.TestAABB(x + x1, y + y1, x + x2, y + y2, types);
 		for(std::vector<Object *>::iterator it = objects.begin(); it != objects.end(); it++){
-			if(ShouldTarget(*(*it))){
+			if(ShouldTarget(*(*it), world)){
 				target = true;
 				break;
 			}
@@ -672,7 +687,7 @@ Object * Guard::Look(World & world, Uint8 direction){
 		int xv2 = x2 - x1;
 		int yv2 = y2 - y1;
 		Object * object = world.TestIncr(x + x1, y + y1 - 1, x + x1, y + y1, &xv2, &yv2, types);
-		if(object && ShouldTarget(*object)){
+		if(object && ShouldTarget(*object, world)){
 			if(!world.map.TestIncr(x + x1, y + y1 - 1, x + x1, y + y1, &xv2, &yv2, Platform::STAIRSDOWN | Platform::STAIRSDOWN | Platform::RECTANGLE, 0, true)){
 				return object;
 			}
@@ -759,11 +774,11 @@ bool Guard::CooledDown(World & world){
 	return false;
 }
 
-bool Guard::ShouldTarget(Object & object){
+bool Guard::ShouldTarget(Object & object, World & world){
 	switch(object.type){
 		case ObjectTypes::PLAYER:{
 			Player * player = static_cast<Player *>(&object);
-			if((!chasing && !player->IsDisguised() && !player->HasSecurityPass()) || player->id == chasing){
+			if((!player->IsDisguised() && !player->IsInvisible(world) && !player->HasSecurityPass()) || player->id == chasing){
 				return true;
 			}
 		}break;

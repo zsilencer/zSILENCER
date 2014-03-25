@@ -29,6 +29,7 @@ public:
 	void StopMusic(void);
 	void PauseMusic(void);
 	void ResumeMusic(void);
+	bool MusicPaused(void);
 	void SetMusicVolume(int volume);
 	
 	bool enabled;

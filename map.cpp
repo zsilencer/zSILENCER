@@ -539,8 +539,10 @@ bool Map::LoadFile(const char * filename, World & world, Team * team){
 					case 0:
 					case 1:
 					case 2:
+					case 3:
 					case 4:
 					case 5:
+					case 6:
 						valid = true;
 					break;
 				}
@@ -559,11 +561,17 @@ bool Map::LoadFile(const char * filename, World & world, Team * team){
 							case 2:
 								pickup->type = PickUp::JETPACK;
 							break;
+							case 3:
+								pickup->type = PickUp::INVISIBLE;
+							break;
 							case 4:
 								pickup->type = PickUp::HACKING;
 							break;
 							case 5:
 								pickup->type = PickUp::RADAR;
+							break;
+							case 6:
+								pickup->type = PickUp::DEPOSITOR;
 							break;
 						}
 						pickup->x = actorx;

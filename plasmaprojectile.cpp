@@ -7,7 +7,7 @@ PlasmaProjectile::PlasmaProjectile() : Object(ObjectTypes::PLASMAPROJECTILE){
 	res_index = 0;
 	state_i = 0;
 	healthdamage = 4;
-	shielddamage = 3;
+	shielddamage = 5;
 	velocity = 5;
 	drawcheckered = true;
 	renderpass = 3;
@@ -30,7 +30,7 @@ void PlasmaProjectile::Serialize(bool write, Serializer & data, Serializer * old
 void PlasmaProjectile::Tick(World & world){
 	if(large){
 		healthdamage = 5;
-		shielddamage = 4;
+		shielddamage = 6;
 	}
 	Plume * plume = (Plume *)world.CreateObject(ObjectTypes::PLUME);
 	if(plume){

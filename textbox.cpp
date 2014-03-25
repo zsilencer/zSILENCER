@@ -48,8 +48,13 @@ void TextBox::AddLine(const char * string, Uint8 color, Uint8 brightness){
 	text.push_back(newstring);
 }
 
-void TextBox::AddText(const char * string, Uint8 color, Uint8 brightness){
-	char * wrapped = Interface::WordWrap(string, width / fontwidth);
+void TextBox::AddText(const char * string, Uint8 color, Uint8 brightness, int indent){
+	char breakchar[10];
+	strcpy(breakchar, "\n");
+	for(int i = 0; i < indent && i < 8; i++){
+		strcat(breakchar, " ");
+	}
+	char * wrapped = Interface::WordWrap(string, width / fontwidth, breakchar);
 	char * line = strtok(wrapped, "\n");
 	while(line){
 		AddLine(line, color, brightness);

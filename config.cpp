@@ -21,6 +21,7 @@ void Config::Save(void){
 		WriteString(file, "scalefilter", scalefilter ? "1" : "0");
 		WriteString(file, "teamcolors", teamcolors ? "1" : "0");
 		WriteString(file, "music", music ? "1" : "0");
+		sprintf(temp, "%d", musicvolume); WriteString(file, "musicvolume", temp);
 		sprintf(temp, "%d", defaultagency); WriteString(file, "defaultagency", temp);
 		WriteString(file, "defaultgamename", defaultgamename);
 		sprintf(temp, "%d", defaulttechchoices[0]); WriteString(file, "defaulttechchoices0", temp);
@@ -64,8 +65,9 @@ bool Config::Load(void){
 				if(CompareString(variable, "scalefilter")){ if(atoi(data) == 0){ scalefilter = false; }else{ scalefilter = true; } }
 				if(CompareString(variable, "teamcolors")){ if(atoi(data) == 0){ teamcolors = false; }else{ teamcolors = true; } }
 				if(CompareString(variable, "music")){ if(atoi(data) == 0){ music = false; }else{ music = true; } }
+				if(CompareString(variable, "musicvolume")){ musicvolume = atoi(data); }
 				if(CompareString(variable, "defaultagency")){ defaultagency = atoi(data); }
-				if(CompareString(variable, "defaultgamename")){ ReadString(data, defaultgamename); }
+				if(CompareString(variable, "defaultgamename")){ ReadString(data, defaultgamename, sizeof(defaultgamename)); }
 				if(CompareString(variable, "defaulttechchoices0")){ defaulttechchoices[0] = atoi(data); }
 				if(CompareString(variable, "defaulttechchoices1")){ defaulttechchoices[1] = atoi(data); }
 				if(CompareString(variable, "defaulttechchoices2")){ defaulttechchoices[2] = atoi(data); }
@@ -104,6 +106,7 @@ void Config::LoadDefaults(void){
 	scalefilter = true;
 	teamcolors = false;
 	music = true;
+	musicvolume = 64;
 	defaultagency = Team::NOXIS;
 	strcpy(defaultgamename, "New Game");
 	defaulttechchoices[0] = World::BUY_LASER | World::BUY_ROCKET;
@@ -215,12 +218,15 @@ void Config::WriteString(SDL_RWops * file, const char * variable, const char * s
 	SDL_RWwrite(file, line, strlen(line), 1);
 }
 
-void Config::ReadString(const char * data, char * variable){
+void Config::ReadString(const char * data, char * variable, int length){
+	memset(variable, 0, length);
 	for(int i = 0, j = 0; i < strlen(data); i++){
 		if(j == 0 && (data[i] == ' ' || data[i] == '\t')){
 			
 		}else{
-			variable[j++] = data[i];
+			if(j < length){
+				variable[j++] = data[i];
+			}
 		}
 	}
 }
