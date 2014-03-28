@@ -91,7 +91,7 @@ private:
 	std::vector<std::string> ListFiles(const char * directory);
 	void LoadRandomGameMusic(void);
 	std::string FindMap(const char * name, unsigned char (*hash)[20] = 0, const char * directory = 0);
-	void SaveMap(const char * name, unsigned char * data, int size);
+	std::string SaveMap(const char * name, unsigned char * data, int size);
 	void CalculateMapHash(const char * filename, unsigned char (*hash)[20]);
 	std::string StringFromHash(unsigned char (*hash)[20]);
 	void LoadMapData(const char * filename);

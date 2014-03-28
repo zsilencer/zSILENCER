@@ -538,7 +538,7 @@ bool Game::Loop(void){
 		sprintf(fpstext, "%d", fps);
 		renderer.DrawText(&screenbuffer, 10, 30, fpstext, 133, 7);*/
 		if(minimized){
-			//SDL_Delay(wait);
+			SDL_Delay(wait);
 		}
 		world.DoNetwork();
 		//Uint32 drawtick = SDL_GetTicks();
@@ -571,7 +571,7 @@ bool Game::Tick(void){
 		if(world.gameplaystate == World::INLOBBY){
 			ProcessMapDownload();
 		}
-		Peer * localpeer = world.peerlist[world.localpeerid];
+		/*Peer * localpeer = world.peerlist[world.localpeerid];
 		if(localpeer){
 			if(localpeer->gameinfoloaded && !world.dedicatedserver.checkedhavemap){
 				if(FindMap(world.gameinfo.mapname, &world.gameinfo.maphash).size() > 0){
@@ -580,7 +580,7 @@ bool Game::Tick(void){
 				}
 				world.dedicatedserver.checkedhavemap = true;
 			}
-		}
+		}*/
 	}
 	if(!sharedstate && !world.IsAuthority()){
 		//printf("no shared state!");
@@ -812,9 +812,9 @@ bool Game::Tick(void){
 								GetGameChannelName(*lobbygame, temp);
 								strcpy(lastchannel, world.lobby.channel);
 								world.lobby.JoinChannel(temp);
-								if(FindMap(lobbygame->mapname, &lobbygame->maphash).size() > 0){
+								/*if(FindMap(lobbygame->mapname, &lobbygame->maphash).size() > 0){
 									world.SendMapDownloaded();
-								}
+								}*/
 							}
 							Interface * lobbyiface = static_cast<Interface *>(world.GetObjectFromId(lobbyinterface));
 							if(lobbyiface){
@@ -3835,8 +3835,8 @@ void Game::ProcessLobbyConnectInterface(Interface * iface){
 						
 					break;
 					case Lobby::WAITING:
-						textbox->AddLine("Connecting to lobby.zsilencer.com:518");
-						world.lobby.Connect("lobby.zsilencer.com", 518);
+						textbox->AddLine("Connecting to lobby.zsilencer.com:517");
+						world.lobby.Connect("lobby.zsilencer.com", 517);
 						//world.lobby.state = Lobby::AUTHENTICATED;
 					break;
 					case Lobby::RESOLVING:
@@ -3850,7 +3850,7 @@ void Game::ProcessLobbyConnectInterface(Interface * iface){
 					break;
 					case Lobby::RESOLVED:
 						textbox->AddLine("Hostname resolved");
-						world.lobby.Connect("lobby.zsilencer.com", 518);
+						world.lobby.Connect("lobby.zsilencer.com", 517);
 					break;
 					case Lobby::CONNECTED:
 						textbox->AddLine("Connected");
@@ -5219,7 +5219,7 @@ std::string Game::FindMap(const char * name, unsigned char (*hash)[20], const ch
 	return empty;
 }
 
-void Game::SaveMap(const char * name, unsigned char * data, int size){
+std::string Game::SaveMap(const char * name, unsigned char * data, int size){
 	std::string filename = "level/download/";
 	filename.append(name);
 	SDL_RWops * file = SDL_RWFromFile(filename.c_str(), "wb");
@@ -5229,15 +5229,16 @@ void Game::SaveMap(const char * name, unsigned char * data, int size){
 	}
 	unsigned char hash[20];
 	CalculateMapHash(filename.c_str(), &hash);
-	filename = "level/archive/";
-	filename.append(StringFromHash(&hash));
-	filename.append(".");
-	filename.append(name);
-	file = SDL_RWFromFile(filename.c_str(), "wb");
+	std::string archivefilename = "level/archive/";
+	archivefilename.append(StringFromHash(&hash));
+	archivefilename.append(".");
+	archivefilename.append(name);
+	file = SDL_RWFromFile(archivefilename.c_str(), "wb");
 	if(file){
 		SDL_RWwrite(file, data, 1, size);
 		SDL_RWclose(file);
 	}
+	return filename;
 }
 
 void Game::CalculateMapHash(const char * filename, unsigned char (*hash)[20]){
@@ -5279,8 +5280,10 @@ void Game::ProcessMapDownload(void){
 		if(localpeer->gameinfoloaded){
 			if(!localpeer->mapdownloaded){
 				if(!mapexistchecked){
-					if(FindMap(world.gameinfo.mapname, &world.gameinfo.maphash).size() > 0){
+					std::string mapfilename = FindMap(world.gameinfo.mapname, &world.gameinfo.maphash);
+					if(mapfilename.size() > 0){
 						world.SendMapDownloaded();
+						LoadMapData(mapfilename.c_str());
 					}
 					mapexistchecked = true;
 				}else{
@@ -5288,14 +5291,15 @@ void Game::ProcessMapDownload(void){
 						// request map chunks after received, or if last request was a while ago
 						if(world.currentmapdataend){
 							//printf("map done downloading\n");
-							SaveMap(world.gameinfo.mapname, world.currentmapdata, world.currentmapdatalength);
+							std::string mapfilename = SaveMap(world.gameinfo.mapname, world.currentmapdata, world.currentmapdatalength);
 							world.SendMapDownloaded();
+							LoadMapData(mapfilename.c_str());
 						}else{
 							world.GetMapChunk(world.currentmapdatalength);
 							world.currentmapdataprocessed = true;
 						}
 					}
-					if(world.currentmapdataend && world.tickcount % 24 == 0){
+					if(world.currentmapdataend && world.tickcount % 48 == 0){
 						// this is just in case the SendMapDownloaded packet is lost
 						if(FindMap(world.gameinfo.mapname, &world.gameinfo.maphash).size() > 0){
 							world.SendMapDownloaded();

@@ -18,7 +18,6 @@ public:
 	Uint32 gameid;
 	Uint32 accountid;
 	int nopeerstime;
-	bool checkedhavemap;
 	
 private:
 	char lobbyaddress[256];
