@@ -64,7 +64,7 @@ void User::Serialize(bool write, Serializer & data){
 }
 
 int User::TotalUpgradePointsPossible(Uint8 agencynum){
-	Uint8 total = 0;
+	int total = 0;
 	total += agency[agencynum].maxcontacts;
 	total += agency[agencynum].maxendurance;
 	total += agency[agencynum].maxhacking;

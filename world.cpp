@@ -1394,6 +1394,8 @@ void World::SetTech(Uint8 peerid, Uint32 techchoices){
 
 void World::DisplayChatMessage(Uint32 accountid, const char * msg){
 	std::string chatmsg(lobby.GetUserInfo(accountid)->name);
+	std::replace(chatmsg.begin(), chatmsg.end(), ' ', '\xA0');
+	// replace spaces with nbsp so usernames dont wordwrap
 	chatmsg.append(":\xA0");
 	chatmsg.append(msg);
 	

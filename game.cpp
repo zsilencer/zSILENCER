@@ -483,7 +483,7 @@ bool Game::Loop(void){
 	unsigned int wait = 42; // 24 fps
 	if(updatetitle){
 		char title[128];
-		sprintf(title, "zSILENCER - %d FPS  Latency: %d ms [%d]  B/s: D:%d U:%d", fps, world.GetPingTime(), world.snapshotqueue.size(), world.totalbytesread, world.totalbytessent);
+		sprintf(title, "zSILENCER - %d FPS  Latency: %d ms [%d]  B/s: D:%d U:%d", fps, world.GetPingTime(), (int)world.snapshotqueue.size(), world.totalbytesread, world.totalbytessent);
 		SDL_SetWindowTitle(window, title);
 		updatetitle = false;
 		frames = 1;
@@ -4711,7 +4711,11 @@ void Game::UpdateGameSummaryInterface(void){
 			if(user->agency[user->statsagency].contacts < user->agency[user->statsagency].maxcontacts){
 				upgradesavailable[5] = true;
 			}
-			if(totalbonusupgrades - user->agency[user->statsagency].defaultbonuses < user->TotalUpgradePointsPossible(user->statsagency)){
+			int maxupgrades = user->agency[user->statsagency].level;
+			if(maxupgrades > user->TotalUpgradePointsPossible(user->statsagency)){
+				maxupgrades = user->TotalUpgradePointsPossible(user->statsagency);
+			}
+			if(totalbonusupgrades - user->agency[user->statsagency].defaultbonuses < maxupgrades){
 				upgradeavailable = true;
 			}
 		}
@@ -5153,6 +5157,8 @@ void Game::LoadRandomGameMusic(void){
 		return;
 	}
 	if(world.resources.gamemusic){
+		Mix_FadeOutMusic(0);
+		Mix_ResumeMusic();
 		Mix_FreeMusic(world.resources.gamemusic);
 		world.resources.gamemusic = 0;
 	}
