@@ -73,7 +73,7 @@ void Guard::Tick(World & world){
 			}
 			if((found = Look(world, 1))){
 				if(state == CROUCHED){
-					if(CooledDown(world) && (state_hit == 0 || state_hit % 32 >= 3)){
+					if(CooledDown(world) && (state_hit == 0 || state_hit % 32 >= 10)){
 						state = SHOOTCROUCHED;
 						state_i = 0;
 					}
@@ -348,7 +348,7 @@ void Guard::Tick(World & world){
 					yv = -yv;
 				}
 			}
-			if(state_hit == 0 || state_hit % 32 >= 3){
+			if(state_hit == 0 || state_hit % 32 >= 10){
 				if(Look(world, 6) && CooledDown(world)){
 					state = SHOOTLADDERUP;
 					state_i = -1;
@@ -475,7 +475,7 @@ void Guard::Tick(World & world){
 		if(object){
 			if(object->type == ObjectTypes::PLAYER){
 				Player * player = static_cast<Player *>(object);
-				if(player->InBase(world)){
+				if(player->InBase(world) || player->IsInvisible(world)){
 					chasing = 0;
 				}
 			}
@@ -528,7 +528,7 @@ void Guard::HandleHit(World & world, Uint8 x, Uint8 y, Object & projectile){
 		state = HIT;
 		state_i = 0;
 	}
-	if(health == 0 && state != DYING && state != DYINGEXPLODE){
+	if(health == 0 && state != DYING && state != DYINGEXPLODE && state != DEAD){
 		state = DYING;
 		state_i = 0;
 		if(weapon != 0){

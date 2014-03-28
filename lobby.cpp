@@ -432,7 +432,7 @@ void Lobby::JoinChannel(const char * channel){
 	SendMessage(msg, size);
 }
 
-void Lobby::CreateGame(const char * name, const char * map, const char * password, Uint8 securitylevel, Uint8 minlevel, Uint8 maxlevel, Uint8 maxplayers, Uint8 maxteams){
+void Lobby::CreateGame(const char * name, const char * map, const unsigned char maphash[20], const char * password, Uint8 securitylevel, Uint8 minlevel, Uint8 maxlevel, Uint8 maxplayers, Uint8 maxteams){
 	Serializer data;
 	Uint8 code = MSG_NEWGAME;
 	data.Put(code);
@@ -447,7 +447,8 @@ void Lobby::CreateGame(const char * name, const char * map, const char * passwor
 	lobbygame.maxlevel = maxlevel;
 	lobbygame.maxplayers = maxplayers;
 	lobbygame.maxteams = maxteams;
-	lobbygame.CalculateMapHash();
+	//lobbygame.CalculateMapHash();
+	memcpy(lobbygame.maphash, maphash, 20);
 	lobbygame.Serialize(Serializer::WRITE, data);
 	SendMessage(data.data, data.BitsToBytes(data.offset));
 	creategamestatus = 100;

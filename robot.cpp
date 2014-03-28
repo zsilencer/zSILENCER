@@ -141,19 +141,33 @@ void Robot::Tick(World & world){
 				GetAABB(world.resources, &x1, &y1, &x2, &y2);
 				std::vector<Uint8> types;
 				types.push_back(ObjectTypes::PLAYER);
-				std::vector<Object *> players = world.TestAABB(x1, y1, x2, y2, types);
+				types.push_back(ObjectTypes::FIXEDCANNON);
+				types.push_back(ObjectTypes::GUARD);
+				std::vector<Object *> objects = world.TestAABB(x1, y1, x2, y2, types);
 				bool meleed = false;
-				for(std::vector<Object *>::iterator it = players.begin(); it != players.end(); it++){
-					Player * player = static_cast<Player *>(*it);
-					Team * team = player->GetTeam(world);
-					if(!player->IsDisguised() && !player->IsInvisible(world) && (team && team->id != virusplanter) && !player->HasSecurityPass()){
-						damaging = 1;
-						Object damageprojectile(ObjectTypes::FLAREPROJECTILE);
-						damageprojectile.healthdamage = 60;
-						damageprojectile.shielddamage = 60;
-						damageprojectile.ownerid = id;
-						player->HandleHit(world, 50, 50, damageprojectile);
-						meleed = true;
+				for(std::vector<Object *>::iterator it = objects.begin(); it != objects.end(); it++){
+					switch((*it)->type){
+						case ObjectTypes::PLAYER:{
+							Player * player = static_cast<Player *>(*it);
+							Team * team = player->GetTeam(world);
+							if(!player->IsDisguised() && !player->IsInvisible(world) && (team && team->id != virusplanter) && !player->HasSecurityPass()){
+								Melee(*(*it), world);
+								meleed = true;
+							}
+						}break;
+						case ObjectTypes::FIXEDCANNON:{
+							FixedCannon * fixedcannon = static_cast<FixedCannon *>(*it);
+							if(fixedcannon->teamid != virusplanter){
+								Melee(*(*it), world);
+								meleed = true;
+							}
+						}break;
+						case ObjectTypes::GUARD:{
+							if(world.IsSecurity(*(*it)) && !world.IsSecurity(*this)){
+								Melee(*(*it), world);
+								meleed = true;
+							}
+						}break;
 					}
 				}
 				if(meleed){
@@ -432,4 +446,13 @@ void Robot::StopAmbience(void){
 		Audio::GetInstance().Stop(soundchannel, 800);
 	}
 	soundchannel = -1;
+}
+
+void Robot::Melee(Object & object, World & world){
+	damaging = 1;
+	Object damageprojectile(ObjectTypes::FLAREPROJECTILE);
+	damageprojectile.healthdamage = 60;
+	damageprojectile.shielddamage = 60;
+	damageprojectile.ownerid = id;
+	object.HandleHit(world, 50, 50, damageprojectile);
 }

@@ -119,8 +119,10 @@ Player::Player() : Object(ObjectTypes::PLAYER){
 	secondcounter = 0;
 	poisonedby = 0;
 	poisonedamount = 0;
+	poisoned_i = 0;
 	lastweaponchangesound = 0;
 	ai = 0;
+	invisible = false;
 };
 
 void Player::Serialize(bool write, Serializer & data, Serializer * old){
@@ -166,6 +168,8 @@ void Player::Serialize(bool write, Serializer & data, Serializer * old){
 	data.Serialize(write, canresurrect, old);
 	data.Serialize(write, poisonedby, old);
 	data.Serialize(write, poisonedamount, old);
+	data.Serialize(write, poisoned_i, old);
+	data.Serialize(write, invisible, old);
 }
 
 void Player::Tick(World & world){
@@ -230,20 +234,46 @@ void Player::Tick(World & world){
 			secondcounter = 0;
 		}
 	}
-	if(poisonedby && world.tickcount % (24 / poisonedamount) == 0){
-		Player * player = static_cast<Player *>(world.GetObjectFromId(poisonedby));
-		Object poisonprojectile(ObjectTypes::FLAREPROJECTILE);
-		poisonprojectile.healthdamage = 1;
-		poisonprojectile.bypassshield = true;
-		poisonprojectile.ownerid = player->id;
-		Uint8 oldhitx = hitx;
-		Uint8 oldhity = hity;
-		Uint8 oldstate_hit = state_hit;
-		HandleHit(world, 50, 50, poisonprojectile);
-		// we put back the old hitx, hity, state_hit so that it doesnt interfere with other hit effects
-		hitx = oldhitx;
-		hity = oldhity;
-		state_hit = oldstate_hit;
+	if(poisonedby){
+		if(poisoned_i % (24 / poisonedamount) == 0){
+			if(health){
+				health--;
+			}
+			if(health == 0 && state != DYING && state != DEAD){
+				Player * player = static_cast<Player *>(world.GetObjectFromId(poisonedby));
+				Peer * peer = GetPeer(world);
+				if(peer){
+					const char * killedby = "?";
+					bool killedself = false;
+					killedby = "a Player";
+					Peer * killedbypeer = player->GetPeer(world);
+					if(killedbypeer){
+						killedby = world.lobby.GetUserInfo(killedbypeer->accountid)->name;
+						if(player->id == id){
+							killedself = true;
+						}else{
+							killedbypeer->stats.kills++;
+						}
+					}
+					char temp[256];
+					if(killedself){
+						sprintf(temp, "%s committed suicide", world.lobby.GetUserInfo(peer->accountid)->name);
+						peer->stats.suicides++;
+					}else{
+						sprintf(temp, "%s was killed by %s", world.lobby.GetUserInfo(peer->accountid)->name, killedby);
+						peer->stats.deaths++;
+					}
+					world.ShowStatus(temp, 160, true);
+				}
+				state = DYING;
+				state_i = 0;
+				EmitSound(world, world.resources.soundbank["grunt2a.wav"]);
+			}
+		}
+		poisoned_i++;
+		if(poisoned_i >= 24){
+			poisoned_i = 0;
+		}
 	}
 	if(tracetime > 0 && secondcounter == 0 && !world.replaying){
 		tracetime--;
@@ -754,13 +784,13 @@ void Player::Tick(World & world){
 						std::vector<Object *> objects = world.TestAABB(x1, y1, x2, y2, types, id);
 						bool found = false;
 						for(std::vector<Object *>::iterator it = objects.begin(); it != objects.end(); it++){
+							found = true;
 							Player * player = static_cast<Player *>(*it);
 							if(player->Poison(world, id, 3)){
 								Peer * peer = GetPeer(world);
 								if(peer){
 									peer->stats.poisons++;
 								}
-								found = true;
 								RemoveInventoryItem(INV_POISON);
 								break;
 							}else{
@@ -2070,7 +2100,7 @@ void Player::Tick(World & world){
 							}
 							oldfiles += 6;
 						}*/
-						if(hackingbonustime > world.tickcount && world.tickcount % ((rand() % 6) + 5) == 0){
+						if(hackingbonustime > world.tickcount && world.tickcount % ((rand() % 4) + 6) == 0){
 							const char * sounds[] = {"type1.wav", "type2.wav", "type3.wav", "type4.wav", "type5.wav"};
 							EmitSound(world, world.resources.soundbank[sounds[rand() % (sizeof(sounds) / sizeof(const char *))]], 64);
 						}
@@ -2133,6 +2163,9 @@ void Player::Tick(World & world){
 			y -= 3;
 			res_bank = 15;
 			res_index = state_i;
+			if(res_index > 15){
+				res_index = 15;
+			}
 			if(input.keymovedown && ((mirrored && !input.keyleft) || (!mirrored && !input.keyright))){
 				currentplatformid = 0;
 				x -= (mirrored ? -1 : 1);
@@ -2341,6 +2374,7 @@ void Player::Tick(World & world){
 			x += xe;
 			y += ye;
 			if(((input.keyactivate && !oldinput.keyactivate) || state_i > 48) && !state_warp && !world.winningteamid){
+				state_hit = 0;
 				Team * team = GetTeam(world);
 				if(team && team->agency == Team::LAZARUS && canresurrect && !world.winningteamid){
 					state = RESURRECTING;
@@ -2784,6 +2818,12 @@ void Player::UnDisguise(World & world){
 
 bool Player::IsInvisible(World & world){
 	if(invisiblebonustime > world.tickcount){
+		return true;
+	}
+	if(invisible){
+		if(world.IsAuthority()){
+			invisible = false;
+		}
 		return true;
 	}
 	return false;
@@ -3392,7 +3432,7 @@ bool Player::CanExhaustInputQueue(World & world, int queuesize){
 		}
 	}*/
 	Peer * peer = GetPeer(world);
-	if(peer && (peer->firstinputtime + peer->totalinputs <= world.tickcount + 24 /* allow 1 second skew */)){
+	if(peer && (peer->firstinputtime + peer->totalinputs <= world.tickcount + 48 /* allow 2 second skew */)){
 		if((xv == 0 && yv == 0) || (queuesize > 3 && world.tickcount % (24 / 3) == 0)){
 			// when still, or 3 times per second if theres a large queue
 			return true;
@@ -4265,6 +4305,7 @@ bool Player::PickUpItem(World & world, PickUp & pickup){
 				case PickUp::INVISIBLE:{
 					powerupname = "Shielding will render you invisible for 30 seconds!";
 					invisiblebonustime = world.tickcount + (30 * 24);
+					invisible = true;
 				}break;
 				case PickUp::RADAR:{
 					powerupname = "You can see your enemies on radar!";

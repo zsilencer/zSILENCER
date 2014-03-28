@@ -17,7 +17,7 @@ Resources::Resources(){
 Resources::~Resources(){
 	for(std::vector<std::vector<Surface *> >::iterator it = spritebank.begin(); it != spritebank.end(); it++){
 		for(std::vector<Surface *>::iterator ij = (*it).begin(); ij != (*it).end(); ij++){
-			if(*ij){
+			if(*ij && *ij != (Surface *)true){
 				delete *ij;
 				*ij = 0;
 			}

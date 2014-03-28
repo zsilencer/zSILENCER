@@ -21,6 +21,7 @@ public:
 private:
 	bool Look(World & world, Uint8 direction = 0);
 	void StopAmbience(void);
+	void Melee(Object & object, World & world);
 	enum {NEW, SLEEPING, ASLEEP, AWAKENING, WALKING, SHOOTING, DYING, DEAD};
 	Uint8 state;
 	Uint8 state_i;

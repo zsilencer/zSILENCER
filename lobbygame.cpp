@@ -20,6 +20,7 @@ LobbyGame::LobbyGame(){
 	players = 0;
 	state = 0;
 	loaded = false;
+	mapdownloaded = false;
 	createdtime = 0;
 }
 
@@ -72,17 +73,4 @@ void LobbyGame::Serialize(bool write, Serializer & data){
 	if(write == Serializer::READ){
 		loaded = true;
 	}
-}
-
-void LobbyGame::CalculateMapHash(void){
-	unsigned char * mapdata = new unsigned char[65535];
-	char mapfilename[256];
-	sprintf(mapfilename, "level/%s", mapname);
-	SDL_RWops * file = SDL_RWFromFile(mapfilename, "rb");
-	if(file){
-		int mapdatasize = SDL_RWread(file, mapdata, 1, 65535);
-		SDL_RWclose(file);
-		sha1::calc(mapdata, mapdatasize, maphash);
-	}
-	delete[] mapdata;
 }

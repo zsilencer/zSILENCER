@@ -116,7 +116,7 @@ void SurveillanceMonitor::Tick(World & world){
 			}
 		}
 	}*/
-	if(objectfollowing){
+	/*if(objectfollowing){
 		//if(rand() % 500 == 0){
 		//	objectfollowing = 0;
 		//}
@@ -127,7 +127,7 @@ void SurveillanceMonitor::Tick(World & world){
 		}else{
 			objectfollowing = 0;
 		}
-	}
+	}*/
 	state_i++;
 }
 

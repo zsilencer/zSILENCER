@@ -217,21 +217,7 @@ void Renderer::DrawWorld(Surface * surface, Camera & camera, bool drawminimap, b
 			Object * object = *i;
 			Uint8 lightingsurfacebank = 0;
 			Uint8 lightingsurfaceindex = 0;
-			int oldx = object->oldx;
-			int oldy = object->oldy;
-			if(oldx == 0){
-				oldx = object->x;
-			}
-			if(oldy == 0){
-				oldy = object->y;
-			}
-			object->nudgex = (oldx - object->x) * frametime;
-			object->nudgey = (oldy - object->y) * frametime;
-			// stop objects from nudging back and forth when they havent been updated
-			if(world.tickcount - 1 > object->lasttick){
-				object->nudgex = 0;
-				object->nudgey = 0;
-			}
+			object->UpdateNudge(world, frametime);
 			if(object->issprite && object->draw && camera.IsVisible(world, *object)){
 				if(object->renderpass == renderpass){
 					object->x += object->nudgex;
@@ -549,14 +535,11 @@ void Renderer::DrawWorld(Surface * surface, Camera & camera, bool drawminimap, b
 										objectfollowing = world.GetObjectFromId(surveillancemonitor->objectfollowing);
 									}
 									if(objectfollowing){
-										surveillancemonitor->camera.x += (objectfollowing->oldx - objectfollowing->x) * frametime;
-										surveillancemonitor->camera.y += (objectfollowing->oldy - objectfollowing->y) * frametime;
+										objectfollowing->UpdateNudge(world, frametime);
+										surveillancemonitor->camera.x = objectfollowing->x + objectfollowing->nudgex;
+										surveillancemonitor->camera.y = objectfollowing->y + objectfollowing->nudgey - 40;
 									}
 									DrawWorldScaled(&newsurface, surveillancemonitor->camera, recursion, frametime, surveillancemonitor->scalefactor);
-									if(objectfollowing){
-										surveillancemonitor->camera.x -= (objectfollowing->oldx - objectfollowing->x) * frametime;
-										surveillancemonitor->camera.y -= (objectfollowing->oldy - objectfollowing->y) * frametime;
-									}
 									EffectRampColor(&newsurface, 0, 198);
 									BlitSurface(&newsurface, 0, surface, &dstrect);
 								}
@@ -962,7 +945,7 @@ void Renderer::DrawMiniMap(Object * object){
 				if(terminal->isbig){
 					if(terminal->state == Terminal::SECRETREADY){
 						Uint8 color = enemycolor;
-						if(Config::GetInstance().teamcolors){
+						if(Config::GetInstance().teamcolors || world.showteamcolors){
 							if(localplayer){
 								Team * team = localplayer->GetTeam(world);
 								if(team && team->beamingterminalid == terminal->id){
@@ -986,7 +969,7 @@ void Renderer::DrawMiniMap(Object * object){
 						world.map.MiniMapCoords(x1, y1);
 						int radius = terminal->beamingtime * 2;
 						Uint8 color = enemycolor;
-						if(Config::GetInstance().teamcolors){
+						if(Config::GetInstance().teamcolors || world.showteamcolors){
 							Player * player = world.GetPeerPlayer(world.localpeerid);
 							if(player){
 								Team * team = player->GetTeam(world);
@@ -1026,7 +1009,7 @@ void Renderer::DrawMiniMap(Object * object){
 						Uint8 color = 0;
 						Team * team = (Team *)world.GetObjectFromId(basedoor->teamid);
 						if(team){
-							if(Config::GetInstance().teamcolors){
+							if(Config::GetInstance().teamcolors || world.showteamcolors){
 								if(localplayer && localplayer->teamid != team->id){
 									color = enemycolor;
 								}else{
@@ -1077,7 +1060,7 @@ void Renderer::DrawMiniMap(Object * object){
 				Team * team = player->GetTeam(world);
 				if(team){
 					Uint8 color;
-					if(Config::GetInstance().teamcolors){
+					if(Config::GetInstance().teamcolors || world.showteamcolors){
 						if(localplayer && player->GetTeam(world) != localplayer->GetTeam(world)){
 							color = enemycolor;
 						}else{
@@ -1097,7 +1080,7 @@ void Renderer::DrawMiniMap(Object * object){
 			if(localplayer){
 				Team * team = localplayer->GetTeam(world);
 				Uint8 color = 0;
-				if(Config::GetInstance().teamcolors){
+				if(Config::GetInstance().teamcolors || world.showteamcolors){
 					if(localplayer && player->GetTeam(world) != localplayer->GetTeam(world)){
 						color = enemycolor;
 					}else{

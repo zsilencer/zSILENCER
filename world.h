@@ -54,12 +54,18 @@ public:
 	void ChangeTeam(void);
 	void KillByGovt(Peer & peer);
 	void Explode(Object & object, Uint8 suitcolor, float hitx);
+	bool IsSecurity(Object & object);
 	void SetRandomSeed(Uint32 seed);
 	Uint32 Random(void);
 	void SetTech(Uint32 techchoices);
 	int TechSlotsUsed(Peer & peer);
+	void SendMapDownloaded(void);
+	void PutMapChunk(Uint32 offset, Peer & peer);
+	void GetMapChunk(Uint32 offset);
+	void StoreMapChunk(unsigned char * data, Uint32 offset, Uint32 size);
 	void SendPing(void);
 	int GetPingTime(void);
+	int AveragePingJitter(void);
 	bool SecurityIDCanSpawn(Uint8 securityid);
 	void SetSystemCamera(bool system, Uint16 objectfollow, Sint16 x, Sint16 y);
 	bool TestAABB(int x1, int y1, int x2, int y2, Object * object, std::vector<Uint8> & types, bool onlycollidable = true);
@@ -114,6 +120,7 @@ protected:
 	void LoadSnapshot(Serializer & data, bool create = true, Serializer * delta = 0, Uint16 objectid = 0);
 	Peer * AddPeer(char * address, unsigned short port, Uint8 agency, Uint32 accountid);
 	Peer * AddBot(Uint8 agency);
+	LagSimulator lagsimulator;
 	char mapname[256];
 	std::vector<Uint32> ingameusers;
 	std::vector<Uint16> objectsbytype[ObjectTypes::MAX_OBJECT_TYPE];
@@ -123,12 +130,19 @@ private:
 	void DoNetwork_Replica(void);
 	Peer * FindPeer(sockaddr_in & sockaddr);
 	bool ProcessInputQueue(Peer & peer);
-	bool ProcessSnapshotQueue(void);
+	void ProcessSnapshotQueue(void);
+	void ClientSidePredict(Uint32 ourtick);
+	void CheckExists(void);
 	void ClearSnapshotQueue(void);
+	void ClearMapData(void);
+	void AllocateMapData(int size);
+	void LoadMapData(const char * filename);
 	void SendGameInfo(Uint8 peerid);
+	void SendGameInfoLoaded(void);
 	void SendReady(void);
 	bool AllPeersReady(Uint8 except);
 	bool AllPeersLoadedGameInfo(void);
+	bool AllPeersDownloadedMap(void);
 	char * CreateStatusString(const char * status, Uint8 color = 0, Uint8 duration = 100);
 	void PushStatusString(char * statusstring);
 	void RequestPeerList(void);
@@ -154,6 +168,7 @@ private:
 	void ApplyWantedTech(Peer & peer);
 	bool IsCollidable(Uint8 type);
 	static bool CompareTeamByNumber(Team * team1, Team * team2);
+	static bool CompareSnapshot(Serializer * snapshot1, Serializer * snapshot2);
 	std::map<Uint16, class Object *> objectidlookup;
 	std::list<Uint16> objectdestroylist;
 	bool mode;
@@ -175,16 +190,19 @@ private:
 	enum {IDLE, LISTENING, CONNECTING, CONNECTED} state;
 	enum {NONE, INLOBBY, INGAME} gameplaystate;
 	enum {MSG_CONNECT, MSG_SNAPSHOT, MSG_INPUT, MSG_PEERLIST, MSG_DISCONNECT, MSG_PING, MSG_PONG,
-		MSG_GAMEINFO, MSG_READY, MSG_CHAT, MSG_BUY, MSG_REPAIR, MSG_VIRUS, MSG_CHANGETEAM, MSG_STATUS,
-		MSG_MESSAGE, MSG_GOVTKILL, MSG_SOUND, MSG_TECH, MSG_STATS};
+		MSG_GAMEINFO, MSG_READY, MSG_CHAT, MSG_STATION, MSG_CHANGETEAM, MSG_STATUS,
+		MSG_MESSAGE, MSG_GOVTKILL, MSG_SOUND, MSG_TECH, MSG_STATS, MSG_EXISTS, MSG_REMOVE, MSG_MAP};
+	enum {STA_BUY, STA_REPAIR, STA_VIRUS};
+	enum {MAP_DOWNLOADED, MAP_GETCHUNK, MAP_PUTCHUNK};
 	Serializer * oldsnapshots[maxpeers][maxoldsnapshots];
 	ObjectTypes objecttypes;
 	Input localinputhistory[maxlocalinputhistory];
 	Uint32 localtoremoteticks[maxoldsnapshots];
-	LagSimulator lagsimulator;
 	std::list<Serializer *> snapshotqueue;
-	static const int snapshotqueueminsize = 1;
-	static const int snapshotqueuemaxsize = 1;
+	int snapshotqueueminsize;
+	int snapshotqueuemaxsize;
+	Uint32 lastsnapshotqueueadjust;
+	int pinghistory[10];
 	std::list<Serializer *> inputqueue[maxpeers];
 	Uint8 illuminate;
 	bool systemcameraactive[2];
@@ -206,6 +224,12 @@ private:
 	bool intutorialmode;
 	Uint32 randomseed;
 	class Replay replay;
+	unsigned char * currentmapdata;
+	Uint32 currentmapdatalength;
+	Uint32 currentmapdatamax;
+	bool currentmapdataprocessed;
+	bool currentmapdataend;
+	bool showteamcolors;
 };
 
 #endif

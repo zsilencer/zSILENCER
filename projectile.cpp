@@ -30,7 +30,7 @@ bool Projectile::TestCollision(Object & object, World & world, Platform ** colli
 	int ye = object.yv;
 	Object * owner = world.GetObjectFromId(ownerid);
 	std::vector<Uint8> types;
-	bool issecurity = false;
+	/*bool issecurity = false;
 	if(owner && (owner->type == ObjectTypes::GUARD || owner->type == ObjectTypes::ROBOT || owner->type == ObjectTypes::WALLDEFENSE)){
 		if(owner->type == ObjectTypes::WALLDEFENSE){
 			WallDefense * walldefense = static_cast<WallDefense *>(owner);
@@ -46,8 +46,8 @@ bool Projectile::TestCollision(Object & object, World & world, Platform ** colli
 		}else{
 			issecurity = true;
 		}
-	}
-	if(issecurity){
+	}*/
+	if(owner && world.IsSecurity(*owner)){
 		types.push_back(ObjectTypes::PLAYER);
 		types.push_back(ObjectTypes::CIVILIAN);
 		types.push_back(ObjectTypes::FIXEDCANNON);
@@ -132,8 +132,8 @@ bool Projectile::TestCollision(Object & object, World & world, Platform ** colli
 				if(thecollidedobject->type == ObjectTypes::PLAYER){
 					Player * collidedplayer = static_cast<Player *>(thecollidedobject);
 					if(poisonous /*&& collidedplayer->id != ownerid*/){
-						// poison a little bit 4 times per second
-						if(world.tickcount % 6 == 0 && collidedplayer->Poison(world, ownerid, 1)){
+						// poison a little bit 4 times per second, max of 3 poison
+						if(world.tickcount % 6 == 0 && collidedplayer->poisonedamount < 3 && collidedplayer->Poison(world, ownerid, 1)){
 							/*if(peer){
 								peer->stats.poisons++;
 							}*/

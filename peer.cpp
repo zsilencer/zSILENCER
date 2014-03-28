@@ -10,6 +10,7 @@ Peer::Peer(){
 	lastpacket = SDL_GetTicks();
 	ishost = false;
 	gameinfoloaded = false;
+	mapdownloaded = false;
 	isready = false;
 	techchoices = 0;
 	wantedtechchoices = 0;
@@ -22,6 +23,7 @@ void Peer::Serialize(bool write, Serializer & data){
 	data.Serialize(write, id);
 	data.Serialize(write, ishost);
 	data.Serialize(write, gameinfoloaded);
+	data.Serialize(write, mapdownloaded);
 	data.Serialize(write, isready);
 	data.Serialize(write, techchoices);
 	//data.Serialize(write, port);

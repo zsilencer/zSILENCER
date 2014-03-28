@@ -106,7 +106,7 @@ void Config::LoadDefaults(void){
 	scalefilter = true;
 	teamcolors = false;
 	music = true;
-	musicvolume = 64;
+	musicvolume = 48;
 	defaultagency = Team::NOXIS;
 	strcpy(defaultgamename, "New Game");
 	defaulttechchoices[0] = World::BUY_LASER | World::BUY_ROCKET;

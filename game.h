@@ -90,6 +90,12 @@ private:
 	bool FadedIn(void);
 	std::vector<std::string> ListFiles(const char * directory);
 	void LoadRandomGameMusic(void);
+	std::string FindMap(const char * name, unsigned char (*hash)[20] = 0, const char * directory = 0);
+	void SaveMap(const char * name, unsigned char * data, int size);
+	void CalculateMapHash(const char * filename, unsigned char (*hash)[20]);
+	std::string StringFromHash(unsigned char (*hash)[20]);
+	void LoadMapData(const char * filename);
+	void ProcessMapDownload(void);
 	static const int numkeys = 20;
 	const char * keynames[numkeys];
 	Uint8 keystate[SDL_NUM_SCANCODES];
@@ -140,6 +146,8 @@ private:
 	Uint32 optionscontrolstick;
 	int quitscancode;
 	bool interfaceenterfix;
+	Uint32 lastmapchunkrequest;
+	bool mapexistchecked;
 };
 
 #endif

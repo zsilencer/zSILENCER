@@ -9,7 +9,6 @@ class LobbyGame
 public:
 	LobbyGame();
 	void Serialize(bool write, Serializer & data);
-	void CalculateMapHash(void);
 	enum {SECNONE, SECLOW, SECMEDIUM, SECHIGH};
 	char name[64];
 	char mapname[64];
@@ -28,6 +27,7 @@ public:
 	Uint8 maxteams;
 	Uint8 extra;
 	bool loaded;
+	bool mapdownloaded;
 	Uint32 createdtime;
 };
 

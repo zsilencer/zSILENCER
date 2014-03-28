@@ -10,6 +10,7 @@ DedicatedServer::DedicatedServer(){
 	unsigned long iomode = 1;
     ioctl(sockethandle, FIONBIO, &iomode);
 	nopeerstime = 0;
+	checkedhavemap = false;
 }
 
 DedicatedServer::~DedicatedServer(){
@@ -23,6 +24,7 @@ void DedicatedServer::Start(char * lobbyaddress, unsigned short lobbyport, Uint3
 	DedicatedServer::gameid = gameid;
 	DedicatedServer::accountid = accountid;
 	active = true;
+	checkedhavemap = false;
 }
 
 void DedicatedServer::Tick(World & world){

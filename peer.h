@@ -17,6 +17,7 @@ public:
 	Uint8 id;
 	bool ishost;
 	bool gameinfoloaded;
+	bool mapdownloaded;
 	bool isready;
 	Uint32 techchoices;
 	Uint32 accountid;

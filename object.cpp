@@ -9,6 +9,7 @@ Object::Object(Uint8 type){
 	requiresmaptobeloaded = true;
 	snapshotinterval = -1;
 	lasttick = 0;
+	lastsnapshottick = 0;
 	wasdestroyed = false;
 	issprite = true;
 	isphysical = false;

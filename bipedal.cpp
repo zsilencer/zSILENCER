@@ -2,7 +2,6 @@
 #include "object.h"
 #include "projectile.h"
 
-
 Bipedal::Bipedal(){
 	height = 30;
 	state_warp = 0;

@@ -52,7 +52,16 @@ World::World(bool mode) : lobby(this), lagsimulator(&sockethandle), audio(Audio:
 	intutorialmode = false;
 	choosingtech = false;
 	boundport = 0;
-	//lagsimulator.Activate(40, 70, 5.0f);
+	snapshotqueueminsize = 1;
+	snapshotqueuemaxsize = 2;
+	lastsnapshotqueueadjust = 0;
+	for(int i = 0; i < sizeof(pinghistory) / sizeof(int); i++){
+		pinghistory[i] = 100;
+	}
+	lastpingid = 0;
+	currentmapdata = 0;
+	ClearMapData();
+	showteamcolors = false;
 }
 
 World::~World(){
@@ -89,13 +98,11 @@ void World::Tick(void){
 		SendSnapshots();
 	}
 	if(mode == REPLICA){
-		if(!ProcessSnapshotQueue()){
-			replaying = true;
-			audio.enabled = false;
-			TickObjects();
-			audio.enabled = true;
-			replaying = false;
+		if(tickcount % 24 == 0){
+			//snapshotqueuemaxsize = ceil(float(AveragePingJitter()) / 42);
+			CheckExists();
 		}
+		ProcessSnapshotQueue();
 	}
 	if(dedicatedserver.active){
 		dedicatedserver.Tick(*this);
@@ -165,28 +172,26 @@ void World::TickObjects(void){
 			}
 		}
 		if(!(object->requiresmaptobeloaded && !map.loaded) && !object->wasdestroyed){
-			if(!peercontrolled){
-				if(!replaying){
-					object->oldx = object->x;
-					object->oldy = object->y;
-				}
+			if((!IsAuthority() && !localpeercontrolled) || (IsAuthority() && !peercontrolled)){
+				object->oldx = object->x;
+				object->oldy = object->y;
 				object->Tick(*this);
 				object->lasttick = tickcount;
-			}else
+			}/*else
 			if(!IsAuthority() && !localpeercontrolled){
 				// Tick everything to do the sounds and effects, then go back
 				Serializer olddata;
 				object->Serialize(Serializer::WRITE, olddata);
 				//LoadSnapshot(*data, false);
 				//replaying = true;
-				//object->oldx = object->x;
-				//object->oldy = object->y;
+				object->oldx = object->x;
+				object->oldy = object->y;
 				object->Tick(*this);
 				object->lasttick = tickcount;
 				//replaying = false;
 				object->Serialize(Serializer::READ, olddata);
 				//
-			}
+			}*/
 		}
 	}
 	DestroyMarkedObjects();
@@ -254,8 +259,10 @@ void World::DoNetwork_Authority(void){
 							if(dedicatedserver.active){
 								lobby.GetUserInfo(newpeer->accountid);
 								if(newpeer->accountid == dedicatedserver.accountid){
+									printf("host connected\n");
 									newpeer->ishost = true;
 									newpeer->gameinfoloaded = true;
+									newpeer->mapdownloaded = true;
 								}
 							}
 							response.PutBit(true);
@@ -405,9 +412,43 @@ void World::DoNetwork_Authority(void){
 					}
 				}
 			}break;
-			case MSG_BUY:{
+			case MSG_STATION:{
 				if(peer){
+					Uint8 subcode;
+					data.Get(subcode);
 					Uint8 id;
+					data.Get(id);
+					switch(subcode){
+						case STA_BUY:{
+							data.Get(id);
+							Player * player = GetPeerPlayer(peer->id);
+							if(player){
+								player->BuyItem(*this, id);
+							}
+							if(replay.IsRecording()){
+								replay.WriteStation(peer->id, Replay::STA_BUY, id);
+							}
+						}break;
+						case STA_REPAIR:{
+							Player * player = GetPeerPlayer(peer->id);
+							if(player){
+								player->RepairItem(*this, id);
+							}
+							if(replay.IsRecording()){
+								replay.WriteStation(peer->id, Replay::STA_REPAIR, id);
+							}
+						}break;
+						case STA_VIRUS:{
+							Player * player = GetPeerPlayer(peer->id);
+							if(player){
+								player->VirusItem(*this, id);
+							}
+							if(replay.IsRecording()){
+								replay.WriteStation(peer->id, Replay::STA_VIRUS, id);
+							}
+						}break;
+					}
+					/*Uint8 id;
 					data.Get(id);
 					Player * player = GetPeerPlayer(peer->id);
 					if(player){
@@ -415,10 +456,10 @@ void World::DoNetwork_Authority(void){
 					}
 					if(replay.IsRecording()){
 						replay.WriteStation(peer->id, Replay::STA_BUY, id);
-					}
+					}*/
 				}
 			}break;
-			case MSG_REPAIR:{
+			/*case MSG_REPAIR:{
 				if(peer){
 					Uint8 id;
 					data.Get(id);
@@ -443,7 +484,7 @@ void World::DoNetwork_Authority(void){
 						replay.WriteStation(peer->id, Replay::STA_VIRUS, id);
 					}
 				}
-			}break;
+			}break;*/
 			case MSG_CHANGETEAM:{
 				if(peer && gameplaystate == INLOBBY){
 					ChangeTeam(peer->id);
@@ -459,6 +500,47 @@ void World::DoNetwork_Authority(void){
 					SetTech(peer->id, techchoices);
 					if(replay.IsRecording()){
 						replay.WriteSetTech(peer->id, techchoices);
+					}
+				}
+			}break;
+			case MSG_EXISTS:{
+				if(peer){
+					Serializer response;
+					Uint8 code = MSG_REMOVE;
+					response.Put(code);
+					while(data.MoreBytesToRead()){
+						Uint16 objectid;
+						data.Get(objectid);
+						if(!GetObjectFromId(objectid)){
+							response.Put(objectid);
+						}
+					}
+					SendPacket(peer, response.data, response.BitsToBytes(response.offset));
+				}
+			}break;
+			case MSG_MAP:{
+				if(peer){
+					Uint8 subcode;
+					data.Get(subcode);
+					switch(subcode){
+						case MAP_DOWNLOADED:{
+							peer->mapdownloaded = true;
+							SendPeerList();
+						}break;
+						case MAP_GETCHUNK:{
+							Uint32 offset;
+							data.Get(offset);
+							PutMapChunk(offset, *peer);
+						}break;
+						case MAP_PUTCHUNK:{
+							if(peer->ishost){
+								Uint32 offset;
+								data.Get(offset);
+								Uint32 size;
+								data.Get(size);
+								StoreMapChunk((unsigned char *)&data.data[data.BitsToBytes(data.readoffset)], offset, size);
+							}
+						}break;
 					}
 				}
 			}break;
@@ -551,6 +633,7 @@ void World::DoNetwork_Replica(void){
 				data.Get(pingid);
 				if(pingid == lastpingid){
 					pingtime = SDL_GetTicks() - lastpingsent;
+					pinghistory[lastpingid % (sizeof(pinghistory) / sizeof(int))] = pingtime;
 				}
 			}break;
 			case MSG_GAMEINFO:{
@@ -558,10 +641,11 @@ void World::DoNetwork_Replica(void){
 					printf("Received MSG_GAMEINFO\n");
 					gameinfo.Serialize(Serializer::READ, data);
 					printf("password %s\n", gameinfo.password);
-					Serializer response;
+					SendGameInfoLoaded();
+					/*Serializer response;
 					Uint8 code = MSG_GAMEINFO;
 					response.Put(code);
-					SendPacket(GetAuthorityPeer(), response.data, response.BitsToBytes(response.offset));
+					SendPacket(GetAuthorityPeer(), response.data, response.BitsToBytes(response.offset));*/
 				}
 			}break;
 			case MSG_CHAT:{
@@ -596,6 +680,7 @@ void World::DoNetwork_Replica(void){
 				strcpy(message, &data.data[data.BitsToBytes(data.readoffset)]);
 				Uint8 time = data.data[data.BitsToBytes(data.readoffset) + strlen(message) + 1];
 				Uint8 type = data.data[data.BitsToBytes(data.readoffset) + strlen(message) + 1 + 1];
+				printf("GOT MSG_MESSAGE %s %d %d\n", message, time, type);
 				ShowMessage(message, time, type);
 			}break;
 			case MSG_STATS:{
@@ -635,6 +720,41 @@ void World::DoNetwork_Replica(void){
 					char * name = &data.data[data.BitsToBytes(data.readoffset) + 1];
 					Audio::GetInstance().Play(resources.soundbank[name], volume);
 					//printf("MSG_SOUND %d %s\n", volume, name);
+				}
+			}break;
+			case MSG_REMOVE:{
+				if(peer){
+					while(data.MoreBytesToRead()){
+						Uint16 objectid;
+						data.Get(objectid);
+						Object * object = GetObjectFromId(objectid);
+						if(object){
+							MarkDestroyObject(objectid);
+							//printf("DELETED %d\n", objectid);
+						}
+					}
+				}
+			}break;
+			case MSG_MAP:{
+				//printf("MSG_MAP received\n");
+				if(peer){
+					Uint8 subcode;
+					data.Get(subcode);
+					//printf("%d\n", subcode);
+					switch(subcode){
+						case MAP_GETCHUNK:{
+							Uint32 offset;
+							data.Get(offset);
+							PutMapChunk(offset, *peer);
+						}break;
+						case MAP_PUTCHUNK:{
+							Uint32 offset;
+							data.Get(offset);
+							Uint32 size;
+							data.Get(size);
+							StoreMapChunk((unsigned char *)&data.data[data.BitsToBytes(data.readoffset)], offset, size);
+						}break;
+					}
 				}
 			}break;
 		}
@@ -748,10 +868,10 @@ bool World::ProcessInputQueue(Peer & peer){
 			for(std::list<Uint16>::iterator i = peer.controlledlist.begin(); i != peer.controlledlist.end(); i++){
 				Object * object = GetObjectFromId((*i));
 				if(object){
-					if(!replaying){
+					//if(!replaying){
 						object->oldx = object->x;
 						object->oldy = object->y;
-					}
+					//}
 					object->HandleInput(peer.input);
 					object->Tick(*this);
 					object->lasttick = tickcount;
@@ -766,99 +886,120 @@ bool World::ProcessInputQueue(Peer & peer){
 	return false;
 }
 
-bool World::ProcessSnapshotQueue(void){
-	bool ran = false;
-	bool shortenqueue = false;
-	if(snapshotqueue.size() >= snapshotqueuemaxsize){
-		shortenqueue = true;
+void World::ProcessSnapshotQueue(void){
+	if(!peerlist[localpeerid]){
+		return;
 	}
-	if(snapshotqueue.size() >= snapshotqueueminsize){
-		ran = true;
-		do{
+	int maxruns = 1;
+	if(snapshotqueue.size() > snapshotqueuemaxsize){
+		maxruns = 2;
+	}
+	if(snapshotqueue.size() == 0){
+		if(snapshotqueuemaxsize < 4){
+			snapshotqueuemaxsize++;
+		}
+	}
+	if(tickcount - lastsnapshotqueueadjust > 73){
+		if(snapshotqueuemaxsize - snapshotqueueminsize > 1){
+			snapshotqueuemaxsize--;
+			lastsnapshotqueueadjust = tickcount;
+		}
+	}
+	if(snapshotqueue.size() < snapshotqueueminsize){
+		return;
+	}
+	snapshotqueue.sort(CompareSnapshot);
+	for(int k = 0; k < maxruns; k++){
+		if(snapshotqueue.size() > 0){
 			Serializer * data = snapshotqueue.front();
+			unsigned int oldreadoffset = data->readoffset;
 			Uint32 tick;
 			data->Get(tick);
 			Uint32 ourtick;
 			data->Get(ourtick);
-			unsigned int readoffset = data->readoffset;
+			unsigned int readoffsetbeforedelta = data->readoffset;
 			Uint32 deltatick;
 			data->Get(deltatick);
-			data->readoffset = readoffset;
-			if(peerlist[localpeerid]){
-				Serializer ** deltasnapshotptr = &oldsnapshots[localpeerid][deltatick % maxoldsnapshots];
-				if(tick > peerlist[localpeerid]->lasttick){
-					//printf("deltatick: %d, newtick: %d, ourtick: %d, localtick: %d, replaying %d, ticks queue size:%d\n", deltatick, tick, ourtick, peerlist[localpeerid]->lasttick, replayticks, snapshotqueue.size());
-					if(DELTAENABLED && *deltasnapshotptr && tick - deltatick < maxoldsnapshots){
-						LoadSnapshot(*data, true, *deltasnapshotptr);
-					}else{
-						LoadSnapshot(*data, true);
-					}
-					
-					Serializer ** newsnapshotptr = &oldsnapshots[localpeerid][tick % maxoldsnapshots];
-					if(!*newsnapshotptr){
-						*newsnapshotptr = new Serializer;
-					}
-					(*newsnapshotptr)->offset = 0;
-					SaveSnapshot(**newsnapshotptr, localpeerid);
-					
-					TickObjects();
-					
-					// Perform client side predication
-					int replayticks = tickcount - ourtick - 1;
-					if(replayticks < maxlocalinputhistory - 1){
-						for(int i = replayticks; i > 0; i--){
-							for(std::list<Uint16>::iterator it = peerlist[localpeerid]->controlledlist.begin(); it != peerlist[localpeerid]->controlledlist.end(); it++){
-								Object * object = GetObjectFromId((*it));
-								if(object){
-									// set the oldinput
-									if(object->type == ObjectTypes::PLAYER){
-										Player * player = (Player *)object;
-										player->oldinput = localinputhistory[(tickcount - i - 1) % maxlocalinputhistory];
-									}
-									//
-									object->HandleInput(localinputhistory[(tickcount - i) % maxlocalinputhistory]);
-									object->oldx = object->x;
-									object->oldy = object->y;
-									replaying = true;
-									audio.enabled = false;
-									object->Tick(*this);
-									object->lasttick = tickcount;
-									audio.enabled = true;
-									replaying = false;
-									// update surveillance monitors that are following the clientside predicted player
-									for(std::vector<Uint16>::iterator it = objectsbytype[ObjectTypes::SURVEILLANCEMONITOR].begin(); it != objectsbytype[ObjectTypes::SURVEILLANCEMONITOR].end(); it++){
-										SurveillanceMonitor * surveillancemonitor = static_cast<SurveillanceMonitor *>(GetObjectFromId(*it));
-										if(surveillancemonitor->objectfollowing == object->id){
-											surveillancemonitor->Tick(*this);
-										}
-									}
-									//
-								}
-							}
-						}
-					}
-					//
-					peerlist[localpeerid]->lasttick = tick;
-				}else
-				if(tick < peerlist[localpeerid]->lasttick){
-					/*Serializer olddata;
-					SaveSnapshot(olddata, localpeerid);
-					LoadSnapshot(*data, false);
-					replaying = true;
-					TickObjects();
-					replaying = false;
-					LoadSnapshot(olddata, false);*/
-					printf("old snapshot %d\n", tick);
-				}else
-				if(tick == peerlist[localpeerid]->lasttick){
-					// this shouldnt happen
-				}
+			data->readoffset = readoffsetbeforedelta;
+			Serializer ** deltasnapshotptr = &oldsnapshots[localpeerid][deltatick % maxoldsnapshots];
+			
+			if(DELTAENABLED && *deltasnapshotptr && tick - deltatick < maxoldsnapshots){
+				LoadSnapshot(*data, true, *deltasnapshotptr);
+			}else{
+				LoadSnapshot(*data, true);
 			}
+			
+			Serializer ** newsnapshotptr = &oldsnapshots[localpeerid][tick % maxoldsnapshots];
+			if(!*newsnapshotptr){
+				*newsnapshotptr = new Serializer;
+			}
+			(*newsnapshotptr)->offset = 0;
+			SaveSnapshot(**newsnapshotptr, localpeerid);
+			
+			TickObjects();
+			
+			if(tick > peerlist[localpeerid]->lasttick){
+				peerlist[localpeerid]->lasttick = tick;
+				ClientSidePredict(ourtick);
+			}
+
+			data->readoffset = oldreadoffset;
 			delete data;
 			snapshotqueue.pop_front();
-		}while(shortenqueue && snapshotqueue.size() > snapshotqueueminsize);
+		}
 	}
-	return ran;
+}
+
+void World::ClientSidePredict(Uint32 ourtick){
+	// Perform client side predication
+	int replayticks = tickcount - ourtick - 1;
+	if(replayticks < maxlocalinputhistory - 1){
+		for(int i = replayticks; i > 0; i--){
+			for(std::list<Uint16>::iterator it = peerlist[localpeerid]->controlledlist.begin(); it != peerlist[localpeerid]->controlledlist.end(); it++){
+				Object * object = GetObjectFromId((*it));
+				if(object){
+					// set the oldinput
+					if(object->type == ObjectTypes::PLAYER){
+						Player * player = (Player *)object;
+						player->oldinput = localinputhistory[(tickcount - i - 1) % maxlocalinputhistory];
+					}
+					//
+					object->HandleInput(localinputhistory[(tickcount - i) % maxlocalinputhistory]);
+					object->oldx = object->x;
+					object->oldy = object->y;
+					replaying = true;
+					audio.enabled = false;
+					object->Tick(*this);
+					object->lasttick = tickcount;
+					audio.enabled = true;
+					replaying = false;
+				}
+			}
+		}
+	}
+	//
+}
+
+void World::CheckExists(void){
+	Serializer data;
+	Uint8 code = MSG_EXISTS;
+	data.Put(code);
+	int count = 0;
+	Uint8 types[] = {ObjectTypes::PICKUP, ObjectTypes::FIXEDCANNON, ObjectTypes::DETONATOR};
+	// check for these objects, because they can get destroyed while we are not there, and they wont get deleted
+	for(int i = 0; i < sizeof(types) / sizeof(Uint8); i++){
+		for(std::vector<Uint16>::iterator it = objectsbytype[types[i]].begin(); it != objectsbytype[types[i]].end(); it++){
+			if(count >= 50){
+				break;
+			}
+			Object * object = GetObjectFromId(*it);
+			if(object && tickcount - object->lastsnapshottick > maxoldsnapshots){
+				data.Put((*it));
+				count++;
+			}
+		}
+	}
+	SendPacket(GetAuthorityPeer(), data.data, data.BitsToBytes(data.offset));
 }
 
 void World::ClearSnapshotQueue(void){
@@ -867,6 +1008,23 @@ void World::ClearSnapshotQueue(void){
 		delete data;
 	}
 	snapshotqueue.clear();
+}
+
+void World::ClearMapData(void){
+	if(currentmapdata){
+		delete[] currentmapdata;
+	}
+	currentmapdata = 0;
+	currentmapdatalength = 0;
+	currentmapdatamax = 0;
+	currentmapdataprocessed = false;
+	currentmapdataend = false;
+}
+
+void World::AllocateMapData(int size){
+	ClearMapData();
+	currentmapdata = new unsigned char[size];
+	currentmapdatamax = size;
 }
 
 void World::ReadPeerList(Serializer & data){
@@ -904,7 +1062,7 @@ void World::SendPacket(Peer * peer, char * data, unsigned int size){
 		return;
 	}
 	if(peer){
-		if(lagsimulator.Active()){
+		if(lagsimulator.Active() && gameplaystate == INGAME){
 			lagsimulator.QueuePacket(peer, data, size);
 		}else{
 			sockaddr_in recvaddr;
@@ -1187,23 +1345,26 @@ void World::LoadBuyableItems(void){
 }
 
 void World::BuyItem(Uint8 id){
-	char msg[2];
-	msg[0] = MSG_BUY;
-	msg[1] = id;
+	char msg[3];
+	msg[0] = MSG_STATION;
+	msg[1] = STA_BUY;
+	msg[2] = id;
 	SendPacket(GetAuthorityPeer(), msg, sizeof(msg));
 }
 
 void World::RepairItem(Uint8 id){
-	char msg[2];
-	msg[0] = MSG_REPAIR;
-	msg[1] = id;
+	char msg[3];
+	msg[0] = MSG_STATION;
+	msg[1] = STA_REPAIR;
+	msg[2] = id;
 	SendPacket(GetAuthorityPeer(), msg, sizeof(msg));
 }
 
 void World::VirusItem(Uint8 id){
-	char msg[2];
-	msg[0] = MSG_VIRUS;
-	msg[1] = id;
+	char msg[3];
+	msg[0] = MSG_STATION;
+	msg[1] = STA_VIRUS;
+	msg[2] = id;
 	SendPacket(GetAuthorityPeer(), msg, sizeof(msg));
 }
 
@@ -1302,12 +1463,25 @@ bool World::CompareTeamByNumber(Team * team1, Team * team2){
 	return(team1->number < team2->number);
 }
 
+bool World::CompareSnapshot(Serializer * snapshot1, Serializer * snapshot2){
+	unsigned int oldreadoffset = snapshot1->readoffset;
+	Uint32 tick1;
+	snapshot1->Get(tick1);
+	snapshot1->readoffset = oldreadoffset;
+	oldreadoffset = snapshot2->readoffset;
+	Uint32 tick2;
+	snapshot2->Get(tick2);
+	snapshot2->readoffset = oldreadoffset;
+	return(tick1 < tick2);
+}
+
 bool World::Listen(unsigned short port){
 	if(!boundport){
 		if(!Bind(port)){
 			return false;
 		}
 	}
+	AllocateMapData(65535);
 	SwitchToMode(AUTHORITY);
 	state = LISTENING;
 	Peer * authoritypeerptr = GetAuthorityPeer();
@@ -1334,6 +1508,7 @@ unsigned short World::Bind(unsigned short port){
 }
 
 void World::Connect(Uint8 agency, Uint32 accountid, const char * password){
+	AllocateMapData(65535);
 	sockaddr_in addr;
 	addr.sin_addr.s_addr = htonl(GetAuthorityPeer()->ip);
 	printf("sending connect request with agency %d, accountid %d to %s:%d\n", agency, accountid, inet_ntoa(addr.sin_addr), GetAuthorityPeer()->port);
@@ -1357,6 +1532,7 @@ void World::Connect(Uint8 agency, Uint32 accountid, const char * password){
 
 void World::Disconnect(void){
 	ClearSnapshotQueue();
+	ClearMapData();
 	state = IDLE;
 	char data[1];
 	data[0] = MSG_DISCONNECT;
@@ -1400,10 +1576,10 @@ void World::SendInput(void){
 		for(std::list<Uint16>::iterator i = peer->controlledlist.begin(); i != peer->controlledlist.end(); i++){
 			Object * object = GetObjectFromId((*i));
 			if(object){
-				if(!replaying){
+				//if(!replaying){
 					object->oldx = object->x;
 					object->oldy = object->y;
-				}
+				//}
 				object->HandleInput(peer->input);
 				object->Tick(*this);
 				object->lasttick = tickcount;
@@ -1541,6 +1717,12 @@ void World::SendGameInfo(Uint8 peerid){
 	}
 }
 
+void World::SendGameInfoLoaded(void){
+	char data[1];
+	data[0] = MSG_GAMEINFO;
+	SendPacket(GetAuthorityPeer(), data, sizeof(data));
+}
+
 void World::SendReady(void){
 	Serializer data;
 	Uint8 code = MSG_READY;
@@ -1568,6 +1750,20 @@ bool World::AllPeersLoadedGameInfo(void){
 		Peer * peer = peerlist[i];
 		if(peer){
 			if(!peer->gameinfoloaded){
+				allloaded = false;
+				break;
+			}
+		}
+	}
+	return allloaded;
+}
+
+bool World::AllPeersDownloadedMap(void){
+	bool allloaded = true;
+	for(int i = 0; i < maxpeers; i++){
+		Peer * peer = peerlist[i];
+		if(peer){
+			if(!peer->mapdownloaded){
 				allloaded = false;
 				break;
 			}
@@ -1627,9 +1823,6 @@ void World::Illuminate(void){
 }
 
 void World::ShowMessage(const char * message, Uint8 time, Uint8 type, bool networked, Peer * peer){
-	if(messagetype >= 10){ // Skip any messages after end of game messages, so it is not replaced
-		return;
-	}
 	if(networked && IsAuthority()){
 		int msgsize = 1 + strlen(message) + 1 + 1 + 1;
 		char * msg = new char[msgsize];
@@ -1650,6 +1843,9 @@ void World::ShowMessage(const char * message, Uint8 time, Uint8 type, bool netwo
 		delete[] msg;
 	}
 	if(!networked || (IsAuthority() && !peer) || (IsAuthority() && peer && peer->id == localpeerid)){
+		if(messagetype >= 10){ // Skip any messages after end of game messages, so it is not replaced
+			return;
+		}
 		strncpy(World::message, message, sizeof(World::message) - 1);
 		World::message[sizeof(World::message) - 1] = 0;
 		message_i = 1;
@@ -1759,6 +1955,25 @@ void World::KillByGovt(Peer & peer){
 	}
 }
 
+bool World::IsSecurity(Object & object){
+	if(object.type == ObjectTypes::WALLDEFENSE){
+		WallDefense & walldefense = static_cast<WallDefense &>(object);
+		if(!walldefense.teamid){
+			return true;
+		}
+	}else
+	if(object.type == ObjectTypes::ROBOT){
+		Robot & robot = static_cast<Robot &>(object);
+		if(!robot.virusplanter){
+			return true;
+		}
+	}else
+	if(object.type == ObjectTypes::GUARD){
+		return true;
+	}
+	return false;
+}
+
 void World::Explode(Object & object, Uint8 suitcolor, float hitx){
 	object.draw = false;
 	for(int i = 0; i < 6; i++){
@@ -1806,11 +2021,85 @@ int World::TechSlotsUsed(Peer & peer){
 	return slotsused;
 }
 
+void World::SendMapDownloaded(void){
+	if(IsAuthority()){
+		peerlist[localpeerid]->mapdownloaded = true;
+		SendPeerList();
+	}else{
+		char data[2];
+		data[0] = MSG_MAP;
+		data[1] = MAP_DOWNLOADED;
+		SendPacket(GetAuthorityPeer(), data, sizeof(data));
+	}
+	//printf("sent MAP_DOWNLOADED\n");
+}
+
+void World::PutMapChunk(Uint32 offset, Peer & peer){
+	const Uint32 maxchunksize = 1024;
+	Uint32 size = maxchunksize;
+	if(size + offset > currentmapdatalength){
+		if(offset >= currentmapdatalength){
+			size = 0;
+		}else{
+			size = currentmapdatalength - offset;
+		}
+	}
+	char data[1 + 1 + sizeof(Uint32) + sizeof(Uint32) + maxchunksize];
+	data[0] = MSG_MAP;
+	data[1] = MAP_PUTCHUNK;
+	*(Uint32 *)(&data[2]) = offset;
+	*(Uint32 *)(&data[2 + sizeof(Uint32)]) = size;
+	memcpy(&data[2 + sizeof(Uint32) + sizeof(Uint32)], &currentmapdata[offset], size);
+	SendPacket(&peer, data, sizeof(data));
+	//printf("sent MAP_PUTCHUNK %d %d\n", offset, size);
+}
+
+void World::GetMapChunk(Uint32 offset){
+	char data[1 + 1 + sizeof(Uint32)];
+	data[0] = MSG_MAP;
+	data[1] = MAP_GETCHUNK;
+	*(Uint32 *)(&data[2]) = offset;
+	if(IsAuthority()){
+		// get map chunk from host peer who has it already
+		for(int i = 0; i < maxpeers; i++){
+			Peer * peer = peerlist[i];
+			if(peer && peer->mapdownloaded){
+				SendPacket(peer, data, sizeof(data));
+				break;
+			}
+		}
+	}else{
+		SendPacket(GetAuthorityPeer(), data, sizeof(data));
+	}
+	//printf("sent MAP_GETCHUNK %d\n", offset);
+}
+
+void World::StoreMapChunk(unsigned char * data, Uint32 offset, Uint32 size){
+	//printf("StoreMapChunk %d %d\n", offset, size);
+	if(size == 0){
+		currentmapdataend = true;
+	}
+	if(offset + 1 > currentmapdatamax){
+		return;
+	}
+	if(size + offset > currentmapdatamax){
+		if(offset >= currentmapdatamax){
+			size = 0;
+		}else{
+			size = currentmapdatamax - offset;
+		}
+	}
+	memcpy(&currentmapdata[offset], data, size);
+	currentmapdatalength = offset + size;
+	currentmapdataprocessed = false;
+	//printf("stored map chunk %d %d\n", offset, size);
+}
+
 void World::SendPing(void){
 	Serializer data;
 	Uint8 code = MSG_PING;
 	data.Put(code);
-	lastpingid = rand();
+	lastpingid++;
 	data.Put(lastpingid);
 	SendPacket(GetAuthorityPeer(), data.data, data.BitsToBytes(data.offset));
 	lastpingsent = SDL_GetTicks();
@@ -1822,6 +2111,16 @@ int World::GetPingTime(void){
 	}else{
 		return 0;
 	}
+}
+
+int World::AveragePingJitter(void){
+	int average = 0;
+	for(int i = 0; i < sizeof(pinghistory) / sizeof(int); i++){
+		int jitter = abs(pinghistory[i] - pinghistory[(i - 1) % sizeof(pinghistory) / sizeof(int)]);
+		average += jitter;
+	}
+	average /= sizeof(pinghistory) / sizeof(int);
+	return average;
 }
 
 bool World::SecurityIDCanSpawn(Uint8 securityid){
@@ -2026,16 +2325,17 @@ void World::LoadSnapshot(Serializer & data, bool create, Serializer * delta, Uin
 			object = CreateObject(type, id);
 		}
 		if(object){
+			object->lastsnapshottick = tickcount;
 			if(object->type != type){
 				printf("OBJECT TYPE DOES NOT MATCH IN SNAPSHOT\n");
 				MarkDestroyObject(object->id);
 				data.readoffset += objecttypes.SerializedSize(type);
 			}else{
 				if(object->iscontrollable){
-					if(!replaying){
+					//if(!replaying){
 						object->oldx = object->x;
 						object->oldy = object->y;
-					}
+					//}
 				}
 				if(delta){
 					delta->readoffset = 0;

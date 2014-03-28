@@ -92,7 +92,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	
     chdir(path);
 #endif
-	
+
 	Game game;
 	if(!game.Load(cmdline)){
 #ifdef __ANDROID__

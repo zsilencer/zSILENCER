@@ -143,27 +143,36 @@ void RocketProjectile::Tick(World & world){
 			types.push_back(ObjectTypes::TECHSTATION);
 			Object * owner = world.GetObjectFromId(ownerid);
 			Uint16 teamid = 0;
-			switch(owner->type){
-				case ObjectTypes::PLAYER:{
-					Player * player = static_cast<Player *>(owner);
-					Team * team = player->GetTeam(world);
-					if(team){
-						teamid = team->id;
-					}
-				}break;
-				case ObjectTypes::ROBOT:{
-					Robot * robot = static_cast<Robot *>(owner);
-					teamid = robot->virusplanter;
-				}break;
+			bool issecurity = false;
+			if(owner){
+				switch(owner->type){
+					case ObjectTypes::PLAYER:{
+						Player * player = static_cast<Player *>(owner);
+						Team * team = player->GetTeam(world);
+						if(team){
+							teamid = team->id;
+						}
+					}break;
+					case ObjectTypes::ROBOT:{
+						Robot * robot = static_cast<Robot *>(owner);
+						teamid = robot->virusplanter;
+						issecurity = world.IsSecurity(*robot);
+					}break;
+					case ObjectTypes::GUARD:{
+						issecurity = true;
+					}break;
+				}
 			}
 			std::vector<Object *> objects = world.TestAABB(x - 30, y - 30, x + 30, y + 30, types, ownerid, teamid);
 			for(std::vector<Object *>::iterator it = objects.begin(); it != objects.end(); it++){
 				if(!object || (object && (*it)->id != object->id)){
-					Object damageprojectile(ObjectTypes::ROCKETPROJECTILE);
-					damageprojectile.healthdamage = healthdamage;
-					damageprojectile.shielddamage = shielddamage;
-					damageprojectile.ownerid = ownerid;
-					(*it)->HandleHit(world, 50, 50, damageprojectile);
+					if(!issecurity || (issecurity && !world.IsSecurity(*(*it)))){ // prevents robots/rocket guards from doing slash damage to other security
+						Object damageprojectile(ObjectTypes::ROCKETPROJECTILE);
+						damageprojectile.healthdamage = healthdamage;
+						damageprojectile.shielddamage = shielddamage;
+						damageprojectile.ownerid = ownerid;
+						(*it)->HandleHit(world, 50, 50, damageprojectile);
+					}
 				}
 			}
 			xv = 0;

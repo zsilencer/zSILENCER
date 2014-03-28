@@ -1,4 +1,5 @@
 #include "sprite.h"
+#include "world.h"
 
 Sprite::Sprite(){
 	res_index = 0;
@@ -40,5 +41,21 @@ void Sprite::GetAABB(Resources & resources, int * x1, int * y1, int * x2, int * 
 		*x2 = x;
 		*y1 = y;
 		*y2 = y;
+	}
+}
+
+void Sprite::UpdateNudge(World & world, float frametime){
+	if(oldx == 0){
+		oldx = x;
+	}
+	if(oldy == 0){
+		oldy = y;
+	}
+	nudgex = (oldx - x) * frametime;
+	nudgey = (oldy - y) * frametime;
+	// stop objects from nudging back and forth when they havent been updated
+	if(world.tickcount - 1 > lasttick){
+		nudgex = 0;
+		nudgey = 0;
 	}
 }

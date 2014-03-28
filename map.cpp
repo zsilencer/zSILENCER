@@ -97,9 +97,7 @@ bool Map::LoadFile(const char * filename, World & world, Team * team){
 	Uint32 minimapcompressedsize = 0;
 	Uint8 minimapcompressed[172 * 62];
 	Uint32 levelsize = 0;
-	Uint8 levelcompressed[20000];
-	const unsigned int maxlevelsize = 300000;
-	Uint8 level[maxlevelsize];
+	Uint8 levelcompressed[65535];
 	Uint32 numactors = 0;
 	Uint32 numplatforms = 0;
 	Uint16 width;
@@ -130,7 +128,6 @@ bool Map::LoadFile(const char * filename, World & world, Team * team){
 	unsigned long minimapsizeuncompressed = sizeof(minimap.pixels);
 	if(!SDL_RWread(file, &levelsize, 4, 1)){ return false; }
 	levelsize = SDL_SwapLE32(levelsize);
-	unsigned long levelsizeuncompressed = maxlevelsize;
 	if(!SDL_RWread(file, levelcompressed, 1, levelsize)){ return false; }
 	SDL_RWclose(file);
 	
@@ -176,7 +173,22 @@ bool Map::LoadFile(const char * filename, World & world, Team * team){
 		yoffset = Map::height + 10 + (team->number * (26));
 	}
 	
-	if(uncompress(level, &levelsizeuncompressed, levelcompressed, levelsize) != Z_OK){
+	int result;
+	unsigned int maxlevelsize = 0;
+	Uint8 * level;
+	do{
+		maxlevelsize += 100000;
+		level = new Uint8[maxlevelsize];
+		unsigned long levelsizeuncompressed = maxlevelsize;
+		
+		result = uncompress(level, &levelsizeuncompressed, levelcompressed, levelsize);
+
+		if(result != Z_OK){
+			delete[] level;
+		}
+	}while(result == Z_BUF_ERROR);
+	
+	if(result != Z_OK){
 		return false;
 	}
 	

@@ -98,22 +98,6 @@ void Team::Tick(World & world){
 			// game won
 			if(!world.winningteamid){
 				world.winningteamid = id;
-				bool isourteam = false;
-				for(int i = 0; i < numpeers; i++){
-					Peer * peer = world.peerlist[peers[i]];
-					if(peer){
-						if(peer->id == world.localpeerid){
-							isourteam = true;
-						}
-					}
-				}
-				Uint8 type = 10;
-				char fs[64];
-				strcpy(fs, "MISSION SUCCESS\n");
-				if(!isourteam){
-					strcpy(fs, "MISSION FAILED\n");
-					type = 11;
-				}
 				for(std::list<Object *>::iterator it = world.objectlist.begin(); it != world.objectlist.end(); it++){
 					Object * object = *it;
 					if(object->type == ObjectTypes::PLAYER){
@@ -129,20 +113,47 @@ void Team::Tick(World & world){
 						}
 					}
 				}
-				char message[256];
-				sprintf(message, "%sAll secrets retrieved\nby %s agents:\n\n", fs, GetAgencyName());
-				for(int i = 0; i < numpeers; i++){
-					Peer * peer = world.peerlist[peers[i]];
+				for(int i = 0; i < world.maxpeers; i++){
+					Peer * peer = world.peerlist[i];
 					if(peer){
-						User * user = world.lobby.GetUserInfo(peer->accountid);
-						strcat(message, user->name);
-						strcat(message, "\n");
+						Uint8 type = 10;
+						char fs[64];
+						strcpy(fs, "MISSION SUCCESS\n");
+						bool isourteam = false;
+						for(int i = 0; i < numpeers; i++){
+							Peer * peer2 = world.peerlist[peers[i]];
+							if(peer2){
+								if(peer2->id == peer->id){
+									isourteam = true;
+								}
+							}
+						}
+						if(!isourteam){
+							strcpy(fs, "MISSION FAILED\n");
+							type = 11;
+						}
+						char message[256];
+						sprintf(message, "%sAll secrets retrieved\nby %s agents:\n\n", fs, GetAgencyName());
+						for(int i = 0; i < numpeers; i++){
+							Peer * peer2 = world.peerlist[peers[i]];
+							if(peer2){
+								User * user = world.lobby.GetUserInfo(peer2->accountid);
+								strcat(message, user->name);
+								strcat(message, "\n");
+							}
+						}
+						world.ShowMessage(message, 255, type, true, peer);
 					}
 				}
-				world.ShowMessage(message, 255, type);
 			}
 		}
 		secretdelivered = 0;
+	}
+	if(secrets >= 3){
+		// bug fix for when secretdelivered packet is lost
+		if(!world.winningteamid){
+			world.winningteamid = id;
+		}
 	}
 	if(secretprogress >= 180 && oldsecretprogress > 0){
 		secretprogress = 0;
