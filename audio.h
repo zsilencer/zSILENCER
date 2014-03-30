@@ -25,7 +25,7 @@ public:
 	void SetVolume(int channel, int volume);
 	void Mute(int volume);
 	void Unmute(void);
-	void PlayMusic(Mix_Music * music);
+	bool PlayMusic(Mix_Music * music);
 	void StopMusic(void);
 	void PauseMusic(void);
 	void ResumeMusic(void);

@@ -56,12 +56,13 @@ World::World(bool mode) : lobby(this), lagsimulator(&sockethandle), audio(Audio:
 	snapshotqueuemaxsize = 2;
 	lastsnapshotqueueadjust = 0;
 	for(int i = 0; i < sizeof(pinghistory) / sizeof(int); i++){
-		pinghistory[i] = 100;
+		pinghistory[i] = 0;
 	}
 	lastpingid = 0;
 	currentmapdata = 0;
 	ClearMapData();
 	showteamcolors = false;
+	memset(topmessage, 0, sizeof(topmessage));
 }
 
 World::~World(){
@@ -135,6 +136,9 @@ void World::Tick(void){
 		if(message_i >= messagetime){
 			message_i = 0;
 		}
+	}
+	if(topmessage_i){
+		topmessage_i++;
 	}
 	if(showchat_i){
 		showchat_i--;
@@ -1877,6 +1881,14 @@ void World::ShowStatus(const char * status, Uint8 color, bool networked, Peer * 
 	}
 	if(!networked || (IsAuthority() && !peer) || (IsAuthority() && peer && peer->id == localpeerid)){
 		PushStatusString(newstatus);
+	}
+}
+
+void World::ShowTopMessage(const char * message){
+	if(gameplaystate == INGAME){
+		memset(topmessage, 0, sizeof(topmessage));
+		strncpy(topmessage, message, sizeof(topmessage) - 1);
+		topmessage_i = 1;
 	}
 }
 

@@ -56,6 +56,8 @@ private:
 	Interface * CreateGameTechInterface(void);
 	Interface * CreateGameSummaryInterface(Stats & stats, Uint8 agency);
 	Interface * CreateModalDialog(const char * message, bool ok = true);
+	Interface * CreateMapPreview(const char * filename);
+	void PlayMusic(Mix_Music * music);
 	void DestroyModalDialog(void);
 	Interface * CreatePasswordDialog(void);
 	bool GoBack(void);
@@ -69,6 +71,7 @@ private:
 	Uint16 gamesummaryinterface;
 	Uint16 modalinterface;
 	Uint16 passwordinterface;
+	Uint16 mappreviewinterface;
 	Overlay * keynameoverlay[6];
 	Button * c1button[6];
 	Button * cobutton[6];
@@ -77,6 +80,7 @@ private:
 	void ProcessLobbyConnectInterface(Interface * iface);
 	bool ProcessLobbyInterface(Interface * iface);
 	void ProcessGameSummaryInterface(Interface * iface);
+	void UpdateLobbyMapName(const char * name);
 	void UpdateTechInterface(void);
 	void UpdateGameSummaryInterface(void);
 	void AddSummaryLine(TextBox & textbox, const char * name, Uint32 value, bool percentage = false);
@@ -148,6 +152,9 @@ private:
 	bool interfaceenterfix;
 	Uint32 lastmapchunkrequest;
 	bool mapexistchecked;
+	int selectedmap;
+	Uint32 lastmusicplaytime;
+	char currentmusictrack[256];
 };
 
 #endif

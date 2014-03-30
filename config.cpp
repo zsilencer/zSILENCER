@@ -61,38 +61,39 @@ bool Config::Load(void){
 			char * variable = strtok(line, "=");
 			char * data = strtok(NULL, "=");
 			if(variable && data){
-				if(CompareString(variable, "fullscreen")){ if(atoi(data) == 0){ fullscreen = false; }else{ fullscreen = true; } }
-				if(CompareString(variable, "scalefilter")){ if(atoi(data) == 0){ scalefilter = false; }else{ scalefilter = true; } }
-				if(CompareString(variable, "teamcolors")){ if(atoi(data) == 0){ teamcolors = false; }else{ teamcolors = true; } }
-				if(CompareString(variable, "music")){ if(atoi(data) == 0){ music = false; }else{ music = true; } }
-				if(CompareString(variable, "musicvolume")){ musicvolume = atoi(data); }
-				if(CompareString(variable, "defaultagency")){ defaultagency = atoi(data); }
-				if(CompareString(variable, "defaultgamename")){ ReadString(data, defaultgamename, sizeof(defaultgamename)); }
-				if(CompareString(variable, "defaulttechchoices0")){ defaulttechchoices[0] = atoi(data); }
-				if(CompareString(variable, "defaulttechchoices1")){ defaulttechchoices[1] = atoi(data); }
-				if(CompareString(variable, "defaulttechchoices2")){ defaulttechchoices[2] = atoi(data); }
-				if(CompareString(variable, "defaulttechchoices3")){ defaulttechchoices[3] = atoi(data); }
-				if(CompareString(variable, "defaulttechchoices4")){ defaulttechchoices[4] = atoi(data); }
-				if(CompareString(variable, "keymoveup")){ ReadKey(data, &keymoveupbinding, &keymoveupoperator); }
-				if(CompareString(variable, "keymovedown")){ ReadKey(data, &keymovedownbinding, &keymovedownoperator); }
-				if(CompareString(variable, "keymoveleft")){ ReadKey(data, &keymoveleftbinding, &keymoveleftoperator); }
-				if(CompareString(variable, "keymoveright")){ ReadKey(data, &keymoverightbinding, &keymoverightoperator); }
-				if(CompareString(variable, "keylookupleft")){ ReadKey(data, &keylookupleftbinding, &keylookupleftoperator); }
-				if(CompareString(variable, "keylookupright")){ ReadKey(data, &keylookuprightbinding, &keylookuprightoperator); }
-				if(CompareString(variable, "keylookdownleft")){ ReadKey(data, &keylookdownleftbinding, &keylookdownleftoperator); }
-				if(CompareString(variable, "keylookdownright")){ ReadKey(data, &keylookdownrightbinding, &keylookdownrightoperator); }
-				if(CompareString(variable, "keynextinv")){ ReadKey(data, &keynextinvbinding, &keynextinvoperator); }
-				if(CompareString(variable, "keynextcam")){ ReadKey(data, &keynextcambinding, &keynextcamoperator); }
-				if(CompareString(variable, "keyprevcam")){ ReadKey(data, &keyprevcambinding, &keyprevcamoperator); }
-				if(CompareString(variable, "keydetonate")){ ReadKey(data, &keydetonatebinding, &keydetonateoperator); }
-				if(CompareString(variable, "keyjump")){ ReadKey(data, &keyjumpbinding, &keyjumpoperator); }
-				if(CompareString(variable, "keyjetpack")){ ReadKey(data, &keyjetpackbinding, &keyjetpackoperator); }
-				if(CompareString(variable, "keyactivate")){ ReadKey(data, &keyactivatebinding, &keyactivateoperator); }
-				if(CompareString(variable, "keyuse")){ ReadKey(data, &keyusebinding, &keyuseoperator); }
-				if(CompareString(variable, "keyfire")){ ReadKey(data, &keyfirebinding, &keyfireoperator); }
-				if(CompareString(variable, "keychat")){ ReadKey(data, &keychatbinding, &keychatoperator); }
-				if(CompareString(variable, "keydisguise")){ ReadKey(data, &keydisguisebinding, &keydisguiseoperator); }
-				if(CompareString(variable, "keynextweapon")){ ReadKey(data, &keynextweaponbinding, &keynextweaponoperator); }
+				char vardata[64];
+				ReadString(variable, vardata, sizeof(vardata)); if(CompareString(vardata, "fullscreen")){ if(atoi(data) == 0){ fullscreen = false; }else{ fullscreen = true; } }
+				ReadString(variable, vardata, sizeof(vardata)); if(CompareString(vardata, "scalefilter")){ if(atoi(data) == 0){ scalefilter = false; }else{ scalefilter = true; } }
+				ReadString(variable, vardata, sizeof(vardata)); if(CompareString(vardata, "teamcolors")){ if(atoi(data) == 0){ teamcolors = false; }else{ teamcolors = true; } }
+				ReadString(variable, vardata, sizeof(vardata)); if(CompareString(vardata, "music")){ if(atoi(data) == 0){ music = false; }else{ music = true; } }
+				ReadString(variable, vardata, sizeof(vardata)); if(CompareString(vardata, "musicvolume")){ musicvolume = atoi(data); }
+				ReadString(variable, vardata, sizeof(vardata)); if(CompareString(vardata, "defaultagency")){ defaultagency = atoi(data); }
+				ReadString(variable, vardata, sizeof(vardata)); if(CompareString(vardata, "defaultgamename")){ ReadString(data, defaultgamename, sizeof(defaultgamename)); }
+				ReadString(variable, vardata, sizeof(vardata)); if(CompareString(vardata, "defaulttechchoices0")){ defaulttechchoices[0] = atoi(data); }
+				ReadString(variable, vardata, sizeof(vardata)); if(CompareString(vardata, "defaulttechchoices1")){ defaulttechchoices[1] = atoi(data); }
+				ReadString(variable, vardata, sizeof(vardata)); if(CompareString(vardata, "defaulttechchoices2")){ defaulttechchoices[2] = atoi(data); }
+				ReadString(variable, vardata, sizeof(vardata)); if(CompareString(vardata, "defaulttechchoices3")){ defaulttechchoices[3] = atoi(data); }
+				ReadString(variable, vardata, sizeof(vardata)); if(CompareString(vardata, "defaulttechchoices4")){ defaulttechchoices[4] = atoi(data); }
+				ReadString(variable, vardata, sizeof(vardata)); if(CompareString(vardata, "keymoveup")){ ReadKey(data, &keymoveupbinding, &keymoveupoperator); }
+				ReadString(variable, vardata, sizeof(vardata)); if(CompareString(vardata, "keymovedown")){ ReadKey(data, &keymovedownbinding, &keymovedownoperator); }
+				ReadString(variable, vardata, sizeof(vardata)); if(CompareString(vardata, "keymoveleft")){ ReadKey(data, &keymoveleftbinding, &keymoveleftoperator); }
+				ReadString(variable, vardata, sizeof(vardata)); if(CompareString(vardata, "keymoveright")){ ReadKey(data, &keymoverightbinding, &keymoverightoperator); }
+				ReadString(variable, vardata, sizeof(vardata)); if(CompareString(vardata, "keylookupleft")){ ReadKey(data, &keylookupleftbinding, &keylookupleftoperator); }
+				ReadString(variable, vardata, sizeof(vardata)); if(CompareString(vardata, "keylookupright")){ ReadKey(data, &keylookuprightbinding, &keylookuprightoperator); }
+				ReadString(variable, vardata, sizeof(vardata)); if(CompareString(vardata, "keylookdownleft")){ ReadKey(data, &keylookdownleftbinding, &keylookdownleftoperator); }
+				ReadString(variable, vardata, sizeof(vardata)); if(CompareString(vardata, "keylookdownright")){ ReadKey(data, &keylookdownrightbinding, &keylookdownrightoperator); }
+				ReadString(variable, vardata, sizeof(vardata)); if(CompareString(vardata, "keynextinv")){ ReadKey(data, &keynextinvbinding, &keynextinvoperator); }
+				ReadString(variable, vardata, sizeof(vardata)); if(CompareString(vardata, "keynextcam")){ ReadKey(data, &keynextcambinding, &keynextcamoperator); }
+				ReadString(variable, vardata, sizeof(vardata)); if(CompareString(vardata, "keyprevcam")){ ReadKey(data, &keyprevcambinding, &keyprevcamoperator); }
+				ReadString(variable, vardata, sizeof(vardata)); if(CompareString(vardata, "keydetonate")){ ReadKey(data, &keydetonatebinding, &keydetonateoperator); }
+				ReadString(variable, vardata, sizeof(vardata)); if(CompareString(vardata, "keyjump")){ ReadKey(data, &keyjumpbinding, &keyjumpoperator); }
+				ReadString(variable, vardata, sizeof(vardata)); if(CompareString(vardata, "keyjetpack")){ ReadKey(data, &keyjetpackbinding, &keyjetpackoperator); }
+				ReadString(variable, vardata, sizeof(vardata)); if(CompareString(vardata, "keyactivate")){ ReadKey(data, &keyactivatebinding, &keyactivateoperator); }
+				ReadString(variable, vardata, sizeof(vardata)); if(CompareString(vardata, "keyuse")){ ReadKey(data, &keyusebinding, &keyuseoperator); }
+				ReadString(variable, vardata, sizeof(vardata)); if(CompareString(vardata, "keyfire")){ ReadKey(data, &keyfirebinding, &keyfireoperator); }
+				ReadString(variable, vardata, sizeof(vardata)); if(CompareString(vardata, "keychat")){ ReadKey(data, &keychatbinding, &keychatoperator); }
+				ReadString(variable, vardata, sizeof(vardata)); if(CompareString(vardata, "keydisguise")){ ReadKey(data, &keydisguisebinding, &keydisguiseoperator); }
+				ReadString(variable, vardata, sizeof(vardata)); if(CompareString(vardata, "keynextweapon")){ ReadKey(data, &keynextweaponbinding, &keynextweaponoperator); }
 			}
 		}
 		SDL_RWclose(file);
@@ -176,11 +177,7 @@ bool Config::KeyIsPressed(const Uint8 * keyboardstate, SDL_Scancode keybindings[
 }
 
 bool Config::CompareString(const char * str1, const char * str2){
-	int minsize = strlen(str1);
-	if(strlen(str2) < minsize){
-		minsize = strlen(str2);
-	}
-	if(strncmp(str1, str2, minsize) == 0){
+	if(strcmp(str1, str2) == 0){
 		return true;
 	}
 	return false;
@@ -188,7 +185,7 @@ bool Config::CompareString(const char * str1, const char * str2){
 
 void Config::WriteKey(SDL_RWops * file, const char * variable, SDL_Scancode keybindings[2], bool keyoperator){
 	char line[256];
-	sprintf(line, "%s = %d %d %d\n", variable, keybindings[0], keyoperator, keybindings[1]);
+	sprintf(line, "%s = %d %d %d\r\n", variable, keybindings[0], keyoperator, keybindings[1]);
 	SDL_RWwrite(file, line, strlen(line), 1);
 }
 
@@ -214,18 +211,31 @@ void Config::ReadKey(char * data, SDL_Scancode (*keybindings)[2], bool * keyoper
 
 void Config::WriteString(SDL_RWops * file, const char * variable, const char * string){
 	char line[256];
-	sprintf(line, "%s = %s\n", variable, string);
+	sprintf(line, "%s = %s\r\n", variable, string);
 	SDL_RWwrite(file, line, strlen(line), 1);
 }
 
 void Config::ReadString(const char * data, char * variable, int length){
 	memset(variable, 0, length);
+	bool datafound = false;
 	for(int i = 0, j = 0; i < strlen(data); i++){
-		if(j == 0 && (data[i] == ' ' || data[i] == '\t')){
+		if(!datafound && (data[i] == ' ' || data[i] == '\t' || data[i] == '\r')){
 			
 		}else{
+			datafound = true;
 			if(j < length){
 				variable[j++] = data[i];
+			}
+		}
+	}
+	datafound = false;
+	for(int i = strlen(data), j = strlen(variable); i > 0; i--){
+		if(!datafound && (data[i] == ' ' || data[i] == '\t' || data[i] == '\r' || data[i] == 0)){
+			variable[j--] = 0;
+		}else{
+			datafound = true;
+			if(j >= 0){
+				variable[j--] = data[i];
 			}
 		}
 	}

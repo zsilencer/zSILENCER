@@ -71,5 +71,6 @@ int User::TotalUpgradePointsPossible(Uint8 agencynum){
 	total += agency[agencynum].maxjetpack;
 	total += agency[agencynum].maxshield;
 	total += agency[agencynum].maxtechslots;
+	total -= agency[agencynum].defaultbonuses;
 	return total;
 }

@@ -17,9 +17,14 @@ public:
 	Uint8 textbank;
 	Uint8 textwidth;
 	bool textcolorramp;
+	bool textallownewline;
+	int textlineheight;
 	bool drawalpha;
 	Uint8 uid;
 	bool clicked;
+	Uint8 * customsprite;
+	int customspritew;
+	int customspriteh;
 };
 
 #endif

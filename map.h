@@ -14,9 +14,27 @@ class Map
 public:
 	Map();
 	~Map();
+	struct Header{
+		Header();
+		Uint8 firstbyte;
+		Uint8 version;
+		Uint8 maxplayers;
+		Uint8 maxteams;
+		Uint16 width;
+		Uint16 height;
+		Uint8 parallax;
+		Sint8 ambience;
+		Uint32 flags;
+		char description[0x80];
+		Uint32 minimapcompressedsize;
+		Uint8 minimapcompressed[172 * 62];
+		Uint32 levelsize;
+	};
 	bool Load(const char * filename, class World & world);
 	bool LoadBase(class Team & team, class World & world);
 	bool LoadFile(const char * filename, class World & world, Team * team = 0);
+	static bool LoadHeader(SDL_RWops * file, Map::Header & header);
+	static bool UncompressMinimap(Uint8 (*pixels)[172 * 62], const Uint8 * compressed, int compressedsize);
 	void Unload(void);
 	void MiniMapCoords(int & x, int & y);
 	void RandomPlayerStartLocation(World & world, Sint16 & x, Sint16 & y);

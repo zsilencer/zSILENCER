@@ -34,6 +34,7 @@ public:
 	void DrawDebug(Surface * surface);
 	void DrawMessage(Surface * surface);
 	void DrawStatus(Surface * surface);
+	void DrawTopMessage(Surface * surface);
 	static void DrawScaled(Surface * src, Rect * srcrect, Surface *dst, Rect * dstrect, int factor = 2);
 	static void DrawCheckered(Surface * src, Rect * srcrect, Surface * dst, Rect * dstrect);
 	void DrawColored(Surface * src, Rect * srcrect, Surface * dst, Rect * dstrect);

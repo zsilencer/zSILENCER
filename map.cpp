@@ -42,6 +42,21 @@ Map::~Map(){
 	Unload();
 }
 
+Map::Header::Header(){
+	firstbyte = 0;
+	version = 0;
+	maxplayers = 0;
+	maxteams = 0;
+	width = 0;
+	height = 0;
+	parallax = 0;
+	ambience = 0;
+	flags = 0;
+	memset(description, 0, sizeof(description));
+	minimapcompressedsize = 0;
+	levelsize = 0;
+}
+
 bool Map::Load(const char * filename, World & world){
 	Unload();
 	bool result = LoadFile(filename, world, 0);
@@ -79,75 +94,79 @@ bool Map::LoadBase(Team & team, World & world){
 	return LoadFile("XBASE15A.SIL", world, &team);
 }
 
+bool Map::LoadHeader(SDL_RWops * file, Map::Header & header){
+	Uint8 padding = 0;
+	if(!SDL_RWread(file, &header.firstbyte, 1, 1)){ return false; }
+	if(!SDL_RWread(file, &header.version, 1, 1)){ return false; }
+	if(!SDL_RWread(file, &header.maxplayers, 1, 1)){ return false; }
+	if(!SDL_RWread(file, &header.maxteams, 1, 1)){ return false; }
+	if(!SDL_RWread(file, &header.width, 2, 1)){ return false; }
+	if(!SDL_RWread(file, &header.height, 2, 1)){ return false; }
+	header.width = SDL_SwapBE16(header.width);
+	header.height = SDL_SwapBE16(header.height);
+	if(!SDL_RWread(file, &padding, 1, 1)){ return false; }
+	if(!SDL_RWread(file, &header.parallax, 1, 1)){ return false; }
+	if(!SDL_RWread(file, &header.ambience, 1, 1)){ return false; }
+	//ambience -= 128;
+	if(!SDL_RWread(file, &padding, 1, 1)){ return false; }
+	if(!SDL_RWread(file, &padding, 1, 1)){ return false; }
+	if(!SDL_RWread(file, &header.flags, 4, 1)){ return false; }
+	header.flags = SDL_SwapBE32(header.flags);
+	if(!SDL_RWread(file, &header.description, 1, 0x80)){ return false; }
+	header.description[0x80 - 1] = 0;
+	if(!SDL_RWread(file, &header.minimapcompressedsize, 4, 1)){ return false; }
+	header.minimapcompressedsize = SDL_SwapLE32(header.minimapcompressedsize);
+	if(!SDL_RWread(file, header.minimapcompressed, 1, header.minimapcompressedsize)){ return false; }
+	if(!SDL_RWread(file, &header.levelsize, 4, 1)){ return false; }
+	header.levelsize = SDL_SwapLE32(header.levelsize);
+	return true;
+}
+
+bool Map::UncompressMinimap(Uint8 (*pixels)[172 * 62], const Uint8 * compressed, int compressedsize){
+	unsigned long minimapsizeuncompressed = sizeof(*pixels);
+	if(uncompress(*pixels, &minimapsizeuncompressed, compressed, compressedsize) != Z_OK){
+		return false;
+	}
+	return true;
+}
+
 bool Map::LoadFile(const char * filename, World & world, Team * team){
 	SDL_RWops * file = SDL_RWFromFile(filename, "rb");
 	if(!file){
 		return false;
 	}
-	Uint8 firstbyte = 0;
-	Uint8 headerversion = 0;
-	Uint8 maxplayers = 0;
-	Uint8 maxteams = 0;
-	Uint8 padding = 0;
-	Uint8 parallax = 0;
-	Sint8 ambience = 0;
-	Uint32 flags = 0;
-	char description[0x80];
-	memset(description, 0, sizeof(description));
-	Uint32 minimapcompressedsize = 0;
-	Uint8 minimapcompressed[172 * 62];
-	Uint32 levelsize = 0;
+	Header header;
 	Uint8 levelcompressed[65535];
 	Uint32 numactors = 0;
 	Uint32 numplatforms = 0;
-	Uint16 width;
-	Uint16 height;
 	Sint32 x1, y1, x2, y2, type1, type2 = 0;
 
-	if(!SDL_RWread(file, &firstbyte, 1, 1)){ return false; }
-	if(!SDL_RWread(file, &headerversion, 1, 1)){ return false; }
-	if(!SDL_RWread(file, &maxplayers, 1, 1)){ return false; }
-	if(!SDL_RWread(file, &maxteams, 1, 1)){ return false; }
-	if(!SDL_RWread(file, &width, 2, 1)){ return false; }
-	if(!SDL_RWread(file, &height, 2, 1)){ return false; }
-	width = SDL_SwapBE16(width);
-	height = SDL_SwapBE16(height);
-	if(!SDL_RWread(file, &padding, 1, 1)){ return false; }
-	if(!SDL_RWread(file, &parallax, 1, 1)){ return false; }
-	if(!SDL_RWread(file, &ambience, 1, 1)){ return false; }
-	//ambience -= 128;
-	if(!SDL_RWread(file, &padding, 1, 1)){ return false; }
-	if(!SDL_RWread(file, &padding, 1, 1)){ return false; }
-	if(!SDL_RWread(file, &flags, 4, 1)){ return false; }
-	flags = SDL_SwapBE32(flags);
-	if(!SDL_RWread(file, description, 1, 0x80)){ return false; }
-	description[0x80 - 1] = 0;
-	if(!SDL_RWread(file, &minimapcompressedsize, 4, 1)){ return false; }
-	minimapcompressedsize = SDL_SwapLE32(minimapcompressedsize);
-	if(!SDL_RWread(file, minimapcompressed, 1, minimapcompressedsize)){ return false; }
-	unsigned long minimapsizeuncompressed = sizeof(minimap.pixels);
-	if(!SDL_RWread(file, &levelsize, 4, 1)){ return false; }
-	levelsize = SDL_SwapLE32(levelsize);
-	if(!SDL_RWread(file, levelcompressed, 1, levelsize)){ return false; }
+	if(!LoadHeader(file, header)){
+		return false;
+	}
+	if(!SDL_RWread(file, levelcompressed, 1, header.levelsize)){ return false; }
 	SDL_RWclose(file);
 	
-	if(width > 256 || height > 256){
+	if(header.width > 256 || header.height > 256){
 		return false;
 	}
 	
 	Uint32 yoffset = 0;
 	
 	if(team == 0){ // team is 0 for main map
-		expandedwidth = (width > 47 ? width : 47);
-		expandedheight = height + ((26 + 10) * world.maxteams);
-		Map::width = width;
-		Map::height = height;
+		expandedwidth = (header.width > 47 ? header.width : 47);
+		expandedheight = header.height + ((26 + 10) * world.maxteams);
+		Map::width = header.width;
+		Map::height = header.height;
 		/*if(parallax > 3){
 			parallax = 3;
 		}*/
-		Map::parallax = parallax;
-		Map::ambience = ambience;
-		if(uncompress(minimap.pixels, &minimapsizeuncompressed, minimapcompressed, minimapcompressedsize) != Z_OK){
+		Map::parallax = header.parallax;
+		Map::ambience = header.ambience;
+		/*if(uncompress(minimap.pixels, &minimapsizeuncompressed, header.minimapcompressed, header.minimapcompressedsize) != Z_OK){
+			return false;
+		}*/
+		if(!UncompressMinimap(&minimap.pixels, header.minimapcompressed, header.minimapcompressedsize)){
 			return false;
 		}
 		minimap.Recolor(16 * 4);
@@ -169,8 +188,8 @@ bool Map::LoadFile(const char * filename, World & world, Team * team){
 			}
 		}
 	}else{
-		baseambience = ambience;
-		yoffset = Map::height + 10 + (team->number * (26));
+		baseambience = header.ambience;
+		yoffset = height + 10 + (team->number * (26));
 	}
 	
 	int result;
@@ -181,7 +200,7 @@ bool Map::LoadFile(const char * filename, World & world, Team * team){
 		level = new Uint8[maxlevelsize];
 		unsigned long levelsizeuncompressed = maxlevelsize;
 		
-		result = uncompress(level, &levelsizeuncompressed, levelcompressed, levelsize);
+		result = uncompress(level, &levelsizeuncompressed, levelcompressed, header.levelsize);
 
 		if(result != Z_OK){
 			delete[] level;
@@ -193,8 +212,8 @@ bool Map::LoadFile(const char * filename, World & world, Team * team){
 	}
 	
 	unsigned int i = 0;
-	for(unsigned int y = yoffset; y < yoffset + height; y++){
-		for(unsigned int x = 0; x < width; x++){
+	for(unsigned int y = yoffset; y < yoffset + header.height; y++){
+		for(unsigned int x = 0; x < header.width; x++){
 			bg[0][(y * expandedwidth) + x] = ((level[i + 0]) | (level[i + 1] << 8));
 			bgflipped[0][(y * expandedwidth) + x] = level[i + 2] ? true : false;
 			bglum[0][(y * expandedwidth) + x] = level[i + 3] ? true : false ;
@@ -223,7 +242,7 @@ bool Map::LoadFile(const char * filename, World & world, Team * team){
 			i += 36;
 		}
 	}
-	i = width * height * 36;
+	i = header.width * header.height * 36;
 	memcpy(&numactors, &level[i], sizeof(numactors));
 	numactors = SDL_SwapLE32(numactors);
 	i += sizeof(Uint32) + sizeof(Uint32);

@@ -49,6 +49,7 @@ public:
 	void Illuminate(void);
 	void ShowMessage(const char * message, Uint8 time = 255, Uint8 type = 0, bool networked = false, Peer * peer = 0);
 	void ShowStatus(const char * status, Uint8 color = 0, bool networked = false, Peer * peer = 0);
+	void ShowTopMessage(const char * message);
 	void SendChat(bool toteam, char * message);
 	void SendSound(const char * name, Peer * peer = 0, Uint8 volume = 128);
 	void ChangeTeam(void);
@@ -216,6 +217,8 @@ private:
 	Uint8 message_i;
 	Uint8 messagetype;
 	Uint8 messagetime;
+	char topmessage[100];
+	Uint8 topmessage_i;
 	Uint32 lastpingsent;
 	Uint32 lastpingid;
 	int pingtime;

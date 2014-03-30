@@ -120,6 +120,7 @@ void Renderer::Draw(Surface * surface, float frametime){
 		DrawHUD(surface, frametime);
 		//DrawDebug(surface);
 		DrawStatus(surface);
+		DrawTopMessage(surface);
 		DrawMessage(surface);
 	}
 	if(world.quitstate == 1 || world.quitstate == 2){
@@ -873,7 +874,31 @@ void Renderer::DrawWorld(Surface * surface, Camera & camera, bool drawminimap, b
 			if(object->type == ObjectTypes::OVERLAY && object->draw){
 				Overlay * overlay = static_cast<Overlay *>(object);
 				if(overlay->text){
-					DrawText(surface, overlay->x, overlay->y, overlay->text, overlay->textbank, overlay->textwidth, overlay->drawalpha, overlay->effectcolor, overlay->effectbrightness, overlay->textcolorramp);
+					if(overlay->textallownewline){
+						char * textcopy = new char[strlen(overlay->text) + 1];
+						strcpy(textcopy, overlay->text);
+						char * textline = strtok(textcopy, "\n");
+						int yoffset = 0;
+						while(textline){
+							DrawText(surface, overlay->x, overlay->y + yoffset, textline, overlay->textbank, overlay->textwidth, overlay->drawalpha, overlay->effectcolor, overlay->effectbrightness, overlay->textcolorramp);
+							textline = strtok(NULL, "\n");
+							yoffset += overlay->textlineheight;
+						}
+						delete[] textcopy;
+					}else{
+						DrawText(surface, overlay->x, overlay->y, overlay->text, overlay->textbank, overlay->textwidth, overlay->drawalpha, overlay->effectcolor, overlay->effectbrightness, overlay->textcolorramp);
+					}
+				}
+				if(overlay->customsprite){
+					Surface srcsurface;
+					srcsurface.pixels = overlay->customsprite;
+					srcsurface.w = overlay->customspritew;
+					srcsurface.h = overlay->customspriteh;
+					Rect dstrect;
+					dstrect.x = overlay->x;
+					dstrect.y = overlay->y;
+					BlitSurface(&srcsurface, 0, surface, &dstrect);
+					srcsurface.pixels = 0;
 				}
 			}
 			if(object->type == ObjectTypes::CREDITMACHINE && renderpass == 3){
@@ -1679,6 +1704,20 @@ void Renderer::DrawStatus(Surface * surface){
 		DrawText(surface, (640 - (strlen(text) * 7)) / 2 + 1, 370 + liney + 1, text, 133, 7, false, *color, brightness2);
 		DrawText(surface, (640 - (strlen(text) * 7)) / 2, 370 + liney, text, 133, 7, false, *color, brightness);
 		liney -= 10;
+	}
+}
+
+void Renderer::DrawTopMessage(Surface * surface){
+	if(world.topmessage_i){
+		char * text = world.topmessage;
+		if(world.topmessage_i / 2 > 24){
+			text = &world.topmessage[(world.topmessage_i / 2) - 24];
+		}
+		const int maxlength = 35;
+		char textmax[maxlength + 1];
+		memset(textmax, 0, sizeof(textmax));
+		strncpy(textmax, text, maxlength);
+		DrawText(surface, 200, 10, textmax, 133, 7);
 	}
 }
 

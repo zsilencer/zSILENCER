@@ -448,7 +448,7 @@ void Lobby::CreateGame(const char * name, const char * map, const unsigned char 
 	lobbygame.maxplayers = maxplayers;
 	lobbygame.maxteams = maxteams;
 	//lobbygame.CalculateMapHash();
-	memcpy(lobbygame.maphash, maphash, 20);
+	memcpy(lobbygame.maphash, maphash, sizeof(lobbygame.maphash));
 	lobbygame.Serialize(Serializer::WRITE, data);
 	SendMessage(data.data, data.BitsToBytes(data.offset));
 	creategamestatus = 100;

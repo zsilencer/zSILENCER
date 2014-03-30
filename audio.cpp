@@ -133,7 +133,7 @@ void Audio::Mute(int volume){
 		int oldvolume = channelvolume[i];
 		Mix_Volume(i, oldvolume * percent);
 	}
-	Mix_VolumeMusic(volume);
+	Mix_VolumeMusic(musicvolume * percent);
 }
 
 void Audio::Unmute(void){
@@ -142,19 +142,21 @@ void Audio::Unmute(void){
 		int oldvolume = channelvolume[i];
 		Mix_Volume(i, oldvolume);
 	}
-	Mix_VolumeMusic(128);
+	Mix_VolumeMusic(musicvolume);
 }
 
-void Audio::PlayMusic(Mix_Music * music){
+bool Audio::PlayMusic(Mix_Music * music){
 	if(!Config::GetInstance().music){
-		return;
+		return false;
 	}
 	if(!Mix_PlayingMusic() || Mix_FadingMusic() == MIX_FADING_OUT){
 		if(!MusicPaused()){
 			Mix_PlayMusic(music, -1);
 			SetMusicVolume(musicvolume);
+			return true;
 		}
 	}
+	return false;
 }
 
 void Audio::StopMusic(void){

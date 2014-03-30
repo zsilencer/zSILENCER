@@ -11,7 +11,10 @@ Overlay::Overlay() : Object(ObjectTypes::OVERLAY){
 	uid = 0;
 	requiresmaptobeloaded = false;
 	textcolorramp = false;
+	textallownewline = false;
+	textlineheight = 10;
 	clicked = false;
+	customsprite = 0;
 }
 
 Overlay::~Overlay(){
@@ -19,63 +22,71 @@ Overlay::~Overlay(){
 		delete[] text;
 		text = 0;
 	}
+	if(customsprite){
+		delete[] customsprite;
+		customsprite = 0;
+	}
 }
 
 void Overlay::Tick(World & world){
-	switch(res_bank){
-		case 54:
-			res_index = state_i;
-			if(state_i >= 9){
-				state_i = -1;
-			}
-		break;
-		case 56:
-			res_index = 0;
-		break;
-		case 57:
-			res_index = state_i / 4;
-			if(state_i / 4 > 16){
-				state_i--;
-				if(rand() % 100 == 0){
+	if(customsprite){
+		
+	}else{
+		switch(res_bank){
+			case 54:
+				res_index = state_i;
+				if(state_i >= 9){
 					state_i = -1;
 				}
-			}
-		break;
-		case 58:
-			res_index = state_i / 4;
-			if(state_i / 4 > 16){
-				state_i--;
-				if(rand() % 100 == 0){
-					state_i = -1;
-				}
-			}
-		break;
-		case 171:
-			res_index = (state_i / 2) % 4;
-		break;
-		case 208:
-			if(state_i < 30 * 2){
-				res_index = (state_i / 2) + 29;
-			}else
-				if(state_i < 60 * 2){
-					res_index = 60;
-				}else{
-					res_index = (120 - (state_i / 2)) + 29;
-					if(res_index <= 29){
+			break;
+			case 56:
+				res_index = 0;
+			break;
+			case 57:
+				res_index = state_i / 4;
+				if(state_i / 4 > 16){
+					state_i--;
+					if(rand() % 100 == 0){
 						state_i = -1;
-						break;
 					}
 				}
-			if(res_index >= 60){
-				res_index = 60;
-			}
-		break;
-		case 222:
-			if(state_i >= 3){
-				world.MarkDestroyObject(id);
-			}
-			res_index = state_i;
-		break;
+			break;
+			case 58:
+				res_index = state_i / 4;
+				if(state_i / 4 > 16){
+					state_i--;
+					if(rand() % 100 == 0){
+						state_i = -1;
+					}
+				}
+			break;
+			case 171:
+				res_index = (state_i / 2) % 4;
+			break;
+			case 208:
+				if(state_i < 30 * 2){
+					res_index = (state_i / 2) + 29;
+				}else
+					if(state_i < 60 * 2){
+						res_index = 60;
+					}else{
+						res_index = (120 - (state_i / 2)) + 29;
+						if(res_index <= 29){
+							state_i = -1;
+							break;
+						}
+					}
+				if(res_index >= 60){
+					res_index = 60;
+				}
+			break;
+			case 222:
+				if(state_i >= 3){
+					world.MarkDestroyObject(id);
+				}
+				res_index = state_i;
+			break;
+		}
 	}
 	state_i++;
 }

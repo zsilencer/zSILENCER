@@ -440,12 +440,15 @@ char * Interface::WordWrap(const char * text, unsigned int maxlength, const char
 		laststart = lastspace = 0;
 		for (current = 0; current < textlen; current++) {
 			if (chk <= 0) {
+				int oldalloced = alloced;
 				alloced += (int) (((textlen - current + 1)/linelength + 1) * breakcharlen) + 1;
 				//newtext = erealloc(newtext, alloced);
-				if(newtext){
-					delete[] newtext;
-				}
+				char * oldnewtext = newtext;
 				newtext = new char[alloced];
+				if(oldnewtext){
+					memcpy(newtext, oldnewtext, oldalloced);
+					delete[] oldnewtext;
+				}
 				chk = (int) ((textlen - current)/linelength) + 1;
 			}
 			/* when we hit an existing break, copy to new buffer, and
