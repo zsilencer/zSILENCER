@@ -30,7 +30,7 @@ void Platform::GetTopSegment(int & x1, int & y1, int & x2, int & y2){
 		x1 = Platform::x1;
 		y1 = Platform::y1;
 		x2 = Platform::x2;
-		y2 = Platform::y2;         
+		y2 = Platform::y2;
     }
 }
 
@@ -42,8 +42,24 @@ int Platform::XtoY(int x){
 		int pos = abs(signed(x) - signed(tx1));
 		float time = float(pos) / length;
 		if(type == STAIRSUP){
+			// these checks fix an issue but can cause replay desyncs in different versions of version 22
+			if(x > tx2){
+				return ty2;
+			}
+			if(x < tx1){
+				return ty1;
+			}
+			//
 			return (-abs(signed(ty1) - signed(ty2)) * time) + ty1;
 		}else{
+			//
+			if(x < tx1){
+				return ty1;
+			}
+			if(x > tx2){
+				return ty2;
+			}
+			//
 			return (abs(signed(ty1) - signed(ty2)) * time) + ty1;
 		}
 	}else{

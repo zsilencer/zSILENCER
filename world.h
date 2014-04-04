@@ -233,6 +233,7 @@ private:
 	bool currentmapdataprocessed;
 	bool currentmapdataend;
 	bool showteamcolors;
+	bool showplayerlist;
 };
 
 #endif

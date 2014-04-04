@@ -44,6 +44,7 @@ Resources::~Resources(){
 bool Resources::Load(Game & game, bool dedicatedserver){
 	progress = 0;
 	totalprogressitems = 621;
+	CDResDir();
 	if(!LoadSprites(game, dedicatedserver)){
 		return false;
 	}

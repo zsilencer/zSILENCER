@@ -155,6 +155,7 @@ private:
 	int selectedmap;
 	Uint32 lastmusicplaytime;
 	char currentmusictrack[256];
+	bool fullscreentoggled;
 };
 
 #endif

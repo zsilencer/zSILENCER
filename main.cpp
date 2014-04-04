@@ -1,5 +1,6 @@
 #include "shared.h"
 #include "game.h"
+#include "cocoawrapper.h"
 #ifdef __APPLE__
 #include "CoreFoundation/CoreFoundation.h"
 #endif
@@ -54,6 +55,30 @@ extern "C" void Java_com_zSILENCER_game_zSILENCER_OuyaControllerKeyEvent(JNIEnv 
 
 #endif
 
+void CDDataDir(void){
+#ifdef __APPLE__
+	char path[PATH_MAX];
+	sprintf(path, "%s/zSILENCER", GetAppSupportDirectory());
+	mkdir(path, 0777);
+	chdir(path);
+#endif
+}
+
+void CDResDir(void){
+#ifdef __APPLE__
+	CFBundleRef mainBundle = CFBundleGetMainBundle();
+    CFURLRef resourcesURL = CFBundleCopyResourcesDirectoryURL(mainBundle);
+    char path[PATH_MAX];
+    if(!CFURLGetFileSystemRepresentation(resourcesURL, TRUE, (UInt8 *)path, PATH_MAX)){
+        // error!
+		return;
+    }
+    CFRelease(resourcesURL);
+	
+    chdir(path);
+#endif
+}
+
 #ifdef __APPLE__
 int SDL_main(int argc, char * argv[]){
 #elif defined(POSIX)
@@ -81,7 +106,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 #endif
 	
 #ifdef __APPLE__
-	CFBundleRef mainBundle = CFBundleGetMainBundle();
+	/*CFBundleRef mainBundle = CFBundleGetMainBundle();
     CFURLRef resourcesURL = CFBundleCopyResourcesDirectoryURL(mainBundle);
     char path[PATH_MAX];
     if(!CFURLGetFileSystemRepresentation(resourcesURL, TRUE, (UInt8 *)path, PATH_MAX)){
@@ -90,7 +115,13 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     }
     CFRelease(resourcesURL);
 	
-    chdir(path);
+    chdir(path);*/
+	
+	/*FSRef ref;
+	OSType folderType = kApplicationSupportFolderType;
+	char apppath[PATH_MAX];
+	FSFindFolder(kUserDomain, folderType, kCreateFolder, &ref);
+	FSRefMakePath(&ref, (UInt8 *)&apppath, PATH_MAX);*/
 #endif
 
 	Game game;

@@ -26,7 +26,7 @@ public:
 	void DrawText(Surface * surface, Uint16 x, Uint16 y, const char * text, Uint8 bank, Uint8 width, bool alpha = false, Uint8 tint = 0, Uint8 brightness = 128, bool rampcolor = false);
 	void DrawTextInput(Surface * surface, TextInput & textinput);
 	void DrawTinyText(Surface * surface, Uint16 x, Uint16 y, const char * text, Uint8 tint = 0, Uint8 brightness = 128);
-	void DrawShadow(Surface * surface, Object * object);
+	void DrawShadow(Surface * surface, Camera & camera, Object * object);
 	void DrawRain(Surface * surface, Camera & camera, float frametime = 0);
 	void DrawRainPuddles(Surface * surface, Camera & camera);
 	static inline void SetPixel(Surface * surface, unsigned int x, unsigned int y, Uint8 color);
@@ -59,6 +59,7 @@ public:
 	void DrawCircle(Surface * surface, int x, int y, int radius, Uint8 color);
 	Uint8 InvIdToResIndex(Uint8 id);
 	static const char * InvIdToLetter(Uint8 id);
+	static void ClipRect(Surface * surface, Rect & rect);
 	static bool BlitSurfaceUpper(Surface * src, Rect * srcrect, Surface * dst, Rect * dstrect);
 	static void BlitSurfaceSlow(Surface * src, Rect * srcrect, Surface * dst, Rect * dstrect);
 	static void BlitSurfaceFast(Surface * src, Rect * srcrect, Surface * dst, Rect * dstrect);
@@ -71,6 +72,7 @@ public:
 	void DrawForeground(Surface * surface, Camera & camera);
 	void DrawForegroundLuminance(Surface * surface, Camera & camera);
 	void DrawHUD(Surface * surface, float frametime = 0);
+	void DrawPlayerList(Surface * surface);
 	void DrawMessageBackground(Surface * surface, Rect * dstrect);
 	Uint8 GetAmbienceLevel(void);
 	Camera camera;

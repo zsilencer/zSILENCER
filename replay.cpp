@@ -11,6 +11,11 @@ Replay::Replay(){
 	inputsize = 0;
 	gamestarted = false;
 	showallnames = false;
+	x = 0;
+	y = 0;
+	oldx = 0;
+	oldy = 0;
+	speed = 1;
 }
 
 Replay::~Replay(){
@@ -19,6 +24,7 @@ Replay::~Replay(){
 }
 
 void Replay::BeginRecording(const char * filename){
+	CDDataDir();
 	file = SDL_RWFromFile(filename, "wb");
 	if(file){
 		isrecording = true;
@@ -34,6 +40,7 @@ void Replay::EndRecording(void){
 }
 
 void Replay::BeginPlaying(const char * filename){
+	CDDataDir();
 	file = SDL_RWFromFile(filename, "rb");
 	if(file){
 		isplaying = true;

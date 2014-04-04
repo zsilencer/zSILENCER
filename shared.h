@@ -51,5 +51,7 @@ extern JavaVM * jvm;
 #else
 #include <SDL_opengl.h>
 #endif
+void CDResDir(void);
+void CDDataDir(void);
 
 #endif

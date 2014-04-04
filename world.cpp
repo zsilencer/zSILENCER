@@ -62,7 +62,9 @@ World::World(bool mode) : lobby(this), lagsimulator(&sockethandle), audio(Audio:
 	currentmapdata = 0;
 	ClearMapData();
 	showteamcolors = false;
+	showplayerlist = false;
 	memset(topmessage, 0, sizeof(topmessage));
+	topmessage_i = 0;
 }
 
 World::~World(){
@@ -202,6 +204,8 @@ void World::TickObjects(void){
 	Player * localplayer = GetPeerPlayer(localpeerid);
 	if(localplayer){
 		audio.UpdateAllVolumes(*this, localplayer->x, localplayer->y, 500);
+	}else{
+		audio.UpdateAllVolumes(*this, replay.x, replay.y, 500);
 	}
 }
 

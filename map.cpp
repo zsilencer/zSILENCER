@@ -20,6 +20,7 @@
 #include "walldefense.h"
 #include "pickup.h"
 #include "baseexit.h"
+#include "game.h"
 
 Map::Map(){
 	for(unsigned int i = 0; i < 4; i++){
@@ -131,7 +132,12 @@ bool Map::UncompressMinimap(Uint8 (*pixels)[172 * 62], const Uint8 * compressed,
 }
 
 bool Map::LoadFile(const char * filename, World & world, Team * team){
+	CDDataDir();
 	SDL_RWops * file = SDL_RWFromFile(filename, "rb");
+	if(!file){
+		CDResDir();
+		file = SDL_RWFromFile(filename, "rb");
+	}
 	if(!file){
 		return false;
 	}

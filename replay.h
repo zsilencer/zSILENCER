@@ -34,6 +34,8 @@ public:
 	bool ShowAllNames(void);
 	enum {RPL_GAMEINFO, RPL_NEWPEER, RPL_START, RPL_USERINFO, RPL_CHANGETEAM, RPL_TECH, RPL_CHAT, RPL_STATION, RPL_TICK, RPL_INPUT, RPL_DISCONNECT};
 	enum {STA_BUY, STA_REPAIR, STA_VIRUS};
+	int x, y, oldx, oldy;
+	float speed;
 	
 	friend class Game;
 	

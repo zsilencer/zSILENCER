@@ -25,16 +25,18 @@ void TextBox::Tick(World & world){
 	
 }
 
-void TextBox::AddLine(const char * string, Uint8 color, Uint8 brightness){
+void TextBox::AddLine(const char * string, Uint8 color, Uint8 brightness, bool scroll){
 	if(text.size() > maxlines){
 		char * oldstring = text.front();
 		delete[] oldstring;
 		text.pop_front();
 	}
-	if(text.size() > height / lineheight){
-		scrolled = text.size() - (height / lineheight);
-	}else{
-		scrolled = 0;
+	if(scroll){
+		if(text.size() > height / lineheight){
+			scrolled = text.size() - (height / lineheight);
+		}else{
+			scrolled = 0;
+		}
 	}
 	unsigned int size = strlen(string);
 	if(size * fontwidth > width){
@@ -48,7 +50,7 @@ void TextBox::AddLine(const char * string, Uint8 color, Uint8 brightness){
 	text.push_back(newstring);
 }
 
-void TextBox::AddText(const char * string, Uint8 color, Uint8 brightness, int indent){
+void TextBox::AddText(const char * string, Uint8 color, Uint8 brightness, int indent, bool scroll){
 	char breakchar[10];
 	strcpy(breakchar, "\n");
 	for(int i = 0; i < indent && i < 8; i++){
@@ -57,7 +59,7 @@ void TextBox::AddText(const char * string, Uint8 color, Uint8 brightness, int in
 	char * wrapped = Interface::WordWrap(string, width / fontwidth, breakchar);
 	char * line = strtok(wrapped, "\n");
 	while(line){
-		AddLine(line, color, brightness);
+		AddLine(line, color, brightness, scroll);
 		line = strtok(NULL, "\n");
 	}
 	delete[] wrapped;

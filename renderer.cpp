@@ -47,7 +47,7 @@ Renderer::Renderer(World & world) : world(world), camera(640, 480){
 	}
 	playerinbaseold = false;
 }
-
+	
 void Renderer::Draw(Surface * surface, float frametime){
 	// Uncomment below to find and view individual sprites
 	/*surface->Clear(112);
@@ -99,6 +99,16 @@ void Renderer::Draw(Surface * surface, float frametime){
 			camera.Follow(world, px, py, 15, 100, 0, 30);
 			camera.Smooth(frametime);
 		}
+		world.replay.x = localplayer->x;
+		world.replay.y = localplayer->y;
+		world.replay.oldx = localplayer->oldx;
+		world.replay.oldy = localplayer->oldy;
+	}else{
+		if(world.replay.IsPlaying()){
+			int px = world.replay.x + ((world.replay.oldx - world.replay.x) * frametime);
+			int py = world.replay.y + ((world.replay.oldy - world.replay.y) * frametime);
+			camera.Follow(world, px, py, 15, 100, 0, 30);
+		}
 	}
 	if(world.map.loaded){
 		// Clear the minimap
@@ -122,6 +132,9 @@ void Renderer::Draw(Surface * surface, float frametime){
 		DrawStatus(surface);
 		DrawTopMessage(surface);
 		DrawMessage(surface);
+		if(world.showplayerlist){
+			DrawPlayerList(surface);
+		}
 	}
 	if(world.quitstate == 1 || world.quitstate == 2){
 #ifdef OUYA
@@ -136,7 +149,7 @@ void Renderer::Draw(Surface * surface, float frametime){
 void Renderer::Tick(void){
 	// Update ambience level
 	Sint8 ambience = world.map.ambience;
-	if(localplayer && localplayer->InBase(world)){
+	if((localplayer && localplayer->InBase(world)) || (world.replay.IsPlaying() && world.replay.y > world.map.height * 64)){
 		ambience = world.map.baseambience;
 	}
 	ambiencelevel = 128 + (ambience * 4.5) + ambience_r;
@@ -266,7 +279,7 @@ void Renderer::DrawWorld(Surface * surface, Camera & camera, bool drawminimap, b
 									EffectWarp(effectsurface, 0, player->state_warp);
 								}else{
 									if(!skipdrawing){
-										DrawShadow(surface, object);
+										DrawShadow(surface, camera, object);
 									}
 								}
 								if(player->res_index == 5 || (player->currentweapon == 3 && player->res_index == 5 && player->flamersoundchannel != -1)){
@@ -293,7 +306,7 @@ void Renderer::DrawWorld(Surface * surface, Camera & camera, bool drawminimap, b
 								}
 							}break;
 							case ObjectTypes::ROCKETPROJECTILE:{
-								DrawShadow(surface, object);
+								DrawShadow(surface, camera, object);
 							}break;
 							case ObjectTypes::CIVILIAN:{
 								Civilian * civilian = static_cast<Civilian *>(object);
@@ -308,7 +321,7 @@ void Renderer::DrawWorld(Surface * surface, Camera & camera, bool drawminimap, b
 								if(civilian->state_warp){
 									EffectWarp(effectsurface, 0, civilian->state_warp);
 								}else{
-									DrawShadow(surface, object);
+									DrawShadow(surface, camera, object);
 								}
 							}break;
 							case ObjectTypes::WALLDEFENSE:{
@@ -322,7 +335,7 @@ void Renderer::DrawWorld(Surface * surface, Camera & camera, bool drawminimap, b
 								Grenade * grenade = static_cast<Grenade *>(object);
 								effectsurface = CreateSurfaceCopy(src);
 								EffectTeamColor(effectsurface, 0, grenade->color);
-								DrawShadow(surface, object);
+								DrawShadow(surface, camera, object);
 							}break;
 							case ObjectTypes::FIXEDCANNON:{
 								FixedCannon * fixedcannon = static_cast<FixedCannon *>(object);
@@ -334,7 +347,7 @@ void Renderer::DrawWorld(Surface * surface, Camera & camera, bool drawminimap, b
 								if(fixedcannon->state_warp){
 									EffectWarp(effectsurface, 0, fixedcannon->state_warp);
 								}
-								DrawShadow(surface, object);
+								DrawShadow(surface, camera, object);
 							}break;
 							case ObjectTypes::DETONATOR:{
 								Detonator * detonator = static_cast<Detonator *>(object);
@@ -342,7 +355,7 @@ void Renderer::DrawWorld(Surface * surface, Camera & camera, bool drawminimap, b
 									effectsurface = CreateSurfaceCopy(src);
 									EffectWarp(effectsurface, 0, detonator->state_warp);
 								}
-								DrawShadow(surface, object);
+								DrawShadow(surface, camera, object);
 							}break;
 							case ObjectTypes::BODYPART:{
 								BodyPart * bodypart = static_cast<BodyPart *>(object);
@@ -361,7 +374,7 @@ void Renderer::DrawWorld(Surface * surface, Camera & camera, bool drawminimap, b
 								if(guard->state_warp){
 									EffectWarp(effectsurface, 0, guard->state_warp);
 								}else{
-									DrawShadow(surface, object);
+									DrawShadow(surface, camera, object);
 								}
 								if(guard->res_bank == 61 && guard->res_index == 7){
 									lightingsurfacebank = 220;
@@ -386,7 +399,7 @@ void Renderer::DrawWorld(Surface * surface, Camera & camera, bool drawminimap, b
 								if(robot->state_warp){
 									EffectWarp(effectsurface, 0, robot->state_warp);
 								}else{
-									DrawShadow(surface, object);
+									DrawShadow(surface, camera, object);
 								}
 							}break;
 							case ObjectTypes::BASEDOOR:{
@@ -1146,6 +1159,41 @@ void Renderer::BlitSurface(Surface * src, Rect * srcrect, Surface * dst, Rect * 
 	BlitSurfaceUpper(src, srcrect, dst, dstrect);
 }
 
+void Renderer::ClipRect(Surface * surface, Rect & rect){
+	int w = surface->w;
+	int h = surface->h;
+	int srcx;
+	int srcy;
+	// Clip the rectangle to the surface
+	int maxw, maxh;
+	srcx = rect.x;
+	w = rect.w;
+	if(srcx < 0){
+		w += srcx;
+		rect.x -= srcx;
+		srcx = 0;
+	}
+	maxw = surface->w - srcx;
+	if(maxw < w){
+		w = maxw;
+	}
+	srcy = rect.y;
+	h = rect.h;
+	if(srcy < 0){
+		h += srcy;
+		rect.y -= srcy;
+		srcy = 0;
+	}
+	maxh = surface->h - srcy;
+	if(maxh < h){
+		h = maxh;
+	}
+	rect.x = srcx;
+	rect.y = srcy;
+	rect.w = w;
+	rect.h = h;
+}
+
 bool Renderer::BlitSurfaceUpper(Surface * src, Rect * srcrect, Surface * dst, Rect * dstrect){
 	Rect fulldst;
 	int srcx, srcy, w, h;
@@ -1479,10 +1527,10 @@ void Renderer::DrawTinyText(Surface * surface, Uint16 x, Uint16 y, const char * 
 	}
 }
 
-void Renderer::DrawShadow(Surface * surface, Object * object){
+void Renderer::DrawShadow(Surface * surface, Camera & camera, Object * object){
 	unsigned int width = world.resources.spritewidth[object->res_bank][object->res_index];
-	Sint16 x = object->x;
-	Sint16 y = object->y;
+	int x = object->x;
+	int y = object->y;
 	int xv = 0;
 	int yv = 300;
 	Platform * platform = world.map.TestIncr(x, y - 1, x, y - 1, &xv, &yv, Platform::RECTANGLE | Platform::STAIRSUP | Platform::STAIRSDOWN);
@@ -1495,7 +1543,9 @@ void Renderer::DrawShadow(Surface * surface, Object * object){
 			x -= world.resources.spriteoffsetx[object->res_bank][object->res_index];
 		}
 		for(int y1 = y + yv + camera.GetYOffset() - 1; y1 < y + yv + camera.GetYOffset() + 3; y1++){
-			for(int x1 = x + camera.GetXOffset() + (abs(y2) * 4) - 4; x1 < x + camera.GetXOffset() + width - (abs(y2) * 4) + 4; x1++){
+			int x1a = x + camera.GetXOffset() + (abs(y2) * 4) - 4;
+			int x1b = x + camera.GetXOffset() + width - (abs(y2) * 4) + 4;
+			for(int x1 = x1a; x1 < x1b; x1++){
 				if(i % 2){
 					SetPixel(surface, x1, y1, 115);
 				}
@@ -1882,8 +1932,9 @@ void Renderer::EffectBrightness(Surface * dst, Rect * dstrect, Uint8 brightness)
 		zerodstrect.y = 0;
 		dstrect = &zerodstrect;
 	}
-	for(Uint32 x = dstrect->x; x < dstrect->x + dstrect->w; x++){
-        for(Uint32 y = dstrect->y; y < dstrect->y + dstrect->h; y++){
+	ClipRect(dst, *dstrect);
+	for(int x = dstrect->x; x < dstrect->x + dstrect->w; x++){
+        for(int y = dstrect->y; y < dstrect->y + dstrect->h; y++){
 			Uint8 * pixel = &((Uint8 *)dst->pixels)[x + (y * dst->w)];
 			*pixel = palette.Brightness(*pixel, brightness);
         }
@@ -1899,8 +1950,9 @@ void Renderer::EffectColor(Surface * dst, Rect * dstrect, Uint8 color){
 		zerodstrect.y = 0;
 		dstrect = &zerodstrect;
 	}
-	for(Uint32 x = dstrect->x; x < dstrect->w + dstrect->x; x++){
-        for(Uint32 y = dstrect->y; y < dstrect->h + dstrect->y; y++){
+	ClipRect(dst, *dstrect);
+	for(int x = dstrect->x; x < dstrect->w + dstrect->x; x++){
+        for(int y = dstrect->y; y < dstrect->h + dstrect->y; y++){
 			Uint8 * pixel = &((Uint8 *)dst->pixels)[x + (y * dst->w)];
 			*pixel = palette.Color(*pixel, color);
         }
@@ -1916,8 +1968,9 @@ void Renderer::EffectRampColor(Surface * dst, Rect * dstrect, Uint8 color){
 		zerodstrect.y = 0;
 		dstrect = &zerodstrect;
 	}
-	for(Uint32 x = dstrect->x; x < dstrect->w + dstrect->x; x++){
-        for(Uint32 y = dstrect->y; y < dstrect->h + dstrect->y; y++){
+	ClipRect(dst, *dstrect);
+	for(int x = dstrect->x; x < dstrect->w + dstrect->x; x++){
+        for(int y = dstrect->y; y < dstrect->h + dstrect->y; y++){
 			Uint8 * pixel = &((Uint8 *)dst->pixels)[x + (y * dst->w)];
 			if(*pixel){
 				*pixel = palette.RampColor(*pixel, color);
@@ -1935,8 +1988,9 @@ void Renderer::EffectRampColorPlus(Surface * dst, Rect * dstrect, Uint8 color, U
 		zerodstrect.y = 0;
 		dstrect = &zerodstrect;
 	}
-	for(Uint32 x = dstrect->x; x < dstrect->w + dstrect->x; x++){
-        for(Uint32 y = dstrect->y; y < dstrect->h + dstrect->y; y++){
+	ClipRect(dst, *dstrect);
+	for(int x = dstrect->x; x < dstrect->w + dstrect->x; x++){
+        for(int y = dstrect->y; y < dstrect->h + dstrect->y; y++){
 			Uint8 * pixel = &((Uint8 *)dst->pixels)[x + (y * dst->w)];
 			if(*pixel){
 				*pixel = palette.RampColorPlus(*pixel, color, plus);
@@ -2610,7 +2664,7 @@ void Renderer::DrawHUD(Surface * surface, float frametime){
 					}
 				}
 				int playerswithsecret = 0;
-				for(int i = 0; i < 4; i++){
+				for(int i = 0; i < team->numpeers; i++){
 					Peer * peer = world.peerlist[team->peers[i]];
 					if(peer){
 						Player * peerplayer = world.GetPeerPlayer(peer->id);
@@ -2905,8 +2959,54 @@ void Renderer::DrawHUD(Surface * surface, float frametime){
 					}
 				}
 			}
+			
 		}
 		
+	}
+}
+
+void Renderer::DrawPlayerList(Surface * surface){
+	std::vector<Team *> teams;
+	int yoffset = 0;
+	for(std::vector<Uint16>::iterator it = world.objectsbytype[ObjectTypes::TEAM].begin(); it != world.objectsbytype[ObjectTypes::TEAM].end(); it++){
+		teams.push_back(static_cast<Team *>(world.GetObjectFromId(*it)));
+	}
+	//DrawFilledRectangle(surface, 50, 50, 640 - 50, 50 + 10 + (teams.size() * 58), 0);
+	for(int y = 50; y < 50 + 10 + (teams.size() * 58); y++){
+		for(int x = 50 + (y % 2); x < 640 - 50; x += 2){
+			SetPixel(surface, x, y, 0);
+		}
+	}
+	for(std::vector<Team *>::iterator it = teams.begin(); it != teams.end(); it++){
+		Team * team = *it;
+		Surface * newsurface = CreateSurfaceCopy(world.resources.spritebank[181][team->agency]);
+		EffectTeamColor(newsurface, 0, team->GetColor());
+		Rect dstrect;
+		dstrect.x = 50 + 10;
+		dstrect.y = 50 + 10 + yoffset + 10;
+		BlitSurface(newsurface, 0, surface, &dstrect);
+		dstrect.y -= 10;
+		delete newsurface;
+		for(int i = 0; i < team->numpeers; i++){
+			if(world.peerlist[team->peers[i]]){
+				Peer * peer = world.peerlist[team->peers[i]];
+				if(peer){
+					Player * player = world.GetPeerPlayer(peer->id);
+					if(player){
+						int yoffset2 = ((4 - team->numpeers) * 12) / 2;
+						//DrawFilledRectangle(surface, 50 + 40 + 5, dstrect.y + yoffset2 + (i * 12), 640 - 50 - 10, dstrect.y + yoffset2 + ((i + 1) * 12), i % 2 == 0 ? 116 : 115);
+						int textx = dstrect.x + 40;
+						int texty = dstrect.y + yoffset2 + (i * 12) + 1;
+						User * user = world.lobby.GetUserInfo(peer->accountid);
+						DrawText(surface, textx, texty, user->name, 133, 6);
+						char text[100];
+						sprintf(text, "L:%d    E:%d  S:%d  J:%d  H:%d  C:%d", user->agency[team->agency].level, user->agency[team->agency].endurance, user->agency[team->agency].shield, user->agency[team->agency].jetpack, user->agency[team->agency].hacking, user->agency[team->agency].contacts);
+						DrawText(surface, 640 - 50 - 10 - ((strlen(text) + 1) * 6), texty, text, 133, 6);
+					}
+				}
+			}
+		}
+		yoffset += 58;
 	}
 }
 

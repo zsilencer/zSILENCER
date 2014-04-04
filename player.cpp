@@ -2892,7 +2892,7 @@ bool Player::CheckForLadder(World & world){
 
 bool Player::CheckForGround(World & world, Platform & platform){
 	justjumpedfromladder = false;
-	Uint32 yt = platform.XtoY(x);
+	int yt = platform.XtoY(x);
 	if(y <= yt || ((platform.type == Platform::STAIRSUP || platform.type == Platform::STAIRSDOWN) && y <= yt + 1)){
 		EmitSound(world, world.resources.soundbank["futstonr.wav"], 32);
 		EmitSound(world, world.resources.soundbank["land11.wav"], 96);
@@ -2919,7 +2919,7 @@ bool Player::CheckForGround(World & world, Platform & platform){
 		state_i = -1;
 		return true;
 	}else
-		if(y <= yt + (IsDisguised() ? 20 : 80) && !world.map.TestAABB(x > platform.x2 ? platform.x2 - 1 : platform.x1 - 1, yt - 1, x > platform.x2 ? platform.x2 + 1 : platform.x1 + 1, yt - 1, Platform::RECTANGLE | Platform::STAIRSUP | Platform::STAIRSDOWN)){
+	if(y <= yt + (IsDisguised() ? 20 : 80) && !world.map.TestAABB(x > platform.x2 ? platform.x2 - 1 : platform.x1 - 1, yt - 1, x > platform.x2 ? platform.x2 + 1 : platform.x1 + 1, yt - 1, Platform::RECTANGLE | Platform::STAIRSUP | Platform::STAIRSDOWN)){
 		//y = yt + 48;
 		//yv = -3;
 		if(x > platform.x2){

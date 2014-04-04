@@ -14,6 +14,7 @@ Config & Config::GetInstance(void){
 }
 
 void Config::Save(void){
+	CDDataDir();
 	SDL_RWops * file = SDL_RWFromFile("config.cfg", "w");
 	if(file){
 		char temp[256];
@@ -54,6 +55,7 @@ void Config::Save(void){
 }
 
 bool Config::Load(void){
+	CDDataDir();
 	SDL_RWops * file = SDL_RWFromFile("config.cfg", "r");
 	if(file){
 		char line[256];

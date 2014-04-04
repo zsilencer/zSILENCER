@@ -85,6 +85,7 @@ Game::Game() : renderer(world), screenbuffer(640, 480){
 	quitscancode = SDL_SCANCODE_ESCAPE;
 #endif
 	mapexistchecked = false;
+	fullscreentoggled = false;
 }
 
 Game::~Game(){
@@ -499,6 +500,9 @@ bool Game::Loop(void){
 	}*/
 	world.DoNetwork();
 	Uint32 tickcheck = SDL_GetTicks();
+	if(world.replay.IsPlaying()){
+		wait = 42 * world.replay.speed;
+	}
 	while(lasttick <= tickcheck && tickcheck - lasttick > wait){
 		//printf("%d\n", tickcheck - lasttick);
 		world.systemcameraactive[0] = false;
@@ -613,12 +617,27 @@ bool Game::Tick(void){
 			sharedstateobject->oldstate = sharedstateobject->state;
 		}
 	}
+	
 	if(world.gameplaystate == World::INGAME && (state == INGAME || state == SINGLEPLAYERGAME || state == TESTGAME)){
 		UpdateAmbienceChannels();
 		SDL_ShowCursor(SDL_DISABLE);
 	}else{
 		SDL_ShowCursor(SDL_ENABLE);
 	}
+	
+	if(keystate[SDL_SCANCODE_RALT] && keystate[SDL_SCANCODE_RETURN]){
+		if(!fullscreentoggled){
+			if(SDL_GetWindowFlags(window) & SDL_WINDOW_FULLSCREEN_DESKTOP){
+				SDL_SetWindowFullscreen(window, 0);
+			}else{
+				SDL_SetWindowFullscreen(window, SDL_WINDOW_FULLSCREEN_DESKTOP);
+			}
+			fullscreentoggled = true;
+		}
+	}else{
+		fullscreentoggled = false;
+	}
+	
 	switch(state){
 		case FADEOUT:{
 			world.intutorialmode = false;
@@ -715,6 +734,7 @@ bool Game::Tick(void){
 					PlayMusic(world.resources.menumusic);
 				}
 				if(world.lobby.state == Lobby::DISCONNECTED){
+					world.Disconnect();
 					GoToState(LOBBYCONNECT);
 					break;
 				}
@@ -860,6 +880,9 @@ bool Game::Tick(void){
 				//char mapname[7 + 256];
 				//sprintf(mapname, "level/%s", world.gameinfo.mapname);
 				if(!LoadMap(FindMap(world.gameinfo.mapname, &world.gameinfo.maphash).c_str())){
+					if(world.replay.IsPlaying()){
+						world.replay.EndPlaying();
+					}
 					world.Disconnect();
 					if(world.lobby.state == Lobby::AUTHENTICATED){
 						world.lobby.JoinChannel(lastchannel);
@@ -925,11 +948,34 @@ bool Game::Tick(void){
 				if(world.replay.IsPlaying()){
 					// replay controls
 					if(world.localpeerid == world.authoritypeer){
-						for(int i = 0; i < world.maxpeers; i++){
+						/*for(int i = 0; i < world.maxpeers; i++){
 							if(world.peerlist[i] && i != world.authoritypeer){
 								world.localpeerid = i;
 								break;
 							}
+						}*/
+					}
+					world.replay.oldx = world.replay.x;
+					world.replay.oldy = world.replay.y;
+					if(world.localinput.keymoveleft || world.localinput.keymoveright || world.localinput.keymoveup || world.localinput.keymovedown){
+						world.localpeerid = world.authoritypeer;
+						if(world.localinput.keymoveleft){
+							world.replay.x -= 50;
+							if(world.replay.x < 0){
+								world.replay.x = 0;
+							}
+						}
+						if(world.localinput.keymoveright){
+							world.replay.x += 50;
+						}
+						if(world.localinput.keymoveup){
+							world.replay.y -= 50;
+							if(world.replay.y < 0){
+								world.replay.y = 0;
+							}
+						}
+						if(world.localinput.keymovedown){
+							world.replay.y += 50;
 						}
 					}
 					if(world.localinput.keyprevcam && !world.localinputhistory[(world.tickcount - 1) % world.maxlocalinputhistory].keyprevcam){
@@ -948,6 +994,13 @@ bool Game::Tick(void){
 							}
 						}
 
+					}
+					world.replay.speed = 1;
+					if(world.localinput.keydetonate){
+						world.replay.speed = 0.05;
+					}
+					if(world.localinput.keyuse){
+						world.replay.speed = 2;
 					}
 					if(world.localinput.keyjump){
 						world.replay.showallnames = true;
@@ -1047,7 +1100,7 @@ bool Game::Tick(void){
 				ShowDeployMessage();
 				world.GetAuthorityPeer()->controlledlist.push_back(player->id);
 				world.gameinfo.securitylevel = LobbyGame::SECNONE;
-				if(!LoadMap("level/ALLY10c.sil")){
+				if(!LoadMap("AGENCY04.SIL")){
 					GoToState(MAINMENU);
 				}
 				Audio::GetInstance().StopMusic();
@@ -1850,7 +1903,7 @@ bool Game::Tick(void){
 				world.GetAuthorityPeer()->controlledlist.push_back(player->id);
 				GiveDefaultItems(*player);
 				int botnum = 0;
-				for(int i = 0; i < 40; i++){
+				for(int i = 0; i < 10; i++){
 					Uint8 agency;
 					do{
 						agency = rand() % 5;
@@ -3694,7 +3747,12 @@ Interface * Game::CreateMapPreview(const char * filename){
 	maptext->uid = 3;
 	char mapdesc[0x80];
 	strcpy(mapdesc, "");
+	CDDataDir();
 	SDL_RWops * file = SDL_RWFromFile(filename, "rb");
+	if(!file){
+		CDResDir();
+		file = SDL_RWFromFile(filename, "rb");
+	}
 	if(file){
 		Map::Header header;
 		Map::LoadHeader(file, header);
@@ -4288,7 +4346,11 @@ bool Game::ProcessLobbyInterface(Interface * iface){
 							char * message = world.lobby.chatmessages.front();
 							Uint8 color = message[strlen(message) + 1];
 							Uint8 brightness = message[strlen(message) + 2];
-							textbox->AddText(message, color, brightness, 2);
+							bool scroll = true;
+							if(scrollbar && scrollbar->scrollposition != scrollbar->scrollmax){
+								scroll = false;
+							}
+							textbox->AddText(message, color, brightness, 2, scroll);
 							delete[] message;
 							world.lobby.chatmessages.pop_front();
 							if(scrollbar){
@@ -4419,6 +4481,7 @@ bool Game::ProcessLobbyInterface(Interface * iface){
 									}
 									world.choosingtech = true;
 									ShowTeamOverlays(false);
+									world.RequestPeerList();
 									gamejoininterface = 0;
 									gametechinterface = CreateGameTechInterface()->id;
 									iface->AddObject(gametechinterface);
@@ -5333,7 +5396,12 @@ void Game::LoadRandomGameMusic(void){
 	}
 	if(!world.resources.gamemusic){
 		const char * directory = "music";
+		CDDataDir();
 		std::vector<std::string> files = ListFiles(directory);
+		if(files.size() == 0){
+			CDResDir();
+			files = ListFiles(directory);
+		}
 		if(files.size() > 0){
 			char filename[1024];
 			strcpy(filename, directory);
@@ -5367,7 +5435,12 @@ std::string Game::FindMap(const char * name, unsigned char (*hash)[20], const ch
 		if(strcmp(directory, "archive") == 0){
 			isarchive = true;
 		}
+		CDDataDir();
 		std::vector<std::string> files = ListFiles(directory);
+		if(files.size() == 0){
+			CDResDir();
+			files = ListFiles(directory);
+		}
 		for(std::vector<std::string>::iterator it = files.begin(); it != files.end(); it++){
 			//printf("map: %s\n", (*it).c_str());
 			if((*it).compare(name) == 0){
@@ -5397,7 +5470,17 @@ std::string Game::FindMap(const char * name, unsigned char (*hash)[20], const ch
 }
 
 std::string Game::SaveMap(const char * name, unsigned char * data, int size){
+	CDDataDir();
 	std::string filename = "level/download/";
+#ifdef POSIX
+	mkdir("level", 0777);
+	mkdir("level/download", 0777);
+	mkdir("level/archive", 0777);
+#elif _WIN32
+	_mkdir("level");
+	_mkdir("level/download");
+	_mkdir("level/archive");
+#endif
 	filename.append(name);
 	SDL_RWops * file = SDL_RWFromFile(filename.c_str(), "wb");
 	if(file){
@@ -5423,6 +5506,9 @@ void Game::CalculateMapHash(const char * filename, unsigned char (*hash)[20]){
 	//char mapfilename[256];
 	//sprintf(mapfilename, "level/%s", mapname);
 	SDL_RWops * file = SDL_RWFromFile(filename, "rb");
+	if(!file){
+		file = SDL_RWFromFile(filename, "rb");
+	}
 	if(file){
 		int mapdatasize = SDL_RWread(file, mapdata, 1, 65535);
 		SDL_RWclose(file);
@@ -5443,9 +5529,15 @@ std::string Game::StringFromHash(unsigned char (*hash)[20]){
 
 void Game::LoadMapData(const char * filename){
 	//printf("loading map data from %s\n", filename);
+	CDDataDir();
 	SDL_RWops * file = SDL_RWFromFile(filename, "rb");
+	if(!file){
+		CDResDir();
+		file = SDL_RWFromFile(filename, "rb");
+	}
 	if(file){
 		world.currentmapdatalength = SDL_RWread(file, world.currentmapdata, 1, world.currentmapdatamax);
+		world.currentmapdataend = true;
 		//printf("length: %d %s\n", world.currentmapdatalength, SDL_GetError());
 		SDL_RWclose(file);
 	}
@@ -5560,6 +5652,9 @@ bool Game::HandleSDLEvents(void){
 						}
 					}
 				}
+				if(event.key.keysym.scancode == SDL_SCANCODE_F1){
+					world.showplayerlist = true;
+				}
 				if(event.key.keysym.scancode == SDL_SCANCODE_F2){
 					if(world.showteamcolors){
 						world.showteamcolors = false;
@@ -5648,6 +5743,9 @@ bool Game::HandleSDLEvents(void){
 					if(world.quitstate == 3){
 						world.quitstate = 0;
 					}
+				}
+				if(event.key.keysym.scancode == SDL_SCANCODE_F1){
+					world.showplayerlist = false;
 				}
 				keystate[event.key.keysym.scancode] = false;
 			}break;

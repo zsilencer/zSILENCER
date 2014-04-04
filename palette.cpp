@@ -45,7 +45,9 @@ bool Palette::Load(void){
 	/*system("rm PALETTECALC0.BIN");
 	system("rm PALETTECALC1.BIN");
 	system("rm PALETTECALC2.BIN");*/
+	CDResDir();
 	SDL_RWops * file = SDL_RWFromFile("PALETTE.BIN", "rb");
+	CDDataDir();
 	SDL_RWops * filec = SDL_RWFromFile(filename, "rb");
 	if(file){
 		for(int offset = 0; offset < 11; offset++){
@@ -69,7 +71,7 @@ bool Palette::Load(void){
 			}
 			SDL_RWclose(filec);
 		}else{
-			printf("%s not found, calculating lookup tables...", filename);
+			printf("%s not found, calculating lookup tables...\n", filename);
 			Calculate(2, 256 - 30);
 			Save();
 		}
@@ -123,6 +125,7 @@ SDL_Color * Palette::GetColors(void){
 void Palette::Save(void){
 	char filename[256];
 	sprintf(filename, "PALETTECALC%d.BIN", currentpalette);
+	CDDataDir();
 	SDL_RWops * file = SDL_RWFromFile(filename, "wb");
 	for(unsigned int i = 0; i < 256; i++){
 		SDL_RWwrite(file, &brightness[currentpalette][(i * 256)], 256, 1);
