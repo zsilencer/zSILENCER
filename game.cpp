@@ -3260,8 +3260,10 @@ Interface * Game::CreateGameCreateInterface(void){
 #else
 	std::vector<std::string> maps;
 	std::vector<std::string> files;
+	CDResDir();
 	files = ListFiles("level");
 	maps.insert(maps.end(), files.begin(), files.end());
+	CDDataDir();
 	files = ListFiles("level/download");
 	for(std::vector<std::string>::iterator it = files.begin(); it != files.end(); it++){
 		if(std::find(maps.begin(), maps.end(), (*it)) == maps.end()){
