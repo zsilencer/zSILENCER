@@ -4095,12 +4095,16 @@ bool Game::ProcessLobbyInterface(Interface * iface){
 	if(mappreviewinterface && !gamecreateinterface){
 		Interface * mappreviewiface = static_cast<Interface *>(world.GetObjectFromId(mappreviewinterface));
 		if(mappreviewiface){
-			mappreviewiface->DestroyInterface(world, iface);
+			mappreviewiface->DestroyInterface(world);
 		}
 		mappreviewinterface = 0;
 	}
-	for(std::vector<Uint16>::iterator it = iface->objects.begin(); it != iface->objects.end(); it++){
-		Object * object = world.GetObjectFromId(*it);
+	for(int i = 0; i < iface->objects.size(); i++){
+		if(i > iface->objects.size() - 1){
+			return false;
+		}
+		Uint16 id = iface->objects[i];
+		Object * object = world.GetObjectFromId(id);
 		if(object){
 			switch(object->type){
 				case ObjectTypes::SCROLLBAR:{
@@ -4154,7 +4158,7 @@ bool Game::ProcessLobbyInterface(Interface * iface){
 										if(mappreviewinterface){
 											Interface * mappreviewiface = static_cast<Interface *>(world.GetObjectFromId(mappreviewinterface));
 											if(mappreviewiface){
-												mappreviewiface->DestroyInterface(world, iface);
+												mappreviewiface->DestroyInterface(world);
 											}
 											mappreviewinterface = 0;
 										}
@@ -4164,8 +4168,8 @@ bool Game::ProcessLobbyInterface(Interface * iface){
 									if(mappreviewinterface){
 										Interface * mappreviewiface = static_cast<Interface *>(world.GetObjectFromId(mappreviewinterface));
 										if(mappreviewiface){
-											for(std::vector<Uint16>::iterator it = mappreviewiface->objects.begin(); it != mappreviewiface->objects.end(); it++){
-												Object * object = world.GetObjectFromId(*it);
+											for(std::vector<Uint16>::iterator it2 = mappreviewiface->objects.begin(); it2 != mappreviewiface->objects.end(); it2++){
+												Object * object = world.GetObjectFromId(*it2);
 												switch(object->type){
 													case ObjectTypes::OVERLAY:{
 														Overlay * overlay = static_cast<Overlay *>(object);
@@ -4191,7 +4195,7 @@ bool Game::ProcessLobbyInterface(Interface * iface){
 								}else{
 									Interface * mappreviewiface = static_cast<Interface *>(world.GetObjectFromId(mappreviewinterface));
 									if(mappreviewiface){
-										mappreviewiface->DestroyInterface(world, iface);
+										mappreviewiface->DestroyInterface(world);
 									}
 									selectedmap = -1;
 									mappreviewinterface = 0;
@@ -4203,8 +4207,8 @@ bool Game::ProcessLobbyInterface(Interface * iface){
 									do{
 										deleted = false;
 										unsigned int index = 0;
-										for(std::deque<Uint32>::iterator it = selectbox->itemids.begin(); it != selectbox->itemids.end(); it++, index++){
-											Uint32 gameid = (*it);
+										for(std::deque<Uint32>::iterator it2 = selectbox->itemids.begin(); it2 != selectbox->itemids.end(); it2++, index++){
+											Uint32 gameid = (*it2);
 											if(!world.lobby.GetGameById(gameid)){
 												selectbox->DeleteItem(index);
 												deleted = true;
@@ -4212,8 +4216,8 @@ bool Game::ProcessLobbyInterface(Interface * iface){
 											}
 										}
 									}while(deleted);
-									for(std::list<LobbyGame *>::iterator it = world.lobby.games.begin(); it != world.lobby.games.end(); it++){
-										LobbyGame * lobbygame = (*it);
+									for(std::list<LobbyGame *>::iterator it2 = world.lobby.games.begin(); it2 != world.lobby.games.end(); it2++){
+										LobbyGame * lobbygame = (*it2);
 										if(selectbox->IdToIndex(lobbygame->id) == -1){
 											selectbox->AddItem(lobbygame->name, lobbygame->id);
 										}
@@ -4422,8 +4426,8 @@ bool Game::ProcessLobbyInterface(Interface * iface){
 								if(gameselectinterface){
 									Interface * gameselectiface = static_cast<Interface *>(world.GetObjectFromId(gameselectinterface));
 									if(gameselectiface){
-										for(std::vector<Uint16>::iterator it = gameselectiface->objects.begin(); it != gameselectiface->objects.end(); it++){
-											Object * object = world.GetObjectFromId(*it);
+										for(std::vector<Uint16>::iterator it2 = gameselectiface->objects.begin(); it2 != gameselectiface->objects.end(); it2++){
+											Object * object = world.GetObjectFromId(*it2);
 											if(object && object->type == ObjectTypes::SELECTBOX){
 												SelectBox * selectbox = static_cast<SelectBox *>(object);
 												if(selectbox->selecteditem != -1){

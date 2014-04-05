@@ -365,10 +365,12 @@ Object * Interface::GetObjectWithUid(World & world, Uint8 uid){
 }
 
 void Interface::DestroyInterface(World & world, Interface * parentinterface){
-	for(std::vector<Uint16>::iterator it = parentinterface->objects.begin(); it != parentinterface->objects.end(); it++){
-		if(*it == id){
-			parentinterface->objects.erase(it);
-			break;
+	if(parentinterface){
+		for(std::vector<Uint16>::iterator it = parentinterface->objects.begin(); it != parentinterface->objects.end(); it++){
+			if(*it == id){
+				parentinterface->objects.erase(it);
+				break;
+			}
 		}
 	}
 	for(std::vector<Uint16>::iterator it = objects.begin(); it != objects.end(); it++){

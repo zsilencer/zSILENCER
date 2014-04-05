@@ -19,7 +19,7 @@ public:
 	void ProcessMouseWheelDown(World & world);
 	void ActiveChanged(World & world, Interface * callinginterface, bool mouse);
 	Object * GetObjectWithUid(World & world, Uint8 uid);
-	void DestroyInterface(World & world, Interface * parentinterface);
+	void DestroyInterface(World & world, Interface * parentinterface = 0);
 	static char * WordWrap(const char * string, unsigned int maxlength, const char * breakchar = "\n");
 	std::vector<Uint16> objects;
 	std::vector<Uint16> tabobjects;
