@@ -4100,7 +4100,7 @@ bool Game::ProcessLobbyInterface(Interface * iface){
 		mappreviewinterface = 0;
 	}
 	for(int i = 0; i < iface->objects.size(); i++){
-		if(i > iface->objects.size() - 1){
+		if(i >= iface->objects.size()){
 			return false;
 		}
 		Uint16 id = iface->objects[i];
