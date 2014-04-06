@@ -4348,13 +4348,13 @@ bool Game::ProcessLobbyInterface(Interface * iface){
 #endif
 							}
 						}
+						bool scroll = false;
 						while(world.lobby.chatmessages.size() > chatlinesprinted){
 							char * message = world.lobby.chatmessages.front();
 							Uint8 color = message[strlen(message) + 1];
 							Uint8 brightness = message[strlen(message) + 2];
-							bool scroll = true;
-							if(scrollbar && scrollbar->scrollposition != scrollbar->scrollmax){
-								scroll = false;
+							if(scrollbar && scrollbar->scrollposition == scrollbar->scrollmax){
+								scroll = true;
 							}
 							textbox->AddText(message, color, brightness, 2, scroll);
 							delete[] message;

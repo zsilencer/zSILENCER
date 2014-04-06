@@ -1565,7 +1565,7 @@ void World::SendInput(void){
 	localinputhistory[tickcount % maxlocalinputhistory] = localinput;
 	if(mode == REPLICA && state == CONNECTED && gameplaystate == INGAME){
 		peer = peerlist[localpeerid];
-		if(peer){
+		if(peer && peer->controlledlist.size() > 0){
 			peer->input = localinput;
 			peer->input.mousex = 0xFFFF;
 			peer->input.mousey = 0xFFFF;
