@@ -12,7 +12,7 @@ public:
 	~Replay();
 	void BeginRecording(const char * filename);
 	void EndRecording(void);
-	void BeginPlaying(const char * filename);
+	void BeginPlaying(const char * filename, const char * outfilename = 0, bool video = true);
 	void EndPlaying(void);
 	void WriteHeader(class World & world);
 	bool ReadHeader(class World & world);
@@ -36,6 +36,11 @@ public:
 	enum {STA_BUY, STA_REPAIR, STA_VIRUS};
 	int x, y, oldx, oldy;
 	float speed;
+#ifdef POSIX
+	FILE * ffmpeg;
+	bool ffmpegvideo;
+#endif
+	Uint32 tick;
 	
 	friend class Game;
 	

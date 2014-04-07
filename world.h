@@ -113,6 +113,7 @@ public:
 	friend class Terminal;
 	friend class PlayerAI;
 	friend class Replay;
+	friend class Audio;
 	
 protected:
 	std::list<class Object *> objectlist;

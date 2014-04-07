@@ -21,6 +21,8 @@ public:
 	bool Loop(void);
 	bool HandleSDLEvents(void);
 	void LoadProgressCallback(int progress, int totalprogressitems);
+	
+	friend class Audio;
 
 private:
 	bool Tick(void);

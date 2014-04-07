@@ -25,6 +25,7 @@
 #include <netdb.h>
 #include <errno.h>
 #include <poll.h>
+#include <fcntl.h>
 typedef int SOCKET;
 #define closesocket close
 #elif _WIN32

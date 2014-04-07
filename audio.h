@@ -11,7 +11,7 @@ public:
 	Audio();
 	~Audio();
 	static Audio & GetInstance(void);
-	bool Init(void);
+	bool Init(class Game * game);
 	void Close(void);
 	int Play(Mix_Chunk * chunk, int volume = 128, bool loop = false);
 	void Stop(int channel, int fadeoutms = 0);

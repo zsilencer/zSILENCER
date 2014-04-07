@@ -1,6 +1,7 @@
 #include "audio.h"
 #include "world.h"
 #include "config.h"
+#include "game.h"
 #include <math.h>
 
 Audio::Audio(){
@@ -18,13 +19,13 @@ Audio & Audio::GetInstance(void){
 	return instance;
 }
 
-bool Audio::Init(void){
+bool Audio::Init(Game * game){
 	if(Mix_OpenAudio(44100, AUDIO_S16, 1, 1024) == -1){
 		return false;
 	}else{
 		Mix_AllocateChannels(maxchannels);
 		Mix_ChannelFinished(ChannelFinished);
-		//Mix_SetPostMix(MixingFunction, 0);
+		Mix_SetPostMix(MixingFunction, game);
 		return true;
 	}
 }
@@ -185,5 +186,10 @@ void Audio::ChannelFinished(int channel){
 }
 
 void Audio::MixingFunction(void * udata, Uint8 * stream, int len){
-	
+#ifdef POSIX
+	Game * game = (Game *)udata;
+	if(game && game->world.replay.IsPlaying() && game->world.replay.ffmpeg && !game->world.replay.ffmpegvideo && game->deploymessageshown){
+		fwrite(stream, len, 1, game->world.replay.ffmpeg);
+	}
+#endif
 }

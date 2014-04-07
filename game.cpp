@@ -175,7 +175,7 @@ bool Game::Load(char * cmdline){
 	if(!(mixinitted & MIX_INIT_MP3)){
 		printf("Could not initialize MP3 support %s\n", Mix_GetError());
 	}
-	if(!Audio::GetInstance().Init()){
+	if(!Audio::GetInstance().Init(this)){
 		printf("Could not initialize audio\n");
 	}
 	Audio::GetInstance().SetMusicVolume(Config::GetInstance().musicvolume);
@@ -502,6 +502,13 @@ bool Game::Loop(void){
 	Uint32 tickcheck = SDL_GetTicks();
 	if(world.replay.IsPlaying()){
 		wait = 42 * world.replay.speed;
+		if(world.replay.ffmpeg && world.replay.ffmpegvideo){
+			tickcheck = world.replay.tick;
+			if(!tickcheck){
+				lasttick = 0;
+			}
+			world.replay.tick += 20; // 50 fps
+		}
 	}
 	while(lasttick <= tickcheck && tickcheck - lasttick > wait){
 		//printf("%d\n", tickcheck - lasttick);
@@ -541,6 +548,22 @@ bool Game::Loop(void){
 		screenbuffer.Clear(0);
 		world.DoNetwork();
 		renderer.Draw(&screenbuffer, 1 - (float(tickcheck - lasttick) / wait));
+#ifdef POSIX
+		if(world.replay.IsPlaying() && world.replay.ffmpeg && world.replay.ffmpegvideo && deploymessageshown){
+			Uint8 buffer[640 * 480 * 3];
+			int i = 0;
+			int j = 0;
+			for(int y = screenbuffer.h; y > 0; y--){
+				for(int x = screenbuffer.w; x > 0; x--){
+					buffer[i++] = sdlscreenbuffer->format->palette->colors[screenbuffer.pixels[j]].r;
+					buffer[i++] = sdlscreenbuffer->format->palette->colors[screenbuffer.pixels[j]].g;
+					buffer[i++] = sdlscreenbuffer->format->palette->colors[screenbuffer.pixels[j]].b;
+					j++;
+				}
+			}
+			fwrite(buffer, sizeof(buffer), 1, world.replay.ffmpeg);
+		}
+#endif
 		/*char fpstext[16];
 		sprintf(fpstext, "%d", fps);
 		renderer.DrawText(&screenbuffer, 10, 30, fpstext, 133, 7);*/
@@ -948,12 +971,12 @@ bool Game::Tick(void){
 				if(world.replay.IsPlaying()){
 					// replay controls
 					if(world.localpeerid == world.authoritypeer){
-						/*for(int i = 0; i < world.maxpeers; i++){
+						for(int i = 0; i < world.maxpeers; i++){
 							if(world.peerlist[i] && i != world.authoritypeer){
 								world.localpeerid = i;
 								break;
 							}
-						}*/
+						}
 					}
 					world.replay.oldx = world.replay.x;
 					world.replay.oldy = world.replay.y;
@@ -2383,7 +2406,7 @@ Interface * Game::CreateMainMenuInterface(void){
 	Interface * iface = (Interface *)world.CreateObject(ObjectTypes::INTERFACE);
 	iface->AddObject(startbutton->id);
 	iface->AddObject(lobbybutton->id);
-	if(0){
+	if(1){
 		Button * hostbutton = (Button *)world.CreateObject(ObjectTypes::BUTTON);
 		hostbutton->y = -270;
 		hostbutton->x = -240;
@@ -5600,11 +5623,15 @@ bool Game::HandleSDLEvents(void){
 					case SDL_WINDOWEVENT_FOCUS_GAINED:{
 						// fix for Windows sdl bug where viewport is changed when another app goes fullscreen, causing render to go black
 						SDL_RenderSetViewport(windowrenderer, 0);
-						Audio::GetInstance().Unmute();
+						if(!world.replay.IsPlaying()){
+							Audio::GetInstance().Unmute();
+						}
 						minimized = false;
 					}break;
 					case SDL_WINDOWEVENT_FOCUS_LOST:{
-						Audio::GetInstance().Mute(25);
+						if(!world.replay.IsPlaying()){
+							Audio::GetInstance().Mute(25);
+						}
 						minimized = true;
 					}break;
 					case SDL_WINDOWEVENT_MINIMIZED:{

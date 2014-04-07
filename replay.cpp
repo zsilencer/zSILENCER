@@ -16,6 +16,9 @@ Replay::Replay(){
 	oldx = 0;
 	oldy = 0;
 	speed = 1;
+	ffmpeg = 0;
+	ffmpegvideo = true;
+	tick = 0;
 }
 
 Replay::~Replay(){
@@ -39,12 +42,27 @@ void Replay::EndRecording(void){
 	isrecording = false;
 }
 
-void Replay::BeginPlaying(const char * filename){
+void Replay::BeginPlaying(const char * filename, const char * outfilename, bool video){
 	CDDataDir();
 	file = SDL_RWFromFile(filename, "rb");
 	if(file){
 		isplaying = true;
 	}
+#ifdef POSIX
+	if(outfilename){
+		ffmpegvideo = video;
+		if(video){
+			char cmd[256];
+			sprintf(cmd, "ffmpeg -v debug -y -f rawvideo -vcodec rawvideo -s 640x480 -pix_fmt rgb24 -r 50 -i pipe: -an -vcodec libx264 -preset veryslow -qp 0 %s", outfilename);
+			ffmpeg = popen(cmd, "w");
+			tick = 0;
+		}else{
+			char cmd[256];
+			sprintf(cmd, "ffmpeg -v debug -y -f s16le -ar 44100 -ac 1 -acodec pcm_s16le -i pipe: -vn -acodec libvo_aacenc %s", outfilename);
+			ffmpeg = popen(cmd, "w");
+		}
+	}
+#endif
 	gamestarted = false;
 }
 
@@ -53,6 +71,12 @@ void Replay::EndPlaying(void){
 		SDL_RWclose(file);
 	}
 	file = 0;
+#ifdef POSIX
+	if(ffmpeg){
+		pclose(ffmpeg);
+	}
+	ffmpeg = 0;
+#endif
 	isplaying = false;
 }
 
