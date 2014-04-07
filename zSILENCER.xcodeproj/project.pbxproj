@@ -1170,8 +1170,6 @@
 		B2D3A19B176F627E004959A1 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = System/Library/Frameworks/Foundation.framework; sourceTree = SDKROOT; };
 		B2D3A1E9176F6728004959A1 /* zSILENCER.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = zSILENCER.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		B2D3A2A7176F6AE7004959A1 /* zSILENCER-Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = "zSILENCER-Info.plist"; sourceTree = SOURCE_ROOT; };
-		B2D3A2A9176F6AFF004959A1 /* InfoPlist.strings */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.strings; path = InfoPlist.strings; sourceTree = SOURCE_ROOT; };
-		B2D3A2AA176F6AFF004959A1 /* MainMenu.xib */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.xib; path = MainMenu.xib; sourceTree = SOURCE_ROOT; };
 		B2DD69F81773A99A00588166 /* bodypart.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = bodypart.cpp; sourceTree = SOURCE_ROOT; };
 		B2DD69F91773A99B00588166 /* bodypart.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = bodypart.h; sourceTree = SOURCE_ROOT; };
 		B2DD69FB1773BDB500588166 /* CLOSER2.mp3 */ = {isa = PBXFileReference; lastKnownFileType = audio.mp3; path = CLOSER2.mp3; sourceTree = "<group>"; };
@@ -1765,8 +1763,6 @@
 				B2783533178E3D0D001F92D9 /* icon.icns */,
 				B2D39CFD176F5A99004959A1 /* SDLMain.h */,
 				B2D39CFE176F5A99004959A1 /* SDLMain.m */,
-				B2D3A2A9176F6AFF004959A1 /* InfoPlist.strings */,
-				B2D3A2AA176F6AFF004959A1 /* MainMenu.xib */,
 				B2D3A2A7176F6AE7004959A1 /* zSILENCER-Info.plist */,
 			);
 			name = "Supporting Files";
