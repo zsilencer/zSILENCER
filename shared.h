@@ -31,6 +31,7 @@ typedef int SOCKET;
 #elif _WIN32
 #include <winsock2.h>
 #include <windows.h>
+#include <direct.h>
 #undef INTERFACE
 #define EADDRINUSE WSAEADDRINUSE
 #define ECONNRESET WSAECONNRESET

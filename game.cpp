@@ -2406,7 +2406,7 @@ Interface * Game::CreateMainMenuInterface(void){
 	Interface * iface = (Interface *)world.CreateObject(ObjectTypes::INTERFACE);
 	iface->AddObject(startbutton->id);
 	iface->AddObject(lobbybutton->id);
-	if(1){
+	if(0){
 		Button * hostbutton = (Button *)world.CreateObject(ObjectTypes::BUTTON);
 		hostbutton->y = -270;
 		hostbutton->x = -240;

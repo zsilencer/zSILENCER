@@ -36,10 +36,8 @@ public:
 	enum {STA_BUY, STA_REPAIR, STA_VIRUS};
 	int x, y, oldx, oldy;
 	float speed;
-#ifdef POSIX
 	FILE * ffmpeg;
 	bool ffmpegvideo;
-#endif
 	Uint32 tick;
 	
 	friend class Game;
