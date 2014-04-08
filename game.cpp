@@ -5551,7 +5551,7 @@ std::string Game::StringFromHash(unsigned char (*hash)[20]){
 	memset(hashstring, 0, sizeof(hashstring));
 	for(int i = 0; i < 20; i++){
 		unsigned char byte = (*hash)[i];
-		sprintf(&hashstring[i * 2], "%0.2X", byte);
+		sprintf(&hashstring[i * 2], "%.2X", byte);
 	}
 	return std::string(hashstring);
 }

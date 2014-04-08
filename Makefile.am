@@ -1,5 +1,3 @@
-AM_CPPFLAGS = -I/usr/include/SDL2
-AM_LDFLAGS = -lSDL2 -lSDL2_mixer
 bin_PROGRAMS = zSILENCERlinux
 zSILENCERlinux_SOURCES = audio.cpp basedoor.cpp baseexit.cpp terminal.cpp bipedal.cpp \
 					blasterprojectile.cpp bodypart.cpp button.cpp \

@@ -2,7 +2,7 @@
 #include "rocketprojectile.h"
 #include "plasmaprojectile.h"
 #include "player.h"
-#include "Fixedcannon.h"
+#include "fixedcannon.h"
 #include "plume.h"
 
 Robot::Robot() : Object(ObjectTypes::ROBOT){

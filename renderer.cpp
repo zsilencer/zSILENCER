@@ -1648,11 +1648,10 @@ void Renderer::DrawMessage(Surface * surface){
 	if(!world.message_i){
 		return;
 	}
-	int linelength = (int)strchr(world.message, '\n');
-	if(!linelength){
-		linelength = strlen(world.message);
-	}else{
-		linelength -= (int)world.message;
+	int linelength = strlen(world.message);
+	char * newline = strchr(world.message, '\n');
+	if(newline){
+		linelength = newline - world.message;
 	}
 	int liney = 60;
 	Uint8 color = 208;
@@ -1723,11 +1722,10 @@ void Renderer::DrawMessage(Surface * surface){
 		DrawText(surface, ((640 - (linelength * textwidth)) / 2) + (textwidth * (linelength - nextline)), liney, temp, textbank, textwidth, false, color, brightness);
 		nextline--;
 		if(nextline < 0){
-			linelength = (int)strchr(&world.message[i + 1], '\n');
-			if(!linelength){
-				linelength = strlen(&world.message[i + 1]);
-			}else{
-				linelength -= (int)&world.message[i + 1];
+			linelength = strlen(&world.message[i + 1]);
+			char * newline = strchr(&world.message[i + 1], '\n');
+			if(newline){
+				linelength = newline - &world.message[i + 1];
 			}
 			nextline = linelength;
 			if(line == 0 && world.messagetype >= 10){
