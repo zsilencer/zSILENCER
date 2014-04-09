@@ -15,6 +15,8 @@ Replay::Replay(){
 	y = 0;
 	oldx = 0;
 	oldy = 0;
+	xv = 0;
+	yv = 0;
 	speed = 1;
 	ffmpeg = 0;
 	ffmpegvideo = true;
@@ -43,6 +45,9 @@ void Replay::EndRecording(void){
 }
 
 void Replay::BeginPlaying(const char * filename, const char * outfilename, bool video){
+	if(!filename){
+		return;
+	}
 	CDDataDir();
 	file = SDL_RWFromFile(filename, "rb");
 	if(file){

@@ -107,7 +107,7 @@ void Renderer::Draw(Surface * surface, float frametime){
 		if(world.replay.IsPlaying()){
 			int px = world.replay.x + ((world.replay.oldx - world.replay.x) * frametime);
 			int py = world.replay.y + ((world.replay.oldy - world.replay.y) * frametime);
-			camera.Follow(world, px, py, 15, 100, 0, 30);
+			camera.Follow(world, px, py, 0, 0, 0, 30);
 		}
 	}
 	if(world.map.loaded){
@@ -414,6 +414,10 @@ void Renderer::DrawWorld(Surface * surface, Camera & camera, bool drawminimap, b
 											src = 0;
 										}
 									}
+								}else{
+									BaseDoor * basedoor = static_cast<BaseDoor *>(object);
+									effectsurface = CreateSurfaceCopy(src);
+									EffectTeamColor(effectsurface, 0, basedoor->color);
 								}
 							}break;
 							case ObjectTypes::SHRAPNEL:{

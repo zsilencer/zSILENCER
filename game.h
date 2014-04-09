@@ -158,6 +158,7 @@ private:
 	Uint32 lastmusicplaytime;
 	char currentmusictrack[256];
 	bool fullscreentoggled;
+	char * replayfile;
 };
 
 #endif

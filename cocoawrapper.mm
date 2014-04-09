@@ -2,8 +2,8 @@
 #import <Cocoa/Cocoa.h>
 #import <Foundation/Foundation.h>
 
-void RequestUserAttention(void * nswindow){
-	((NSWindow *)nswindow);
+void RequestUserAttention(void){
+	[NSApp requestUserAttention:NSInformationalRequest];
 }
 
 const char * GetAppSupportDirectory(void){

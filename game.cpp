@@ -86,6 +86,7 @@ Game::Game() : renderer(world), screenbuffer(640, 480){
 #endif
 	mapexistchecked = false;
 	fullscreentoggled = false;
+	replayfile = 0;
 }
 
 Game::~Game(){
@@ -119,7 +120,7 @@ Game::~Game(){
 bool Game::Load(char * cmdline){
 	if((cmdline = strtok(cmdline, " "))){
 		do{
-			if(strncmp(cmdline, "-s", 2) == 0){
+			if(strncmp(cmdline, "-s", 2) == 0){ // dedicated server
 				char * lobbyaddress = strtok(NULL, " ");
 				char * lobbyport = strtok(NULL, " ");
 				char * gameid = strtok(NULL, " ");
@@ -156,6 +157,10 @@ bool Game::Load(char * cmdline){
 					newstateobject->state = 0;
 					state = NONE;
 				}
+			}else
+			if(strncmp(cmdline, "-r", 2) == 0){ // play replay
+				replayfile = strtok(NULL, " ");
+				GoToState(REPLAYGAME);
 			}
 		}while((cmdline = strtok(0, " ")));
 	}
@@ -970,7 +975,7 @@ bool Game::Tick(void){
 				}
 				if(world.replay.IsPlaying()){
 					// replay controls
-					if(world.localpeerid == world.authoritypeer){
+					if(world.localpeerid == world.authoritypeer && !deploymessageshown){
 						for(int i = 0; i < world.maxpeers; i++){
 							if(world.peerlist[i] && i != world.authoritypeer){
 								world.localpeerid = i;
@@ -982,24 +987,57 @@ bool Game::Tick(void){
 					world.replay.oldy = world.replay.y;
 					if(world.localinput.keymoveleft || world.localinput.keymoveright || world.localinput.keymoveup || world.localinput.keymovedown){
 						world.localpeerid = world.authoritypeer;
-						if(world.localinput.keymoveleft){
-							world.replay.x -= 50;
-							if(world.replay.x < 0){
-								world.replay.x = 0;
-							}
+						bool inbase = false;
+						if(world.replay.y > world.map.height * 64){
+							inbase = true;
 						}
+						if(world.localinput.keymoveleft){
+							if(world.replay.xv > 0){
+								world.replay.xv = 0;
+							}
+							world.replay.xv -= 3;
+							world.replay.x += world.replay.xv;
+							if(world.replay.x < 320){
+								world.replay.x = 320;
+							}
+						}else
 						if(world.localinput.keymoveright){
-							world.replay.x += 50;
+							if(world.replay.xv < 0){
+								world.replay.xv = 0;
+							}
+							world.replay.xv += 3;
+							world.replay.x += world.replay.xv;
+							if(world.replay.x > ((inbase ? world.map.expandedwidth : world.map.width) * 64) - 320){
+								world.replay.x = ((inbase ? world.map.expandedwidth : world.map.width) * 64) - 320;
+							}
+						}else{
+							world.replay.xv = 0;
 						}
 						if(world.localinput.keymoveup){
-							world.replay.y -= 50;
-							if(world.replay.y < 0){
-								world.replay.y = 0;
+							if(world.replay.yv > 0){
+								world.replay.yv = 0;
 							}
-						}
+							world.replay.yv -= 3;
+							world.replay.y += world.replay.yv;
+							if(world.replay.y < 240){
+								world.replay.y = 240;
+							}
+						}else
 						if(world.localinput.keymovedown){
-							world.replay.y += 50;
+							if(world.replay.yv < 0){
+								world.replay.yv = 0;
+							}
+							world.replay.yv += 3;
+							world.replay.y += world.replay.yv;
+							if(world.replay.y > ((inbase ? world.map.expandedheight : world.map.height) * 64) - 240){
+								world.replay.y = ((inbase ? world.map.expandedheight : world.map.height) * 64) - 240;
+							}
+						}else{
+							world.replay.yv = 0;
 						}
+					}else{
+						world.replay.xv = 0;
+						world.replay.yv = 0;
 					}
 					if(world.localinput.keyprevcam && !world.localinputhistory[(world.tickcount - 1) % world.maxlocalinputhistory].keyprevcam){
 						for(int i = world.localpeerid - 1; i > 0; i--){
@@ -1985,15 +2023,18 @@ bool Game::Tick(void){
 		}break;
 		case REPLAYGAME:{
 			if(stateisnew){
+				world.Disconnect();
+				world.lobby.Disconnect();
+				UnloadGame();
+				world.GetAuthorityPeer()->controlledlist.clear();
 				world.DestroyAllObjects();
+				stateisnew = false;
 				world.gameplaystate = World::INLOBBY;
-				world.replay.BeginPlaying("testrecording.zsr");
+				world.replay.BeginPlaying(replayfile);
 				if((world.replay.IsPlaying() && !world.replay.ReadHeader(world)) || !world.replay.IsPlaying()){
 					printf("Replay error\n");
 					world.replay.EndPlaying();
 					GoToState(MAINMENU);
-				}else{
-					stateisnew = false;
 				}
 			}else{
 				while(world.replay.ReadToNextTick(world)){
@@ -4365,8 +4406,8 @@ bool Game::ProcessLobbyInterface(Interface * iface){
 #endif
 #ifdef __APPLE__
 								if(info.subsystem == SDL_SYSWM_COCOA){
-									NSWindow * nswindow = info.info.cocoa.window;
-									RequestUserAttention(nswindow);
+									//NSWindow * nswindow = info.info.cocoa.window;
+									RequestUserAttention();
 								}
 #endif
 							}

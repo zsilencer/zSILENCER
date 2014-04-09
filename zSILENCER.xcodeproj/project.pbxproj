@@ -287,7 +287,6 @@
 		B25F829217BAD0F500557C24 /* stats.cpp in Sources */ = {isa = PBXBuildFile; fileRef = B25F829017BAD0CD00557C24 /* stats.cpp */; };
 		B278352C178B4110001F92D9 /* detonator.cpp in Sources */ = {isa = PBXBuildFile; fileRef = B278352A178B4110001F92D9 /* detonator.cpp */; };
 		B278352F178B83F9001F92D9 /* plasmaprojectile.cpp in Sources */ = {isa = PBXBuildFile; fileRef = B278352D178B83F8001F92D9 /* plasmaprojectile.cpp */; };
-		B2783534178E3D28001F92D9 /* icon.icns in CopyFiles */ = {isa = PBXBuildFile; fileRef = B2783533178E3D0D001F92D9 /* icon.icns */; };
 		B2783537178FF5A3001F92D9 /* fixedcannon.cpp in Sources */ = {isa = PBXBuildFile; fileRef = B2783535178FF59A001F92D9 /* fixedcannon.cpp */; };
 		B278353A1791BF62001F92D9 /* grenade.cpp in Sources */ = {isa = PBXBuildFile; fileRef = B27835381791BF53001F92D9 /* grenade.cpp */; };
 		B27E2BF3178B0BAB003E0E8D /* buyableitem.cpp in Sources */ = {isa = PBXBuildFile; fileRef = B27E2BF1178B0BA8003E0E8D /* buyableitem.cpp */; };
@@ -701,7 +700,6 @@
 			dstPath = "";
 			dstSubfolderSpec = 7;
 			files = (
-				B2783534178E3D28001F92D9 /* icon.icns in CopyFiles */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -791,7 +789,6 @@
 		B278352B178B4110001F92D9 /* detonator.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = detonator.h; sourceTree = SOURCE_ROOT; };
 		B278352D178B83F8001F92D9 /* plasmaprojectile.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = plasmaprojectile.cpp; sourceTree = SOURCE_ROOT; };
 		B278352E178B83F8001F92D9 /* plasmaprojectile.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = plasmaprojectile.h; sourceTree = SOURCE_ROOT; };
-		B2783533178E3D0D001F92D9 /* icon.icns */ = {isa = PBXFileReference; lastKnownFileType = image.icns; path = icon.icns; sourceTree = "<group>"; };
 		B2783535178FF59A001F92D9 /* fixedcannon.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = fixedcannon.cpp; sourceTree = SOURCE_ROOT; };
 		B2783536178FF59E001F92D9 /* fixedcannon.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = fixedcannon.h; sourceTree = SOURCE_ROOT; };
 		B27835381791BF53001F92D9 /* grenade.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = grenade.cpp; sourceTree = SOURCE_ROOT; };
@@ -870,6 +867,7 @@
 		B28BD61A1758538C00766F72 /* lobby.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = lobby.h; sourceTree = SOURCE_ROOT; };
 		B28BD61B175853AE00766F72 /* lobby.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = lobby.cpp; sourceTree = SOURCE_ROOT; };
 		B290333318EF3EC600D94675 /* AGENCY04.SIL */ = {isa = PBXFileReference; lastKnownFileType = file; path = AGENCY04.SIL; sourceTree = "<group>"; };
+		B290333518F4B7AC00D94675 /* icon.icns */ = {isa = PBXFileReference; lastKnownFileType = image.icns; path = icon.icns; sourceTree = SOURCE_ROOT; };
 		B292CD3717A1F2CA00BB56E4 /* flareprojectile.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = flareprojectile.cpp; sourceTree = SOURCE_ROOT; };
 		B292CD3817A1F2CF00BB56E4 /* flareprojectile.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = flareprojectile.h; sourceTree = SOURCE_ROOT; };
 		B2A12E84175A57F5007001AD /* team.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = team.h; sourceTree = SOURCE_ROOT; };
@@ -1760,8 +1758,8 @@
 		B2D3A1EC176F6729004959A1 /* Supporting Files */ = {
 			isa = PBXGroup;
 			children = (
-				B2783533178E3D0D001F92D9 /* icon.icns */,
 				B2D39CFD176F5A99004959A1 /* SDLMain.h */,
+				B290333518F4B7AC00D94675 /* icon.icns */,
 				B2D39CFE176F5A99004959A1 /* SDLMain.m */,
 				B2D3A2A7176F6AE7004959A1 /* zSILENCER-Info.plist */,
 			);
