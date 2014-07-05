@@ -908,6 +908,7 @@ bool Game::Tick(void){
 				//char mapname[7 + 256];
 				//sprintf(mapname, "level/%s", world.gameinfo.mapname);
 				if(!LoadMap(FindMap(world.gameinfo.mapname, &world.gameinfo.maphash).c_str())){
+					printf("Unable to load map\n");
 					if(world.replay.IsPlaying()){
 						world.replay.EndPlaying();
 					}
@@ -5502,24 +5503,26 @@ std::string Game::FindMap(const char * name, unsigned char (*hash)[20], const ch
 	}else{
 		//printf("searching %s\n", directory);
 		bool isarchive = false;
-		if(strcmp(directory, "archive") == 0){
+		if(strcmp(directory, "level/archive") == 0){
 			isarchive = true;
 		}
-		CDDataDir();
+		CDResDir();
 		std::vector<std::string> files = ListFiles(directory);
-		if(files.size() == 0){
-			CDResDir();
-			files = ListFiles(directory);
-		}
+		CDDataDir();
+		std::vector<std::string> files2 = ListFiles(directory);
+		files.insert(files.end(), files2.begin(), files2.end());
 		for(std::vector<std::string>::iterator it = files.begin(); it != files.end(); it++){
-			//printf("map: %s\n", (*it).c_str());
-			if((*it).compare(name) == 0){
+			std::string cname = (*it);
+			if(isarchive){
+				std::size_t p = cname.find_first_of(".");
+				if(p != std::string::npos){
+					cname.erase(0, p + 1);
+				}
+			}
+			//printf("map: %s cname: %s\n", (*it).c_str(), cname.c_str());
+			if(cname.compare(name) == 0){
 				std::string filename = directory;
 				filename.append("/");
-				if(isarchive && hash){
-					filename.append(StringFromHash(hash));
-					filename.append(".");
-				}
 				filename.append(*it);
 				//printf("found %s\n", filename.c_str());
 				if(!hash){
