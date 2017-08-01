@@ -1,0 +1,10 @@
+# http://standards.freedesktop.org/desktop-entry-spec/desktop-entry-spec-1.0.html
+[Desktop Entry]
+Type=Application
+Version=1.0
+Exec=zsilencer
+Icon=zsilencer
+Name=zSilencer
+GenericName=Online action game
+Comment=Action platformer shooter play online.
+Categories=Game;Action;
