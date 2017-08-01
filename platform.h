@@ -2,6 +2,7 @@
 #define PLATFORM_H
 
 #include "shared.h"
+#include <memory>
 #include "platformset.h"
 
 class Platform

@@ -4,6 +4,7 @@
 #include "shared.h"
 #include <vector>
 #include <map>
+#include <memory>
 #include "platform.h"
 #include "platformset.h"
 #include "minimap.h"
@@ -60,12 +61,16 @@ public:
 	unsigned int expandedheight;
 	char description[0x80];
 	Uint8 parallax;
-	Uint16 * fg[4];
-	Uint16 * bg[4];
-	bool * fgflipped[4];
-	bool * bgflipped[4];
-	bool * fglum[4];
-	bool * bglum[4];
+	struct Tile{
+		Tile() { fg = 0; bg = 0; bgflags = 0; fgflags = 0; };
+		Uint16 fg, bg;
+		int fgflags, bgflags;
+		enum {
+			FLIPPED = 1 << 0,
+			LUM = 1 << 1
+		};
+	};
+	std::vector<Tile> tiles[4];
 	Sint8 ambience;
 	Sint8 baseambience;
 	std::map<Uint16, Platform *> platformids;
@@ -75,12 +80,12 @@ public:
 	std::vector<XY> rainpuddlelocations;
 	Uint16 currentid;
 	MiniMap minimap;
-	Uint8 * nodetypes;
+	std::vector<Uint8> nodetypes;
 	
 //private:
-	static bool CompareType(Platform * a, Platform * b);
-	std::vector<Platform *> platforms;
-	std::vector<PlatformSet *> platformsets;
+	static bool CompareType(std::shared_ptr<Platform> a, std::shared_ptr<Platform> b);
+	std::vector<std::shared_ptr<Platform>> platforms;
+	std::vector<std::shared_ptr<PlatformSet>> platformsets;
 };
 
 #endif

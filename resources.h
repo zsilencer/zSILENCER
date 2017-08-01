@@ -5,6 +5,7 @@
 #include "palette.h"
 #include "surface.h"
 #include <map>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -12,15 +13,14 @@ class Resources
 {
 public:
 	Resources();
-	~Resources();
 	bool Load(class Game & game, bool dedicatedserver = false);
 	bool LoadSprites(class Game & game, bool dedicatedserver = false);
 	bool LoadTiles(class Game & game, bool dedicatedserver = false);
 	bool LoadSounds(class Game & game, bool dedicatedserver = false);
 	void UnloadSounds(void);
-	std::vector<std::vector<Surface *> > spritebank;
-	std::vector<std::vector<Surface *> > tilebank;
-	std::vector<std::vector<Surface *> > tileflippedbank;
+	std::vector<std::vector<std::shared_ptr<Surface> > > spritebank;
+	std::vector<std::vector<std::shared_ptr<Surface> > > tilebank;
+	std::vector<std::vector<std::shared_ptr<Surface> > > tileflippedbank;
 	std::vector<std::vector<int> > spriteoffsetx;
 	std::vector<std::vector<int> > spriteoffsety;
 	std::vector<std::vector<unsigned int> > spritewidth;

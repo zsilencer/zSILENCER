@@ -4,7 +4,6 @@ Overlay::Overlay() : Object(ObjectTypes::OVERLAY){
 	res_bank = 0xFF;
 	res_index = 0;
 	state_i = 0;
-	text = 0;
 	textbank = 135;
 	textwidth = 8;
 	drawalpha = false;
@@ -14,22 +13,10 @@ Overlay::Overlay() : Object(ObjectTypes::OVERLAY){
 	textallownewline = false;
 	textlineheight = 10;
 	clicked = false;
-	customsprite = 0;
-}
-
-Overlay::~Overlay(){
-	if(text){
-		delete[] text;
-		text = 0;
-	}
-	if(customsprite){
-		delete[] customsprite;
-		customsprite = 0;
-	}
 }
 
 void Overlay::Tick(World & world){
-	if(customsprite){
+	if(customsprite.size() > 0){
 		
 	}else{
 		switch(res_bank){
@@ -93,9 +80,9 @@ void Overlay::Tick(World & world){
 
 bool Overlay::MouseInside(World & world, Uint16 mousex, Uint16 mousey){
 	Sint16 x1, y1, x2, y2;
-	if(text){
+	if(text.length() > 0){
 		x1 = x;
-		x2 = x + (strlen(text) * textwidth);
+		x2 = x + (text.length() * textwidth);
 		y1 = y;
 		y2 = y;
 		switch(textbank){

@@ -230,8 +230,7 @@ void Team::Tick(World & world){
 					if(!user->retrieving){
 						Overlay * overlay = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
 						if(overlay){
-							overlay->text = new char[64];
-							sprintf(overlay->text, "%s", user->name);
+							overlay->text = user->name;
 							overlay->textbank = 133;
 							overlay->textwidth = 6;
 							overlay->x = 473;
@@ -241,8 +240,7 @@ void Team::Tick(World & world){
 						}
 						Overlay * leveloverlay = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
 						if(leveloverlay){
-							leveloverlay->text = new char[64];
-							sprintf(leveloverlay->text, "L:%d", user->agency[agency].level);
+							leveloverlay->text = "L:" + std::to_string(user->agency[agency].level);
 							leveloverlay->textbank = 132;
 							leveloverlay->textwidth = 4;
 							leveloverlay->effectcolor = 170;

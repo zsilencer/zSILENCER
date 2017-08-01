@@ -59,7 +59,6 @@ World::World(bool mode) : lobby(this), lagsimulator(&sockethandle), audio(Audio:
 		pinghistory[i] = 0;
 	}
 	lastpingid = 0;
-	currentmapdata = 0;
 	ClearMapData();
 	showteamcolors = false;
 	showplayerlist = false;
@@ -1019,20 +1018,14 @@ void World::ClearSnapshotQueue(void){
 }
 
 void World::ClearMapData(void){
-	if(currentmapdata){
-		delete[] currentmapdata;
-	}
-	currentmapdata = 0;
-	currentmapdatalength = 0;
-	currentmapdatamax = 0;
+	currentmapdata.clear();
 	currentmapdataprocessed = false;
 	currentmapdataend = false;
 }
 
 void World::AllocateMapData(int size){
 	ClearMapData();
-	currentmapdata = new unsigned char[size];
-	currentmapdatamax = size;
+	currentmapdata.resize(size);
 }
 
 void World::ReadPeerList(Serializer & data){
@@ -2055,11 +2048,11 @@ void World::SendMapDownloaded(void){
 void World::PutMapChunk(Uint32 offset, Peer & peer){
 	const Uint32 maxchunksize = 1024;
 	Uint32 size = maxchunksize;
-	if(size + offset > currentmapdatalength){
-		if(offset >= currentmapdatalength){
+	if(size + offset > currentmapdata.size()){
+		if(offset >= currentmapdata.size()){
 			size = 0;
 		}else{
-			size = currentmapdatalength - offset;
+			size = currentmapdata.size() - offset;
 		}
 	}
 	char data[1 + 1 + sizeof(Uint32) + sizeof(Uint32) + maxchunksize];
@@ -2097,18 +2090,17 @@ void World::StoreMapChunk(unsigned char * data, Uint32 offset, Uint32 size){
 	if(size == 0){
 		currentmapdataend = true;
 	}
-	if(offset + 1 > currentmapdatamax){
+	if(offset + 1 > currentmapdata.size()){
 		return;
 	}
-	if(size + offset > currentmapdatamax){
-		if(offset >= currentmapdatamax){
+	if(size + offset > currentmapdata.size()){
+		if(offset >= currentmapdata.size()){
 			size = 0;
 		}else{
-			size = currentmapdatamax - offset;
+			size = currentmapdata.size() - offset;
 		}
 	}
 	memcpy(&currentmapdata[offset], data, size);
-	currentmapdatalength = offset + size;
 	currentmapdataprocessed = false;
 	//printf("stored map chunk %d %d\n", offset, size);
 }

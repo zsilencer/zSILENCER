@@ -2,13 +2,13 @@
 #define SERIALIZER_H
 
 #include <string.h>
+#include <vector>
 
 class Serializer
 {
 public:
 	Serializer(unsigned int size = 1024);
 	Serializer(char * data, unsigned int size);
-	~Serializer();
 	void Resize(unsigned int newsize);
 	void Copy(Serializer & from);
 	bool MoreToRead(void);
@@ -80,7 +80,7 @@ public:
 	unsigned int readoffset;
 	
 private:
-	bool outsidedata;
+	std::vector<char> datap;
 };
 
 #endif

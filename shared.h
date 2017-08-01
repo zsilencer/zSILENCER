@@ -33,12 +33,19 @@ typedef int SOCKET;
 #include <windows.h>
 #include <direct.h>
 #undef INTERFACE
+#ifndef EADDRINUSE
 #define EADDRINUSE WSAEADDRINUSE
+#endif
+#ifndef ECONNRESET
 #define ECONNRESET WSAECONNRESET
+#endif
+#ifndef ECONNREFUSED
 #define ECONNREFUSED WSAECONNREFUSED
+#endif
 #define SHUT_RDWR SD_BOTH
-#undef errno
+#ifndef errno
 #define errno WSAGetLastError()
+#endif
 typedef int socklen_t;
 #define ioctl ioctlsocket
 #define snprintf _snprintf

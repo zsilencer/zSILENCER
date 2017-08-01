@@ -15,20 +15,12 @@ TextBox::TextBox() : Object(ObjectTypes::TEXTBOX){
 	requiresmaptobeloaded = false;
 }
 
-TextBox::~TextBox(){
-	for(std::deque<char *>::iterator it = text.begin(); it != text.end(); it++){
-		delete[] (*it);
-	}
-}
-
 void TextBox::Tick(World & world){
 	
 }
 
 void TextBox::AddLine(const char * string, Uint8 color, Uint8 brightness, bool scroll){
 	if(text.size() > maxlines){
-		char * oldstring = text.front();
-		delete[] oldstring;
 		text.pop_front();
 	}
 	if(scroll){
@@ -42,9 +34,9 @@ void TextBox::AddLine(const char * string, Uint8 color, Uint8 brightness, bool s
 	if(size * fontwidth > width){
 		size = width / fontwidth;
 	}
-	char * newstring = new char[size + 1 + 2];
+	std::vector<char> newstring(size + 1 + 2);
 	newstring[size] = 0;
-	strncpy(newstring, string, size);
+	strncpy(newstring.data(), string, size);
 	newstring[size + 1] = color;
 	newstring[size + 2] = brightness;
 	text.push_back(newstring);

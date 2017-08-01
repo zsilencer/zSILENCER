@@ -26,9 +26,6 @@ Lobby::~Lobby(){
 	LockMutex();
 	Disconnect();
 	ClearGames();
-	for(std::map<Uint32, User *>::iterator it = userinfos.begin(); it != userinfos.end(); it++){
-		delete (*it).second;
-	}
 	userinfos.clear();
 	SDL_DestroyMutex(mutex);
 }
@@ -181,9 +178,9 @@ void Lobby::DoNetwork(void){
 								case MSG_CHAT:{
 									char * channel = (char *)&msg[1];
 									char * message = (char *)&msg[1 + strlen(channel) + 1];
-									char * newmessage = new char[strlen(message) + 1 + 2];
+									std::vector<char> newmessage(strlen(message) + 1 + 2);
 									newmessage[0] = 0;
-									memcpy(newmessage, message, strlen(message) + 1 + 2);
+									memcpy(newmessage.data(), message, strlen(message) + 1 + 2);
 									chatmessages.push_back(newmessage);
 								}break;
 								case MSG_NEWGAME:{
@@ -311,9 +308,9 @@ void Lobby::DoNetwork(void){
 									data.Get(accountid);
 									data.readoffset = oldreadoffset;
 									if(!userinfos[accountid]){
-										userinfos[accountid] = new User;
+										userinfos[accountid] = std::make_shared<User>();
 									}
-									User * user = userinfos[accountid];
+									User * user = userinfos[accountid].get();
 									user->retrieving = false;
 									user->Serialize(Serializer::READ, data);
 									printf("account id = %d\n", user->accountid);
@@ -489,10 +486,10 @@ LobbyGame * Lobby::GetGameById(Uint32 id){
 }
 
 User * Lobby::GetUserInfo(Uint32 accountid){
-	User * userinfo = userinfos[accountid];
-	if(!userinfo){
-		userinfos[accountid] = new User;
-		userinfo = userinfos[accountid];
+	User * userinfo = 0;
+	if(!userinfos[accountid]){
+		userinfos[accountid] = std::make_shared<User>();
+		userinfo = userinfos[accountid].get();
 		if(state != AUTHENTICATED){
 			strcpy(userinfo->name, "Player");
 		}
@@ -513,22 +510,19 @@ User * Lobby::GetUserInfo(Uint32 accountid){
 			Uint32 index = 0xFFFFFFFF - accountid;
 			strcpy(userinfo->name, botnames[index]);
 		}
+	}else{
+		userinfo = userinfos[accountid].get();
 	}
 	return userinfo;
 }
 
 void Lobby::ForgetUserInfo(Uint32 accountid){
-	User * userinfo = userinfos[accountid];
-	if(userinfo){
+	if(userinfos[accountid]){
 		userinfos.erase(accountid);
-		delete userinfo;
 	}
 }
 
 void Lobby::ForgetAllUserInfo(void){
-	for(std::map<Uint32, User *>::iterator it = userinfos.begin(); it != userinfos.end(); it++){
-		delete (*it).second;
-	}
 	userinfos.clear();
 }
 

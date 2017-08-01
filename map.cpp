@@ -23,20 +23,11 @@
 #include "game.h"
 
 Map::Map(){
-	for(unsigned int i = 0; i < 4; i++){
-		fg[i] = 0;
-		bg[i] = 0;
-		fgflipped[i] = 0;
-		bgflipped[i] = 0;
-		fglum[i] = 0;
-		bglum[i] = 0;
-	}
 	width = 0;
 	height = 0;
 	ambience = 0;
 	memset(description, 0, sizeof(description));
 	loaded = false;
-	nodetypes = 0;
 }
 
 Map::~Map(){
@@ -177,21 +168,8 @@ bool Map::LoadFile(const char * filename, World & world, Team * team){
 		}
 		minimap.Recolor(16 * 4);
 		strcpy(Map::description, description);
-		for(unsigned int i = 0; i < 4; i++){
-			fg[i] = new Uint16[expandedwidth * expandedheight];
-			bg[i] = new Uint16[expandedwidth * expandedheight];
-			fgflipped[i] = new bool[expandedwidth * expandedheight];
-			bgflipped[i] = new bool[expandedwidth * expandedheight];
-			fglum[i] = new bool[expandedwidth * expandedheight];
-			bglum[i] = new bool[expandedwidth * expandedheight];
-			for(int j = 0; j < expandedwidth * expandedheight; j++){
-				fg[i][j] = 0;
-				bg[i][j] = 0;
-				fgflipped[i][j] = false;
-				bgflipped[i][j] = false;
-				fglum[i][j] = false;
-				bglum[i][j] = false;
-			}
+		for(size_t i = 0; i < 4; i++){
+			tiles[i].resize(expandedwidth * expandedheight);
 		}
 	}else{
 		baseambience = header.ambience;
@@ -200,17 +178,13 @@ bool Map::LoadFile(const char * filename, World & world, Team * team){
 	
 	int result;
 	unsigned int maxlevelsize = 0;
-	Uint8 * level;
+	std::vector<Uint8> level;
 	do{
 		maxlevelsize += 100000;
-		level = new Uint8[maxlevelsize];
+		level.resize(maxlevelsize);
 		unsigned long levelsizeuncompressed = maxlevelsize;
 		
-		result = uncompress(level, &levelsizeuncompressed, levelcompressed, header.levelsize);
-
-		if(result != Z_OK){
-			delete[] level;
-		}
+		result = uncompress(level.data(), &levelsizeuncompressed, levelcompressed, header.levelsize);
 	}while(result == Z_BUF_ERROR);
 	
 	if(result != Z_OK){
@@ -220,32 +194,20 @@ bool Map::LoadFile(const char * filename, World & world, Team * team){
 	unsigned int i = 0;
 	for(unsigned int y = yoffset; y < yoffset + header.height; y++){
 		for(unsigned int x = 0; x < header.width; x++){
-			bg[0][(y * expandedwidth) + x] = ((level[i + 0]) | (level[i + 1] << 8));
-			bgflipped[0][(y * expandedwidth) + x] = level[i + 2] ? true : false;
-			bglum[0][(y * expandedwidth) + x] = level[i + 3] ? true : false ;
-			bg[1][(y * expandedwidth) + x] = ((level[i + 4]) | (level[i + 5] << 8));
-			bgflipped[1][(y * expandedwidth) + x] = level[i + 6] ? true : false;
-			bglum[1][(y * expandedwidth) + x] = level[i + 7] ? true : false;
-			bg[2][(y * expandedwidth) + x] = ((level[i + 8]) | (level[i + 9] << 8));
-			bgflipped[2][(y * expandedwidth) + x] = level[i + 10] ? true : false;
-			bglum[2][(y * expandedwidth) + x] = level[i + 11] ? true : false;
-			bg[3][(y * expandedwidth) + x] = ((level[i + 12]) | (level[i + 13] << 8));
-			bgflipped[3][(y * expandedwidth) + x] = level[i + 14] ? true : false;
-			bglum[3][(y * expandedwidth) + x] = level[i + 15] ? true : false;
-			
-			fg[0][(y * expandedwidth) + x] = ((level[i + 20]) | (level[i + 21] << 8));
-			fgflipped[0][(y * expandedwidth) + x] = level[i + 22] ? true : false;
-			fglum[0][(y * expandedwidth) + x] = level[i + 23] ? true : false;
-			fg[1][(y * expandedwidth) + x] = ((level[i + 24]) | (level[i + 25] << 8));
-			fgflipped[1][(y * expandedwidth) + x] = level[i + 26] ? true : false;
-			fglum[1][(y * expandedwidth) + x] = level[i + 27] ? true : false;
-			fg[2][(y * expandedwidth) + x] = ((level[i + 28]) | (level[i + 29] << 8));
-			fgflipped[2][(y * expandedwidth) + x] = level[i + 30] ? true : false;
-			fglum[2][(y * expandedwidth) + x] = level[i + 31] ? true : false;
-			fg[3][(y * expandedwidth) + x] = ((level[i + 32]) | (level[i + 33] << 8));
-			fgflipped[3][(y * expandedwidth) + x] = level[i + 34] ? true : false;
-			fglum[3][(y * expandedwidth) + x] = level[i + 35] ? true : false;
-			i += 36;
+			size_t offset = (y * expandedwidth) + x;
+			for(size_t j = 0; j < 4; j++){
+				tiles[j][offset].bg = level[i] | (level[i + 1] << 8);
+				i += 2;
+				if(level[i++]) tiles[j][offset].bgflags |= Map::Tile::FLIPPED;
+				if(level[i++]) tiles[j][offset].bgflags |= Map::Tile::LUM;
+			}
+			i += 4;
+			for(size_t j = 0; j < 4; j++) {
+				tiles[j][offset].fg = level[i] | (level[i + 1] << 8);
+				i += 2;
+				if(level[i++]) tiles[j][offset].fgflags |= Map::Tile::FLIPPED;
+				if(level[i++]) tiles[j][offset].fgflags |= Map::Tile::LUM;
+			}
 		}
 	}
 	i = header.width * header.height * 36;
@@ -769,8 +731,8 @@ bool Map::LoadFile(const char * filename, World & world, Team * team){
 		//printf("%d (%d, %d) (%d, %d)\n", type, x1, y1, x2, y2);
 		
 		if(valid){
-			Platform * newplatform = new Platform(type, currentid, x1, y1, x2, y2);
-			platformids[currentid] = newplatform;
+			auto newplatform = std::make_shared<Platform>(Platform(type, currentid, x1, y1, x2, y2));
+			platformids[currentid] = newplatform.get();
 			platforms.push_back(newplatform);
 			currentid++;
 		}
@@ -790,44 +752,12 @@ void Map::Unload(void){
 	playerstartlocations.clear();
 	surveillancecameras.clear();
 	rainpuddlelocations.clear();
-	for(unsigned int i = 0; i < 4; i++){
-		if(fg[i]){
-			delete[] fg[i];
-			fg[i] = 0;
-		}
-		if(bg[i]){
-			delete[] bg[i];
-			bg[i] = 0;
-		}
-		if(fgflipped[i]){
-			delete[] fgflipped[i];
-			fgflipped[i] = 0;
-		}
-		if(bgflipped[i]){
-			delete[] bgflipped[i];
-			bgflipped[i] = 0;
-		}
-		if(fglum[i]){
-			delete[] fglum[i];
-			fglum[i] = 0;
-		}
-		if(bglum[i]){
-			delete[] bglum[i];
-			bglum[i] = 0;
-		}
-	}
-	for(std::vector<Platform *>::iterator i = platforms.begin(); i != platforms.end(); i++){
-		delete (*i);
+	for(size_t i = 0; i < 4; i++){
+		tiles[i].clear();
 	}
 	platforms.clear();
-	for(std::vector<PlatformSet *>::iterator i = platformsets.begin(); i != platformsets.end(); i++){
-		delete (*i);
-	}
 	platformsets.clear();
-	if(nodetypes){
-		delete[] nodetypes;
-		nodetypes = 0;
-	}
+	nodetypes.clear();
 }
 
 void Map::MiniMapCoords(int & x, int & y){
@@ -854,11 +784,11 @@ void Map::RandomPlayerStartLocation(World & world, Sint16 & x, Sint16 & y){
 
 void Map::CalculateRainPuddleLocations(void){
 	for(unsigned int i = 0 ; i < platforms.size(); i++){
-		Platform * platform = platforms[i];
+		auto platform = platforms[i];
 		if(platform->type == Platform::RECTANGLE){
 			for(int x = platform->x1 + 8; x < platform->x2 - 32; x += 32){
 				if(TestAABB(x, platform->y1, x + 32, platform->y1, Platform::OUTSIDEROOM)){
-					if(!TestAABB(x, platform->y1, x + 32, platform->y1, Platform::RECTANGLE | Platform::STAIRSUP | Platform::STAIRSDOWN, platform)){
+					if(!TestAABB(x, platform->y1, x + 32, platform->y1, Platform::RECTANGLE | Platform::STAIRSUP | Platform::STAIRSDOWN, platform.get())){
 						XY xy;
 						xy.x = x;
 						xy.y = platform->y1 - 4;
@@ -883,32 +813,32 @@ void Map::CalculateAdjacentPlatforms(void){
 							if(!platforms[i]->adjacentl){
 								if(platforms[j]->x2 == platforms[i]->x1 && platforms[j]->y1 == platforms[i]->y1){
 									if(!TestAABB(platforms[j]->x2, platforms[j]->y1 - 1, platforms[j]->x2, platforms[j]->y1 - 1, Platform::RECTANGLE)){
-										platforms[i]->adjacentl = platforms[j];
+										platforms[i]->adjacentl = platforms[j].get();
 									}
 								}
 							}
 							if(!platforms[i]->adjacentr){
 								if(platforms[j]->x1 == platforms[i]->x2 && platforms[j]->y1 == platforms[i]->y1){
 									if(!TestAABB(platforms[j]->x1, platforms[j]->y1 - 1, platforms[j]->x1, platforms[j]->y1 - 1, Platform::RECTANGLE)){
-										platforms[i]->adjacentr = platforms[j];
+										platforms[i]->adjacentr = platforms[j].get();
 									}
 								}
 							}
 						break;
 						case Platform::STAIRSUP:
 							if(platforms[j]->x2 == platforms[i]->x1 && platforms[j]->y1 == platforms[i]->y1){
-								platforms[i]->adjacentl = platforms[j];
+								platforms[i]->adjacentl = platforms[j].get();
 							}
 							if(platforms[j]->x1 == platforms[i]->x2 && platforms[j]->y2 == platforms[i]->y1){
-								platforms[i]->adjacentr = platforms[j];
+								platforms[i]->adjacentr = platforms[j].get();
 							}
 						break;
 						case Platform::STAIRSDOWN:
 							if(platforms[j]->x2 == platforms[i]->x1 && platforms[j]->y2 == platforms[i]->y1){
-								platforms[i]->adjacentl = platforms[j];
+								platforms[i]->adjacentl = platforms[j].get();
 							}
 							if(platforms[j]->x1 == platforms[i]->x2 && platforms[j]->y1 == platforms[i]->y1){
-								platforms[i]->adjacentr = platforms[j];
+								platforms[i]->adjacentr = platforms[j].get();
 							}
 						break;
 					}
@@ -920,29 +850,29 @@ void Map::CalculateAdjacentPlatforms(void){
 						case Platform::RECTANGLE:
 							if(!platforms[i]->adjacentl){
 								if(platforms[j]->x2 == platforms[i]->x1 && platforms[j]->y1 == platforms[i]->y2){
-									platforms[i]->adjacentl = platforms[j];
+									platforms[i]->adjacentl = platforms[j].get();
 								}
 							}
 							if(!platforms[i]->adjacentr){
 								if(platforms[j]->x1 == platforms[i]->x2 && platforms[j]->y1 == platforms[i]->y1){
-									platforms[i]->adjacentr = platforms[j];
+									platforms[i]->adjacentr = platforms[j].get();
 								}
 							}
 						break;
 						case Platform::STAIRSUP:
 							if(platforms[j]->x2 == platforms[i]->x1 && platforms[j]->y1 == platforms[i]->y2){
-								platforms[i]->adjacentl = platforms[j];
+								platforms[i]->adjacentl = platforms[j].get();
 							}
 							if(platforms[j]->x1 == platforms[i]->x2 && platforms[j]->y2 == platforms[i]->y1){
-								platforms[i]->adjacentr = platforms[j];
+								platforms[i]->adjacentr = platforms[j].get();
 							}
 						break;
 						case Platform::STAIRSDOWN:
 							if(platforms[j]->x2 == platforms[i]->x1 && platforms[j]->y2 == platforms[i]->y2){
-								platforms[i]->adjacentl = platforms[j];
+								platforms[i]->adjacentl = platforms[j].get();
 							}
 							if(platforms[j]->x1 == platforms[i]->x2 && platforms[j]->y1 == platforms[i]->y1){
-								platforms[i]->adjacentr = platforms[j];
+								platforms[i]->adjacentr = platforms[j].get();
 							}
 						break;
 					}
@@ -954,29 +884,29 @@ void Map::CalculateAdjacentPlatforms(void){
 						case Platform::RECTANGLE:
 							if(!platforms[i]->adjacentl){
 								if(platforms[j]->x2 == platforms[i]->x1 && platforms[j]->y1 == platforms[i]->y1){
-									platforms[i]->adjacentl = platforms[j];
+									platforms[i]->adjacentl = platforms[j].get();
 								}
 							}
 							if(!platforms[i]->adjacentr){
 								if(platforms[j]->x1 == platforms[i]->x2 && platforms[j]->y1 == platforms[i]->y2){
-									platforms[i]->adjacentr = platforms[j];
+									platforms[i]->adjacentr = platforms[j].get();
 								}
 							}
 						break;
 						case Platform::STAIRSUP:
 							if(platforms[j]->x2 == platforms[i]->x1 && platforms[j]->y1 == platforms[i]->y1){
-								platforms[i]->adjacentl = platforms[j];
+								platforms[i]->adjacentl = platforms[j].get();
 							}
 							if(platforms[j]->x1 == platforms[i]->x2 && platforms[j]->y2 == platforms[i]->y2){
-								platforms[i]->adjacentr = platforms[j];
+								platforms[i]->adjacentr = platforms[j].get();
 							}
 						break;
 						case Platform::STAIRSDOWN:
 							if(platforms[j]->x2 == platforms[i]->x1 && platforms[j]->y2 == platforms[i]->y1){
-								platforms[i]->adjacentl = platforms[j];
+								platforms[i]->adjacentl = platforms[j].get();
 							}
 							if(platforms[j]->x1 == platforms[i]->x2 && platforms[j]->y1 == platforms[i]->y2){
-								platforms[i]->adjacentr = platforms[j];
+								platforms[i]->adjacentr = platforms[j].get();
 							}
 						break;
 					}
@@ -994,15 +924,15 @@ void Map::CalculatePlatformSets(void){
 			case Platform::STAIRSDOWN:
 				Platform & leftmost = GetLeftmostPlatform(*platforms[i]);
 				if(!leftmost.set){
-					PlatformSet * platformset = new PlatformSet;
-					Platform * platform = &leftmost;
+					auto platformset = std::make_shared<PlatformSet>();
+					auto platform = &leftmost;
 					do{
 						if(platform->set){
 							break;
 						}
 						platformset->platforms.push_back(platform);
 						platformset->length += platform->GetLength();
-						platform->set = platformset;
+						platform->set = platformset.get();
 						platform = platform->adjacentr;
 					}while(platform);
 					platformsets.push_back(platformset);
@@ -1012,7 +942,7 @@ void Map::CalculatePlatformSets(void){
 	}
 	for(unsigned int i = 0 ; i < platforms.size(); i++){
 		if(platforms[i]->type == Platform::LADDER){
-			Platform * ladder = platforms[i];
+			Platform * ladder = platforms[i].get();
 			Sint16 center = abs(ladder->x2 - ladder->x1) + ladder->x1;
 			Platform * top = TestAABB(center, ladder->y1, center, ladder->y1, Platform::RECTANGLE);
 			if(top){
@@ -1037,10 +967,7 @@ void Map::CalculatePlatformSetConnections(void){
 }
 
 void Map::CalculateNodes(void){
-	if(nodetypes){
-		delete nodetypes;
-	}
-	nodetypes = new Uint8[expandedwidth * expandedheight];
+	nodetypes.resize(expandedwidth * expandedheight);
 	for(int y = 0; y < expandedheight; y++){
 		for(int x = 0; x < expandedwidth; x++){
 			Platform * platform = TestAABB((x * 64) + 16, (y * 64) + 16, (x * 64) + 48, (y * 64) + 48, Platform::RECTANGLE | Platform::STAIRSDOWN | Platform::STAIRSUP | Platform::LADDER);
@@ -1089,8 +1016,8 @@ Platform & Map::GetRightmostPlatform(Platform & platform){
 
 std::vector<Platform *> Map::LaddersToPlatform(PlatformSet & from, PlatformSet & to){
 	std::vector<Platform *> ladders;
-	for(std::vector<Platform *>::iterator it = from.ladders.begin(); it != from.ladders.end(); it++){
-		Platform * ladder = *it;
+	for(auto it = from.ladders.begin(); it != from.ladders.end(); it++){
+		auto ladder = *it;
 		std::vector<Platform *>::iterator found = std::find(to.ladders.begin(), to.ladders.end(), ladder);
 		if(found != to.ladders.end()){
 			ladders.push_back(ladder);
@@ -1100,11 +1027,11 @@ std::vector<Platform *> Map::LaddersToPlatform(PlatformSet & from, PlatformSet &
 }
 
 Platform * Map::TestAABB(int x1, int y1, int x2, int y2, Uint8 type, Platform * except, bool ignorethin){
-	for(std::vector<Platform *>::iterator i = platforms.begin(); i != platforms.end(); i++){
-		Platform * platform = (*i);
-		if(platform != except){
-			if(TestAABB(x1, y1, x2, y2, platform, type, ignorethin)){
-				return platform;
+	for(auto i = platforms.begin(); i != platforms.end(); i++){
+		auto platform = (*i);
+		if(platform.get() != except){
+			if(TestAABB(x1, y1, x2, y2, platform.get(), type, ignorethin)){
+				return platform.get();
 			}
 		}
 	}
@@ -1166,8 +1093,8 @@ Platform * Map::TestLine(int x1, int y1, int x2, int y2, int * xe, int * ye, Uin
 	// platform and must only be used for finding collision/distance when they are not touching.
 	Platform * hit = 0;
 	int xe1 = 0, ye1 = 0;
-	for(std::vector<Platform *>::iterator i = platforms.begin(); i != platforms.end(); i++){
-		Platform * platform = (*i);
+	for(auto i = platforms.begin(); i != platforms.end(); i++){
+		Platform * platform = i->get();
 		if(TestAABB(x1, y1, x2, y2, platform, type)){ // broadphase
 			float x[4], y[4], xed = x2, yed = y2;
 			int segments = 0;
@@ -1216,8 +1143,8 @@ Platform * Map::TestLine(int x1, int y1, int x2, int y2, int * xe, int * ye, Uin
 Platform * Map::TestIncr(int x1, int y1, int x2, int y2, int * xv, int * yv, Uint8 type, Platform * except, bool ignorethin){
 	// broadphase
 	std::vector<Platform *> test;
-	for(std::vector<Platform *>::iterator i = platforms.begin(); i != platforms.end(); i++){
-		Platform * platform = (*i);
+	for(auto i = platforms.begin(); i != platforms.end(); i++){
+		Platform * platform = i->get();
 		if(platform == except){
 			continue;
 		}
@@ -1415,7 +1342,7 @@ bool Map::LineSegmentIntersection(float Ax, float Ay, float Bx, float By, float 
 	return true;
 }
 
-bool Map::CompareType(Platform * a, Platform * b){
+bool Map::CompareType(std::shared_ptr<Platform> a, std::shared_ptr<Platform> b){
 	if((a->type == Platform::STAIRSDOWN || a->type == Platform::STAIRSUP) && (b->type != Platform::STAIRSDOWN && b->type != Platform::STAIRSUP)){
 		return true;
 	}

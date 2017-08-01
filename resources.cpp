@@ -3,42 +3,15 @@
 #include "game.h"
 
 Resources::Resources(){
-	spritebank.assign(256, std::vector<Surface *>(256, (Surface *)0));
-	tilebank.assign(256, std::vector<Surface *>(256, (Surface *)0));
-	tileflippedbank.assign(256, std::vector<Surface *>(256, (Surface *)0));
+	spritebank.assign(256, std::vector<std::shared_ptr<Surface>>(256, std::make_shared<Surface>(0, 0)));
+	tilebank.assign(256, std::vector<std::shared_ptr<Surface>>(256, std::make_shared<Surface>(0, 0)));
+	tileflippedbank.assign(256, std::vector<std::shared_ptr<Surface>>(256, std::make_shared<Surface>(0, 0)));
 	spriteoffsetx.assign(256, std::vector<int>(256, 0));
 	spriteoffsety.assign(256, std::vector<int>(256, 0));
 	spritewidth.assign(256, std::vector<unsigned int>(256, 0));
 	spriteheight.assign(256, std::vector<unsigned int>(256, 0));
 	menumusic = 0;
 	gamemusic = 0;
-}
-
-Resources::~Resources(){
-	for(std::vector<std::vector<Surface *> >::iterator it = spritebank.begin(); it != spritebank.end(); it++){
-		for(std::vector<Surface *>::iterator ij = (*it).begin(); ij != (*it).end(); ij++){
-			if(*ij && *ij != (Surface *)true){
-				delete *ij;
-				*ij = 0;
-			}
-		}
-	}
-	for(std::vector<std::vector<Surface *> >::iterator it = tilebank.begin(); it != tilebank.end(); it++){
-		for(std::vector<Surface *>::iterator ij = (*it).begin(); ij != (*it).end(); ij++){
-			if(*ij){
-				delete *ij;
-				*ij = 0;
-			}
-		}
-	}
-	for(std::vector<std::vector<Surface *> >::iterator it = tileflippedbank.begin(); it != tileflippedbank.end(); it++){
-		for(std::vector<Surface *>::iterator ij = (*it).begin(); ij != (*it).end(); ij++){
-			if(*ij){
-				delete *ij;
-				*ij = 0;
-			}
-		}
-	}
 }
 
 bool Resources::Load(Game & game, bool dedicatedserver){
@@ -85,13 +58,13 @@ bool Resources::LoadSprites(Game & game, bool dedicatedserver){
 					spritewidth[i][j] = width;
 					spriteheight[i][j] = height;
 					if(dedicatedserver){
-						spritebank[i][j] = (Surface *)true;
+						spritebank[i][j] = std::make_shared<Surface>(0, 0);;
 						continue;
 					}
 					Uint32 size = SDL_SwapLE32(((Uint32 *)header2)[(j * 86) + 3]);
 					Uint8 offsets = ((Uint8 *)header2)[(j * 344) + 20];
-					Uint8 * data = new Uint8[size];
-					Uint8 * decompressed = new Uint8[width * height];
+					std::vector<Uint8> data(size);
+					std::vector<Uint8> decompressed(width * height);
 					if(offsets){
 						Uint32 tempvalue = 0;
 						Uint32 count = 0;
@@ -108,7 +81,7 @@ bool Resources::LoadSprites(Game & game, bool dedicatedserver){
 								for(unsigned int y = y2 * 64; y < ymax; y++){
 									for(unsigned int x = x2 * 64; x < xmax; x += 4){
 										if(count){
-											((Uint32 *)decompressed)[((y * width) / 4) + (x / 4)] = SDL_SwapLE32(tempvalue);
+											((Uint32 *)decompressed.data())[((y * width) / 4) + (x / 4)] = SDL_SwapLE32(tempvalue);
 											count -= 4;
 										}else{
 											SDL_RWread(file2, &tempvalue, sizeof(Uint32), 1);
@@ -119,35 +92,34 @@ bool Resources::LoadSprites(Game & game, bool dedicatedserver){
 												tempvalue |= tempvalue >> 16;
 												count -= 4;
 											}
-											((Uint32 *)decompressed)[((y * width) / 4) + (x / 4)] = SDL_SwapLE32(tempvalue);
+											((Uint32 *)decompressed.data())[((y * width) / 4) + (x / 4)] = SDL_SwapLE32(tempvalue);
 										}
 									}
 								}
 							}
 						}
 					}else{
-						SDL_RWread(file2, data, size, 1);
+						SDL_RWread(file2, data.data(), size, 1);
 						for(unsigned int j = 0, k = 0; j < size / 4; j++, k++){
-							Uint32 tempvalue = SDL_SwapLE32(((Uint32 *)data)[j]);
+							Uint32 tempvalue = SDL_SwapLE32(((Uint32 *)data.data())[j]);
 							if(tempvalue >= 0xFF000000){
 								Uint32 count = tempvalue & 0x0000FFFF;
 								tempvalue &= 0x00FF0000;
 								tempvalue |= tempvalue << 8;
 								tempvalue |= tempvalue >> 16;
 								while(count){
-									((Uint32 *)decompressed)[k] = SDL_SwapLE32(tempvalue);
+									((Uint32 *)decompressed.data())[k] = SDL_SwapLE32(tempvalue);
 									count -= 4;
 									k++;
 								}
 								k--;
 							}else{
-								((Uint32 *)decompressed)[k] = SDL_SwapLE32(tempvalue);
+								((Uint32 *)decompressed.data())[k] = SDL_SwapLE32(tempvalue);
 							}
 						}
 					}
-					Uint8 * sprite = new Uint8[width * height];
-					memcpy(sprite, decompressed, width * height);
-					Surface * surface = new Surface(width, height);
+					std::vector<Uint8> sprite(width * height);
+					memcpy(sprite.data(), decompressed.data(), width * height);
 					unsigned int paletteoffset = 0;
 					switch(i){
 						case 0:
@@ -169,12 +141,10 @@ bool Resources::LoadSprites(Game & game, bool dedicatedserver){
 							paletteoffset = 2;
 						break;
 					}
-					spritebank[i][j] = surface;
-					memcpy(surface->pixels, sprite, width * height);
+					spritebank[i][j] = std::make_shared<Surface>(width, height);
+					Surface * surface = spritebank[i][j].get();
+					memcpy(surface->pixels.data() , sprite.data(), width * height);
 					RLESurface(surface);
-					delete[] sprite;
-					delete[] data;
-					delete[] decompressed;
 				}
 				SDL_RWclose(file2);
 			}else{
@@ -210,40 +180,38 @@ bool Resources::LoadTiles(Game & game, bool dedicatedserver){
 			if(file2){
 				Uint8 header2[(12 * 256) + 4];
 				SDL_RWread(file2, header2, (12 * headers[i][2]) + 4, 1);
-				Uint8 * data = new Uint8[64 * 64 * 256];
-				size_t datasize = SDL_RWread(file2, data, 1, 64 * 64 * 256);
-				Uint8 * decompressed = new Uint8[64 * 64 * 256];
+				std::vector<Uint8> data(64 * 64 * 256);
+				size_t datasize = SDL_RWread(file2, data.data(), 1, data.size());
+				std::vector<Uint8> decompressed(64 * 64 * 256);
 				for(unsigned int j = 0, k = 0; j < datasize / 4; j++, k++){
-					Uint32 tempvalue = SDL_SwapLE32(((Uint32 *)data)[j]);
+					Uint32 tempvalue = SDL_SwapLE32(((Uint32 *)data.data())[j]);
 					if(tempvalue >= 0xFF000000){
 						Uint32 count = tempvalue & 0x0000FFFF;
 						tempvalue &= 0x00FF0000;
 						tempvalue |= tempvalue << 8;
 						tempvalue |= tempvalue >> 16;
 						while(count){
-							((Uint32 *)decompressed)[k] = SDL_SwapLE32(tempvalue);
+							((Uint32 *)decompressed.data())[k] = SDL_SwapLE32(tempvalue);
 							count -= 4;
 							k++;
 						}
 						k--;
 					}else{
-						((Uint32 *)decompressed)[k] = SDL_SwapLE32(tempvalue);
+						((Uint32 *)decompressed.data())[k] = SDL_SwapLE32(tempvalue);
 					}
 				}
 				for(unsigned int j = 0; j < headers[i][2]; j++){
 					Uint8 tile[64 * 64];
-					memcpy(tile, decompressed + (j * 64 * 64), sizeof(tile));
-					Surface * surface = new Surface(64, 64);
-					tilebank[i][j] = surface;
-					memcpy(surface->pixels, tile, 64 * 64);
-					RLESurface(tilebank[i][j]);
-					tileflippedbank[i][j] = new Surface(64, 64);
-					memcpy(tileflippedbank[i][j]->pixels, surface->pixels, surface->w * surface->h);
-					MirrorY(tileflippedbank[i][j]);
-					RLESurface(tileflippedbank[i][j]);
+					memcpy(tile, decompressed.data() + (j * 64 * 64), sizeof(tile));
+					tilebank[i][j] = std::make_shared<Surface>(64, 64);
+					Surface * surface = tilebank[i][j].get();
+					memcpy(surface->pixels.data(), tile, 64 * 64);
+					RLESurface(tilebank[i][j].get());
+					tileflippedbank[i][j] = std::make_shared<Surface>(64, 64);
+					memcpy(tileflippedbank[i][j]->pixels.data(), surface->pixels.data(), surface->w * surface->h);
+					MirrorY(tileflippedbank[i][j].get());
+					RLESurface(tileflippedbank[i][j].get());
 				}
-				delete[] data;
-				delete[] decompressed;
 				SDL_RWclose(file2);
 			}else{
 				printf("Could not open %s %d\n", filename, errno);
@@ -326,9 +294,9 @@ bool Resources::LoadSounds(Game & game, bool dedicatedserver){
 		int memsize = sizeof(header) + length;
 		memcpy(&header[4], &lengthplus, sizeof(lengthplus));
 		memcpy(&header[sizeof(header) - 4], &lengthminus, sizeof(lengthminus));
-		Uint8 * mem = new Uint8[memsize];
-		memset(mem, 0, memsize);
-		memcpy(mem, header, sizeof(header));
+		std::vector<Uint8> mem(memsize);
+		memset(mem.data(), 0, memsize);
+		memcpy(mem.data(), header, sizeof(header));
 		
 		SDL_RWseek(file, sizeof(numsounds) + sizeof(soundssize) + (numsounds * sizeof(soundheader)) + offset, RW_SEEK_SET);
 		SDL_RWread(file, &mem[sizeof(header)], length, 1);
@@ -338,8 +306,7 @@ bool Resources::LoadSounds(Game & game, bool dedicatedserver){
 		fwrite(&mem[sizeof(header)], 1, length, file2);
 		fclose(file2);*/
 		
-		Mix_Chunk * chunk = Mix_LoadWAV_RW(SDL_RWFromConstMem(mem, memsize), true);
-		delete[] mem;
+		Mix_Chunk * chunk = Mix_LoadWAV_RW(SDL_RWFromConstMem(mem.data(), mem.size()), true);
 		if(!chunk){
 			printf("Could not load sound %s - %s\n", name, Mix_GetError());
 			SDL_RWclose(file);
@@ -387,16 +354,17 @@ void Resources::UnloadSounds(void){
 
 void Resources::MirrorY(Surface * surface){
     Surface newsurface(surface->w, surface->h);
-	memcpy(newsurface.pixels, surface->pixels, surface->w * surface->h);
+	memcpy(newsurface.pixels.data(), surface->pixels.data(), surface->w * surface->h);
     for(int y = 0; y < surface->h; y++){
         for(int x = 0; x < surface->w; x++){
-            ((Uint8 *)surface->pixels)[x + (y * surface->w)] = ((Uint8 *)newsurface.pixels)[(y * surface->w) + (surface->w - (x + 1))];
+            ((Uint8 *)surface->pixels.data())[x + (y * surface->w)] = ((Uint8 *)newsurface.pixels.data())[(y * surface->w) + (surface->w - (x + 1))];
         }
     }
 }
 
 void Resources::RLESurface(Surface * surface){
-	Uint8 *rlebuf, *dst;
+	Uint8 *dst;
+	std::vector<Uint8> rlebuf;
 	int maxn;
 	int y;
 	Uint8 *srcbuf, *curbuf, *lastline;
@@ -412,14 +380,14 @@ void Resources::RLESurface(Surface * surface){
 	 starting with an opaque pixel */
 	maxsize = surface->h * 3 * (surface->w / 2 + 1) + 2;
 
-	rlebuf = new Uint8[maxsize];
+	rlebuf.resize(maxsize);
 
 	/* Set up the conversion */
-	srcbuf = (Uint8 *) surface->pixels;
+	srcbuf = (Uint8 *) surface->pixels.data();
 	curbuf = srcbuf;
 	maxn = 255;
 	skip = run = 0;
-	dst = rlebuf;
+	dst = rlebuf.data();
 	rgbmask = 0xFF;//~surface->format->Amask;
 	ckey = 0;
 	lastline = dst;
@@ -487,11 +455,8 @@ void Resources::RLESurface(Surface * surface){
 	#undef ADD_COUNTS
 
 	/* realloc the buffer to release unused memory */
-	int newsize = dst - rlebuf;
-	Uint8 * newbuf = new Uint8[newsize];
-	memcpy(newbuf, rlebuf, newsize);
-	delete[] rlebuf;
-	surface->rlepixels = newbuf;
+	int newsize = dst - rlebuf.data();
+	surface->rlepixels.assign(rlebuf.data(), rlebuf.data() + newsize);
 	//delete[] surface->pixels;
 	//surface->pixels = 0;
 }

@@ -7,6 +7,7 @@
 #include "user.h"
 #include <list>
 #include <map>
+#include <memory>
 
 class Lobby
 {
@@ -40,7 +41,7 @@ public:
 	Uint8 creategamestatus;
 	Uint32 createdgameid;
 	Uint8 connectgamestatus;
-	std::list<char *> chatmessages;
+	std::list<std::vector<char>> chatmessages;
 	std::list<LobbyGame *> games;
 	bool gamesprocessed;
 	char channel[64];
@@ -71,7 +72,7 @@ private:
 	unsigned int sendbufferoffset;
 	static const unsigned int maxusername = 16;
 	World * world;
-	std::map<Uint32, User *> userinfos;
+	std::map<Uint32, std::shared_ptr<User>> userinfos;
 };
 
 #endif

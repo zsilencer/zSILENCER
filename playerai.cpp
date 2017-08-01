@@ -151,10 +151,10 @@ bool PlayerAI::CreatePathToPlatformSet(World & world, std::deque<PlatformSet *> 
 		if(platformset == &to){
 			return true;
 		}else{
-			for(std::vector<PlatformSet *>::iterator it = world.map.platformsets.begin(); it != world.map.platformsets.end(); it++){
-				if(std::find(path.begin(), path.end(), (*it)) == path.end()){
+			for(auto it = world.map.platformsets.begin(); it != world.map.platformsets.end(); it++){
+				if(std::find(path.begin(), path.end(), it->get()) == path.end()){
 					if(FindAnyLink(world, *platformset, *(*it))){
-						path.push_back((*it));
+						path.push_back(it->get());
 						if(CreatePathToPlatformSet(world, path, to)){
 							return true;
 						}

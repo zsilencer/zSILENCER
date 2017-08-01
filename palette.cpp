@@ -3,43 +3,32 @@
 
 Palette::Palette(){
 	currentpalette = 0;
-	for(int i = 0; i < 11; i++){
-		brightness[i] = 0;
-		colored[i] = 0;
-		alphaed[i] = 0;
-	}
 }
 
 Palette::~Palette(){
 	for(int i = 0; i < 11; i++){
-		if(brightness[i]){
-			delete[] brightness[i];
-		}
-		if(colored[i]){
-			delete[] colored[i];
-		}
-		if(alphaed[i]){
-			delete[] alphaed[i];
-		}
+		brightness[i].clear();
+		colored[i].clear();
+		alphaed[i].clear();
 	}
 }
 
 bool Palette::Load(void){
-	if(!brightness[currentpalette]){
-		brightness[currentpalette] = new Uint8[256 * 256];
-		memset(brightness[currentpalette], 0, 256 * 256);
+	if(brightness[currentpalette].size() == 0){
+		brightness[currentpalette].resize(256 * 256);
+		memset(brightness[currentpalette].data(), 0, 256 * 256);
 	}
-	if(!colored[currentpalette]){
-		colored[currentpalette] = new Uint8[256 * 256];
-		memset(colored[currentpalette], 0, 256 * 256);
+	if(colored[currentpalette].size() == 0){
+		colored[currentpalette].resize(256 * 256);
+		memset(colored[currentpalette].data(), 0, 256 * 256);
 	}
-	if(!alphaed[currentpalette]){
-		alphaed[currentpalette] = new Uint8[256 * 256];
-		memset(alphaed[currentpalette], 0, 256 * 256);
+	if(alphaed[currentpalette].size() == 0){
+		alphaed[currentpalette].resize(256 * 256);
+		memset(alphaed[currentpalette].data(), 0, 256 * 256);
 	}
-	currentalphaedpalette = alphaed[currentpalette];
-	currentbrightnesspalette = brightness[currentpalette];
-	currentcoloredpalette = colored[currentpalette];
+	currentalphaedpalette = &alphaed[currentpalette];
+	currentbrightnesspalette = &brightness[currentpalette];
+	currentcoloredpalette = &colored[currentpalette];
 	char filename[256];
 	sprintf(filename, "PALETTECALC%d.BIN", currentpalette);
 	/*system("rm PALETTECALC0.BIN");
@@ -112,9 +101,9 @@ bool Palette::SetPalette(Uint8 palette){
 		return false;
 	}
 	currentpalette = palette;
-	currentalphaedpalette = alphaed[currentpalette];
-	currentbrightnesspalette = brightness[currentpalette];
-	currentcoloredpalette = colored[currentpalette];
+	currentalphaedpalette = &alphaed[currentpalette];
+	currentbrightnesspalette = &brightness[currentpalette];
+	currentcoloredpalette = &colored[currentpalette];
 	return Load();
 }
 

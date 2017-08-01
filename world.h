@@ -5,6 +5,7 @@
 #include <list>
 #include <map>
 #include <deque>
+#include <vector>
 #include "peer.h"
 #include "object.h"
 #include "sprite.h"
@@ -228,9 +229,7 @@ private:
 	bool intutorialmode;
 	Uint32 randomseed;
 	class Replay replay;
-	unsigned char * currentmapdata;
-	Uint32 currentmapdatalength;
-	Uint32 currentmapdatamax;
+	std::vector<unsigned char> currentmapdata;
 	bool currentmapdataprocessed;
 	bool currentmapdataend;
 	bool showteamcolors;

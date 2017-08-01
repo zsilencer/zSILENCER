@@ -4,8 +4,8 @@ Serializer::Serializer(unsigned int size){
 	offset = 0;
 	readoffset = 0;
 	Serializer::size = size;
-	data = new char[size];
-	outsidedata = false;
+	datap.resize(size);
+	data = datap.data();
 }
 
 Serializer::Serializer(char * data, unsigned int size){
@@ -13,23 +13,18 @@ Serializer::Serializer(char * data, unsigned int size){
 	readoffset = 0;
 	Serializer::data = data;
 	Serializer::size = size;
-	outsidedata = true;
-}
-
-Serializer::~Serializer(){
-	if(!outsidedata){
-		delete[] data;
-	}
 }
 
 void Serializer::Resize(unsigned int newsize){
-	char * newdata = new char[newsize];
-	memcpy(newdata, data, BitsToBytes(offset));
-	if(!outsidedata){
-		delete[] data;
+	bool copy = false;
+	if(data != datap.data()){
+		copy = true;
 	}
-	outsidedata = false;
-	data = newdata;
+	datap.resize(newsize);
+	if(copy){
+		memcpy(datap.data(), data, newsize);
+	}
+	data = datap.data();
 	size = newsize;
 }
 
