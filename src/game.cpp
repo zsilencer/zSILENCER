@@ -171,11 +171,11 @@ bool Game::Load(char * cmdline){
 		return false;
 	}
 	int mixinitted;
-	if((mixinitted = Mix_Init(MIX_INIT_MP3 | MIX_INIT_MOD | MIX_INIT_MODPLUG)) == -1){
+	if((mixinitted = Mix_Init(MIX_INIT_MP3 | MIX_INIT_MOD )) == -1){
 		printf("Could not initialize SDL_mixer %s\n", Mix_GetError());
 		return false;
 	}
-	if(!(mixinitted & MIX_INIT_MOD) && !(mixinitted & MIX_INIT_MODPLUG)){
+	if(!(mixinitted & MIX_INIT_MOD) && !(mixinitted & MIX_INIT_MOD)){
 		printf("Could not initialize MOD support %s\n", Mix_GetError());
 	}
 	if(!(mixinitted & MIX_INIT_MP3)){
