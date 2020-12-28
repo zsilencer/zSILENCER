@@ -175,7 +175,7 @@ bool Game::Load(char * cmdline){
 		printf("Could not initialize SDL_mixer %s\n", Mix_GetError());
 		return false;
 	}
-	if(!(mixinitted & MIX_INIT_MOD) && !(mixinitted & MIX_INIT_MOD)){
+	if(!(mixinitted & MIX_INIT_MOD)){
 		printf("Could not initialize MOD support %s\n", Mix_GetError());
 	}
 	if(!(mixinitted & MIX_INIT_MP3)){
